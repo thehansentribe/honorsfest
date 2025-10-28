@@ -45,7 +45,7 @@ async function startServer() {
     initializeDatabase();
     app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
-      console.log(`Login with: admin / password123`);
+      console.log(`Database initialized`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

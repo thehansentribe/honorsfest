@@ -39,7 +39,7 @@ npm install
 cp .env.example .env
 ```
 
-4. Seed the database with honors:
+4. Seed the database with honors and create admin user:
 ```bash
 npm run seed
 ```
@@ -49,12 +49,32 @@ npm run seed
 npm run dev
 ```
 
-6. Open your browser to `http://localhost:3000`
+## Initial Setup
 
-## Default Credentials
-
+After seeding the database, you'll have a default admin account:
 - **Username**: `admin`
 - **Password**: `password123`
+
+**Important**: Change this password immediately after first login!
+
+## Production Deployment
+
+### Deploy to Render.com (Recommended)
+
+1. Push this repository to GitHub
+2. Go to [Render.com](https://render.com)
+3. Create a New Web Service
+4. Connect your GitHub repository
+5. Configure environment variables:
+   - `JWT_SECRET`: Generate a secure random string (32+ characters)
+   - `NODE_ENV`: Set to `production`
+6. Set the build command: `npm install`
+7. Set the start command: `node src/server.js`
+8. Deploy!
+
+The database will be automatically created on first run.
+
+6. Open your browser to `http://localhost:3000`
 
 ## Project Structure
 

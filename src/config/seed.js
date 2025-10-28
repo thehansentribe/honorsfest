@@ -63,7 +63,7 @@ function seedDatabase() {
       const birthDate = new Date(new Date().getFullYear() - 99, 0, 1).toISOString().split('T')[0];
       
       insertUser.run('System', 'Administrator', 'admin', birthDate, passwordHash, 'Admin', 1, 1);
-      console.log('Created default admin user: admin / password123');
+      console.log('Created default admin user');
     } else {
       console.log('Admin user already exists');
       
