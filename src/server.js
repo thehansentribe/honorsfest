@@ -44,6 +44,10 @@ async function startServer() {
   try {
     initializeDatabase();
     
+    // Run migrations
+    const { migrateDatabase } = require('./config/migrate');
+    migrateDatabase();
+    
     // Check if we need to seed the database
     const { db } = require('./config/db');
     const userCount = db.prepare('SELECT COUNT(*) as count FROM Users').get();
