@@ -16,7 +16,7 @@ function initializeDatabase() {
         FirstName TEXT NOT NULL,
         LastName TEXT NOT NULL,
         Username TEXT UNIQUE NOT NULL,
-        Age INTEGER NOT NULL,
+        DateOfBirth TEXT,
         Email TEXT,
         Phone TEXT,
         PasswordHash TEXT NOT NULL,
