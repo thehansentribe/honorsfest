@@ -79,11 +79,17 @@ function seedDatabase() {
     console.log('Database seeding completed successfully');
   } catch (error) {
     console.error('Error seeding database:', error);
-    process.exit(1);
-  } finally {
-    db.close();
+    // Don't exit the process if called from server startup
+    if (require.main === module) {
+      process.exit(1);
+    }
   }
 }
 
-seedDatabase();
+// Only run if called directly, not when required by another module
+if (require.main === module) {
+  seedDatabase();
+}
+
+module.exports = { seedDatabase };
 

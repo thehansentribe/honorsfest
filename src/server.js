@@ -43,8 +43,21 @@ app.get('*', (req, res) => {
 async function startServer() {
   try {
     initializeDatabase();
+    
+    // Check if we need to seed the database
+    const { db } = require('./config/db');
+    const userCount = db.prepare('SELECT COUNT(*) as count FROM Users').get();
+    
+    if (userCount.count === 0) {
+      console.log('Database is empty, running seed script...');
+      const { seedDatabase } = require('./config/seed');
+      if (typeof seedDatabase === 'function') {
+        seedDatabase();
+      }
+    }
+    
     app.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
+      console.log(`Server running on port ${PORT}`);
       console.log(`Database initialized`);
     });
   } catch (error) {
