@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Honors Festival - Dashboard</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <h1>Redirecting to dashboard...</h1>
+  <script src="/js/utils.js"></script>
+  <script>
+    // Redirect to appropriate dashboard based on user role
+    if (!checkAuth()) {
+      window.location.href = '/login.html';
+    } else {
+      const user = getCurrentUser();
+      redirectToDashboard(user.role);
+    }
+  </script>
+</body>
+</html>
+
+

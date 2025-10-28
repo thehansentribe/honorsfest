@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Club Director Dashboard - Honors Festival</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="top-banner">
+    <h1>Club Director Dashboard</h1>
+    <div class="user-info">
+      <span id="userName">Welcome, <strong id="userDisplayName"></strong></span>
+      <button onclick="logout()" class="btn btn-outline">Logout</button>
+    </div>
+  </div>
+
+  <div id="eventStatusBanner" style="display: none;" class="status-banner status-banner-closed">
+    <strong>⚠ Registration Closed:</strong> The event registration is currently closed. You can view users and classes but cannot add or remove students from classes.
+  </div>
+
+  <div class="container">
+    <div class="tabs">
+      <button class="tab active" data-tab="users" onclick="switchTab('users', this)">Users</button>
+      <button class="tab" data-tab="classes" onclick="switchTab('classes', this)">Classes</button>
+      <button class="tab" data-tab="codes" onclick="switchTab('codes', this)">Registration Codes</button>
+      <button class="tab" data-tab="reports" onclick="switchTab('reports', this)">Reports</button>
+    </div>
+
+    <div id="content">
+      <div class="card">
+        <p class="text-center">Loading dashboard...</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/utils.js"></script>
+  <script src="/js/clubdirector-dashboard.js"></script>
+  <script src="/js/admin-dashboard.js"></script>
+</body>
+</html>
+
+

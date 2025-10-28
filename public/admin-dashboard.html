@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - Honors Festival</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="top-banner">
+    <h1>Honors Festival - Admin Dashboard</h1>
+    <div class="user-info">
+      <span id="eventName" class="event-info"></span>
+      <span id="userName">Welcome, <strong id="userDisplayName"></strong></span>
+      <button onclick="logout()" class="btn btn-outline">Logout</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('events', this)">Events</button>
+      <button class="tab" onclick="switchTab('users', this)">Users</button>
+      <button class="tab" onclick="switchTab('locations', this)">Class Locations</button>
+      <button class="tab" onclick="switchTab('timeslots', this)">Timeslots</button>
+      <button class="tab" onclick="switchTab('clubs', this)">Clubs</button>
+      <button class="tab" onclick="switchTab('classes', this)">Classes</button>
+      <button class="tab" onclick="switchTab('reports', this)">Reports</button>
+    </div>
+
+    <div id="content">
+      <div class="card">
+        <p class="text-center">Admin dashboard content - Full implementation in separate JS file</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/utils.js"></script>
+  <script src="/js/admin-dashboard.js"></script>
+</body>
+</html>
+

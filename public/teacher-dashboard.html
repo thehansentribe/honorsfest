@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teacher Dashboard - Honors Festival</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="top-banner">
+    <h1>Teacher Dashboard</h1>
+    <div class="user-info">
+      <span id="userName">Welcome, <strong id="userDisplayName"></strong></span>
+      <button onclick="logout()" class="btn btn-outline">Logout</button>
+    </div>
+  </div>
+
+  <div id="eventStatusBanner" style="display: none;" class="status-banner status-banner-closed">
+    <strong>⚠ Event Closed:</strong> Registration is closed for this event. You can view class rosters but registrations cannot be modified.
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">My Classes</h2>
+      </div>
+      <div id="myClasses">
+        <p class="text-center">Loading...</p>
+      </div>
+    </div>
+
+    <div class="card" id="rosterCard" style="display: none;">
+      <div class="card-header">
+        <h2 class="card-title">Class Roster</h2>
+      </div>
+      <div id="roster">
+        <p class="text-center">Select a class to view roster</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/utils.js"></script>
+  <script>
+    let currentUserId = null;
+    let myClasses = [];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!checkAuth()) return;
+
+      const user = getCurrentUser();
+      currentUserId = user.id;
+      document.getElementById('userDisplayName').textContent = `${user.firstName} ${user.lastName}`;
+
+      await checkEventStatus();
+      await loadMyClasses();
+    });
+
+    async function checkEventStatus() {
+      try {
+        const response = await fetch('/api/events/current/status');
+        const data = await response.json();
+        
+        const banner = document.getElementById('eventStatusBanner');
+        if (data.status === 'Closed') {
+          banner.style.display = 'block';
+        } else {
+          banner.style.display = 'none';
+        }
+      } catch (error) {
+        console.error('Error checking event status:', error);
+      }
+    }
+
+    async function loadMyClasses() {
+      try {
+        const eventsResponse = await fetchWithAuth('/api/events');
+        const events = await eventsResponse.json();
+        const activeEvent = events.find(e => e.Status === 'Live') || events[0];
+
+        if (!activeEvent) {
+          document.getElementById('myClasses').innerHTML = '<p>No active events</p>';
+          return;
+        }
+
+        const classesResponse = await fetchWithAuth(`/api/classes/${activeEvent.ID}?teacherId=${currentUserId}`);
+        myClasses = await classesResponse.json();
+
+        renderClasses();
+      } catch (error) {
+        console.error('Error loading classes:', error);
+        document.getElementById('myClasses').innerHTML = '<p>Error loading classes</p>';
+      }
+    }
+
+    function renderClasses() {
+      const container = document.getElementById('myClasses');
+
+      if (myClasses.length === 0) {
+        container.innerHTML = '<p class="text-center">No classes assigned</p>';
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="form-group">
+          <label for="classSelect">Select Class:</label>
+          <select id="classSelect" class="form-control" onchange="loadRoster(this.value)">
+            <option value="">-- Select a class --</option>
+            ${myClasses.map(c => `<option value="${c.ID}">${c.HonorName} - ${c.TimeslotDate} ${c.TimeslotStartTime}</option>`).join('')}
+          </select>
+        </div>
+      `;
+    }
+
+    async function loadRoster(classId) {
+      if (!classId) return;
+
+      try {
+        const response = await fetchWithAuth(`/api/registrations/class/${classId}/roster`);
+        const roster = await response.json();
+
+        const rosterCard = document.getElementById('rosterCard');
+        const rosterContainer = document.getElementById('roster');
+
+        rosterCard.style.display = 'block';
+        rosterContainer.innerHTML = `
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Student Name</th>
+                <th>Investiture Level</th>
+                <th>Attended</th>
+                <th>Completed</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${roster.map(student => `
+                <tr>
+                  <td>${student.FirstName} ${student.LastName}</td>
+                  <td>${student.InvestitureLevel || 'None'}</td>
+                  <td>
+                    <input type="checkbox" ${student.Attended ? 'checked' : ''} 
+                      onchange="updateAttendance(${classId}, ${student.UserID}, 'Attended', this.checked)">
+                  </td>
+                  <td>
+                    <input type="checkbox" ${student.Completed ? 'checked' : ''}
+                      onchange="updateAttendance(${classId}, ${student.UserID}, 'Completed', this.checked)">
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } catch (error) {
+        console.error('Error loading roster:', error);
+      }
+    }
+
+    async function updateAttendance(classId, userId, field, value) {
+      try {
+        const updateData = {};
+        updateData[field] = value;
+
+        const response = await fetchWithAuth(`/api/attendance/${classId}/${userId}`, {
+          method: 'PUT',
+          body: JSON.stringify(updateData)
+        });
+
+        if (response.ok) {
+          showNotification('Attendance updated', 'success');
+        }
+      } catch (error) {
+        console.error('Error updating attendance:', error);
+        showNotification('Error updating attendance', 'error');
+      }
+    }
+  </script>
+</body>
+</html>
+
+

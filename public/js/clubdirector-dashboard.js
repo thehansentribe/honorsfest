@@ -1,0 +1,928 @@
+// Club Director Dashboard - Uses Admin Dashboard Code with Filters
+// Wrapped in IIFE to avoid variable conflicts with admin-dashboard.js
+(function() {
+'use strict';
+
+let clubDirectorTab = 'users';
+let clubDirectorClubId = null;
+let clubDirectorEventId = null;
+let clubDirectorUser = null;
+let clubDirectorUsers = [];
+let clubDirectorEvents = [];
+let clubDirectorClasses = [];
+
+// Define functions BEFORE they're called in DOMContentLoaded
+
+// Override switchTab
+function clubdirectorSwitchTab(tabName, clickedElement = null) {
+  clubDirectorTab = tabName;
+  
+  // Update tab UI
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  
+  if (clickedElement) {
+    clickedElement.classList.add('active');
+  }
+  
+  // Load tab content
+  const content = document.getElementById('content');
+  
+  switch(tabName) {
+    case 'users':
+      content.innerHTML = getUsersTab();
+      renderUsers();
+      break;
+    case 'classes':
+      content.innerHTML = getClassesTabClubDirector();
+      renderClasses();
+      break;
+    case 'codes':
+      content.innerHTML = getCodesTab();
+      renderCodes();
+      break;
+    case 'reports':
+      content.innerHTML = getReportsTab();
+      break;
+  }
+}
+
+// Get Users Tab HTML for Club Director
+function getUsersTab() {
+  return `
+    <div class="card">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <h2 class="card-title" style="margin: 0;">Users in Your Club</h2>
+        <button onclick="showCreateUserForm()" class="btn btn-primary">Add User</button>
+      </div>
+      <div id="usersList">
+        <p class="text-center">Loading users...</p>
+      </div>
+    </div>
+  `;
+}
+
+// Get Classes Tab HTML for Club Director
+function getClassesTabClubDirector() {
+  return `
+    <div class="card">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <h2 class="card-title" style="margin: 0;">Classes</h2>
+        <button onclick="showCreateClassForm()" class="btn btn-primary" id="createClassBtn">Create Class</button>
+      </div>
+      <div id="classesList">
+        <p class="text-center">Loading classes...</p>
+      </div>
+    </div>
+  `;
+}
+
+// Get Registration Codes Tab HTML for Club Director
+function getCodesTab() {
+  return `
+    <div class="card">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <h2 class="card-title" style="margin: 0;">Registration Codes</h2>
+        <button onclick="generateRegistrationCode()" class="btn btn-primary">Generate New Code</button>
+      </div>
+      <div id="codesList">
+        <p class="text-center">Loading codes...</p>
+      </div>
+    </div>
+  `;
+}
+
+// Get Reports Tab HTML for Club Director
+function getReportsTab() {
+  return `
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Reports for Your Event</h2>
+      </div>
+      <select id="reportEventFilter" class="form-control mb-2" style="pointer-events: none; background-color: #f0f0f0;" disabled>
+        <option value="${clubDirectorEventId}">${clubDirectorEvents.find(e => e.ID === parseInt(clubDirectorEventId))?.Name || 'Your Event'}</option>
+      </select>
+      <button id="generateReportBtn" onclick="generateReport()" class="btn btn-primary">Generate CSV Report</button>
+    </div>
+  `;
+}
+
+// Override renderUsers
+function renderUsers() {
+  const container = document.getElementById('usersList');
+  if (!container) return;
+  
+  if (clubDirectorUsers.length === 0) {
+    container.innerHTML = '<p class="text-center">No users in your club yet. Create your first user!</p>';
+    return;
+  }
+  
+  container.innerHTML = `
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Username</th>
+          <th>Role</th>
+          <th>Club</th>
+          <th>Age (DOB)</th>
+          <th>Active</th>
+          <th>BG Check</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${clubDirectorUsers.map(user => `
+          <tr>
+            <td>${user.FirstName} ${user.LastName}</td>
+            <td>${user.Username}</td>
+            <td>${user.Role}</td>
+            <td>${user.ClubName ? `<strong>${user.ClubName}</strong>` : '<span style="color: #d32f2f;">None</span>'}</td>
+            <td>${user.Age !== null ? user.Age : 'N/A'}</td>
+            <td>${user.Active ? 'Yes' : 'No'}</td>
+            <td>${user.BackgroundCheck ? '✓' : '-'}</td>
+            <td>
+              <button onclick="editUser(${user.ID})" class="btn btn-sm btn-secondary">Edit</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+// Helper function for time conversion
+function convertTo12Hour(time24) {
+  if (!time24) return '';
+  const [hours, minutes] = time24.split(':');
+  const hour = parseInt(hours);
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  return `${hour12}:${minutes} ${period}`;
+}
+
+// Override renderClasses to filter by their club's event
+async function renderClasses() {
+  const container = document.getElementById('classesList');
+  if (!container) {
+    console.error('Classes list container not found');
+    return;
+  }
+  
+  if (!clubDirectorEventId) {
+    container.innerHTML = '<p class="text-center">No event assigned to your club</p>';
+    return;
+  }
+  
+  try {
+    console.log('Loading classes for event:', clubDirectorEventId);
+    const response = await fetchWithAuth(`/api/classes/${clubDirectorEventId}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to load classes: ${response.status}`);
+    }
+    
+    clubDirectorClasses = await response.json();
+    
+    console.log(`Loaded ${clubDirectorClasses.length} classes`);
+    
+    // Filter out inactive classes for Club Directors
+    const activeClasses = clubDirectorClasses.filter(c => c.Active);
+    
+    if (activeClasses.length === 0) {
+      container.innerHTML = '<p class="text-center">No active classes found for this event</p>';
+      return;
+    }
+    
+    container.innerHTML = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width: 20%; padding: 12px 8px;">Honor</th>
+            <th style="width: 15%; padding: 12px 8px;">Teacher</th>
+            <th style="width: 15%; padding: 12px 8px;">Location</th>
+            <th style="width: 18%; padding: 12px 8px;">Date/Time</th>
+            <th style="width: 12%; padding: 12px 8px;">Capacity</th>
+            <th style="width: 10%; padding: 12px 8px;">Enrolled</th>
+            <th style="width: 10%; padding: 12px 8px;">Status</th>
+            <th style="width: 10%; padding: 12px 8px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${activeClasses.map(cls => `
+          <tr style="border-bottom: 1px solid #e0e0e0;">
+            <td style="padding: 12px 8px;"><strong>${cls.HonorName || 'N/A'}</strong></td>
+            <td style="padding: 12px 8px;">${cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
+            <td style="padding: 12px 8px;">${cls.LocationName || 'N/A'}</td>
+            <td style="padding: 12px 8px;">
+              ${cls.TimeslotDate || 'N/A'}<br>
+              <small style="color: var(--text-light);">${cls.TimeslotStartTime ? convertTo12Hour(cls.TimeslotStartTime) : ''} - ${cls.TimeslotEndTime ? convertTo12Hour(cls.TimeslotEndTime) : ''}</small>
+            </td>
+            <td style="padding: 12px 8px;">${cls.EnrolledCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}</td>
+            <td style="padding: 12px 8px; text-align: center;">${cls.EnrolledCount || 0}</td>
+            <td style="padding: 12px 8px; text-align: center;"><span class="badge bg-success">Active</span></td>
+            <td style="padding: 12px 8px; text-align: center;">
+              <button onclick="viewClassStudents(${cls.ID})" class="btn btn-sm btn-info">View Students</button>
+              <button onclick="editClass(${cls.ID})" class="btn btn-sm btn-secondary">Edit</button>
+            </td>
+          </tr>
+        `).join('')}
+        </tbody>
+      </table>
+    `;
+  } catch (error) {
+    console.error('Error loading classes:', error);
+    container.innerHTML = `<p class="text-center" style="color: red;">Error loading classes: ${error.message}</p>`;
+    showNotification('Error loading classes', 'error');
+  }
+}
+
+// Override loadEvents to only load their event
+async function loadEvents() {
+  try {
+    const response = await fetchWithAuth('/api/events');
+    clubDirectorEvents = await response.json();
+    
+    // Filter to only their event
+    if (clubDirectorEventId) {
+      clubDirectorEvents = clubDirectorEvents.filter(e => e.ID === parseInt(clubDirectorEventId));
+    }
+    
+    // No need to populate event filters for Club Directors
+    // They only see their own event
+    console.log(`Loaded ${clubDirectorEvents.length} events for Club Director`);
+  } catch (error) {
+    console.error('Error loading events:', error);
+  }
+}
+
+// Override loadUsers to load ONLY users from the director's club
+async function loadUsers() {
+  try {
+    // Club Directors ONLY see users from their own club
+    const queryParams = new URLSearchParams();
+    if (clubDirectorClubId) {
+      queryParams.append('clubId', clubDirectorClubId);
+    }
+    
+    const response = await fetchWithAuth(`/api/users?${queryParams.toString()}`);
+    clubDirectorUsers = await response.json();
+    
+    console.log(`Loaded ${clubDirectorUsers.length} users from club ${clubDirectorClubId}`);
+    
+    // Now trigger renderUsers if tab is active
+    if (clubDirectorTab === 'users') {
+      renderUsers();
+    }
+  } catch (error) {
+    console.error('Error loading users:', error);
+    showNotification('Error loading users', 'error');
+  }
+}
+
+// Override showCreateUserForm to prefill club and event
+function showCreateUserFormClubDirector() {
+  const modal = document.createElement('div');
+  modal.id = 'createUserModal';
+  modal.className = 'modal';
+  modal.style.display = 'flex';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Add User to Your Club</h2>
+        <button onclick="closeModal('createUserModal')" class="btn btn-outline">×</button>
+      </div>
+      <form id="createUserForm" onsubmit="handleCreateUser(event)">
+        <input type="hidden" id="clubId" name="clubId" value="${clubDirectorClubId}">
+        <input type="hidden" id="eventId" name="eventId" value="${clubDirectorEventId}">
+        <div class="form-group">
+          <label for="firstName">First Name *</label>
+          <input type="text" id="firstName" name="firstName" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label for="lastName">Last Name *</label>
+          <input type="text" id="lastName" name="lastName" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label for="dateOfBirth">Date of Birth *</label>
+          <input type="date" id="dateOfBirth" name="dateOfBirth" class="form-control" required>
+          <small style="color: var(--text-light);">Age will be calculated automatically</small>
+        </div>
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" class="form-control">
+        </div>
+        <div class="form-group">
+          <label for="phone">Phone</label>
+          <input type="text" id="phone" name="phone" class="form-control">
+        </div>
+        <div class="form-group">
+          <label for="role">Role *</label>
+          <select id="role" name="role" class="form-control" required>
+            <option value="">Select Role</option>
+            <option value="Student">Student</option>
+            <option value="Teacher">Teacher</option>
+            <option value="Staff">Staff</option>
+          </select>
+          <small style="color: var(--text-light);">Club Directors can only add Students, Teachers, and Staff</small>
+        </div>
+        <div class="form-group">
+          <label for="investitureLevel">Investiture Level</label>
+          <select id="investitureLevel" name="investitureLevel" class="form-control">
+            <option value="None">None</option>
+            <option value="Friend">Friend</option>
+            <option value="Companion">Companion</option>
+            <option value="Explorer">Explorer</option>
+            <option value="Ranger">Ranger</option>
+            <option value="Voyager">Voyager</option>
+            <option value="Guide">Guide</option>
+            <option value="MasterGuide">Master Guide</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="password">Password *</label>
+          <input type="password" id="password" name="password" class="form-control" required>
+          <small style="color: var(--text-light);">Default: password123</small>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Create User</button>
+          <button type="button" onclick="closeModal('createUserModal')" class="btn btn-outline">Cancel</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+// Override edit user to prevent club/event changes
+function editUserClubDirector(userId) {
+  const user = clubDirectorUsers.find(u => u.ID === userId);
+  if (!user) return;
+  
+  const modal = document.createElement('div');
+  modal.id = 'editUserModal';
+  modal.className = 'modal';
+  modal.style.display = 'flex';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Edit User</h2>
+        <button onclick="closeModal('editUserModal')" class="btn btn-outline">×</button>
+      </div>
+      <form id="editUserForm" data-user-id="${userId}" onsubmit="handleEditUser(event, ${userId})">
+        <input type="hidden" id="editClubId" name="editClubId" value="${clubDirectorClubId}">
+        <input type="hidden" id="editEventId" name="editEventId" value="${clubDirectorEventId}">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" value="${user.Username}" class="form-control" disabled>
+        </div>
+        <div class="form-group">
+          <label for="editFirstName">First Name *</label>
+          <input type="text" id="editFirstName" name="editFirstName" class="form-control" value="${user.FirstName}" required>
+        </div>
+        <div class="form-group">
+          <label for="editLastName">Last Name *</label>
+          <input type="text" id="editLastName" name="editLastName" class="form-control" value="${user.LastName}" required>
+        </div>
+        <div class="form-group">
+          <label for="editDateOfBirth">Date of Birth *</label>
+          <input type="date" id="editDateOfBirth" name="editDateOfBirth" class="form-control" value="${user.DateOfBirth || ''}" required>
+          ${user.Age !== null ? `<small style="color: var(--text-light);">Current age: ${user.Age}</small>` : ''}
+        </div>
+        <div class="form-group">
+          <label for="editEmail">Email</label>
+          <input type="email" id="editEmail" name="editEmail" class="form-control" value="${user.Email || ''}">
+        </div>
+        <div class="form-group">
+          <label for="editPhone">Phone</label>
+          <input type="text" id="editPhone" name="editPhone" class="form-control" value="${user.Phone || ''}">
+        </div>
+        <div class="form-group">
+          <label for="editRole">Role *</label>
+          <select id="editRole" name="editRole" class="form-control" required>
+            <option value="Student" ${user.Role === 'Student' ? 'selected' : ''}>Student</option>
+            <option value="Teacher" ${user.Role === 'Teacher' ? 'selected' : ''}>Teacher</option>
+            <option value="Staff" ${user.Role === 'Staff' ? 'selected' : ''}>Staff</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="editInvestitureLevel">Investiture Level</label>
+          <select id="editInvestitureLevel" name="editInvestitureLevel" class="form-control">
+            <option value="None" ${user.InvestitureLevel === 'None' ? 'selected' : ''}>None</option>
+            <option value="Friend" ${user.InvestitureLevel === 'Friend' ? 'selected' : ''}>Friend</option>
+            <option value="Companion" ${user.InvestitureLevel === 'Companion' ? 'selected' : ''}>Companion</option>
+            <option value="Explorer" ${user.InvestitureLevel === 'Explorer' ? 'selected' : ''}>Explorer</option>
+            <option value="Ranger" ${user.InvestitureLevel === 'Ranger' ? 'selected' : ''}>Ranger</option>
+            <option value="Voyager" ${user.InvestitureLevel === 'Voyager' ? 'selected' : ''}>Voyager</option>
+            <option value="Guide" ${user.InvestitureLevel === 'Guide' ? 'selected' : ''}>Guide</option>
+            <option value="MasterGuide" ${user.InvestitureLevel === 'MasterGuide' ? 'selected' : ''}>Master Guide</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="editPassword">New Password</label>
+          <input type="password" id="editPassword" name="editPassword" class="form-control">
+          <small style="color: var(--text-light);">Leave blank to keep current password</small>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Update User</button>
+          <button type="button" onclick="closeModal('editUserModal')" class="btn btn-outline">Cancel</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+// Override showCreateClassForm for Club Directors - filter teachers by club
+async function showCreateClassFormClubDirector() {
+  const eventId = clubDirectorEventId;
+  
+  if (!eventId) {
+    showNotification('No event assigned to your club', 'error');
+    return;
+  }
+  
+  // Load honors, timeslots for Club Directors (no locations - admins set those)
+  const [honorsRes, timeslotsRes] = await Promise.all([
+    fetchWithAuth('/api/classes/honors'),
+    fetchWithAuth(`/api/events/${eventId}/timeslots`)
+  ]);
+  
+  const honors = await honorsRes.json();
+  const timeslots = await timeslotsRes.json();
+  
+  // Load teachers from the same club
+  const teachersResponse = await fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Teacher`);
+  const teachers = await teachersResponse.json();
+  
+  console.log(`Loaded ${teachers.length} teachers from club ${clubDirectorClubId}`);
+  
+  const modal = document.createElement('div');
+  modal.id = 'createClassModal';
+  modal.className = 'modal';
+  modal.style.display = 'flex';
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+      <div class="modal-header">
+        <h2>Create New Class</h2>
+        <button onclick="closeModal('createClassModal')" class="btn btn-outline">×</button>
+      </div>
+      <form id="createClassForm" onsubmit="handleCreateClass(event)">
+        <div class="form-group">
+          <label for="classHonor">Honor *</label>
+          <select id="classHonor" name="classHonor" class="form-control" required>
+            <option value="">Select Honor</option>
+            ${honors.map(h => `<option value="${h.ID}">${h.Name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="classTeacher">Teacher * (Only teachers from your club)</label>
+          <select id="classTeacher" name="classTeacher" class="form-control" required>
+            <option value="">Select Teacher</option>
+            ${teachers.map(t => `<option value="${t.ID}">${t.FirstName} ${t.LastName}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="classMaxCapacity">Max Capacity *</label>
+          <input type="number" id="classMaxCapacity" name="classMaxCapacity" class="form-control" min="1" required>
+          <small style="color: var(--text-light);">Admin will assign location later</small>
+        </div>
+        <div class="form-group">
+          <label>Select Timeslots (Sessions) for this Class *</label>
+          <div style="border: 1px solid #ddd; padding: 15px; border-radius: 5px; max-height: 300px; overflow-y: auto;">
+            ${timeslots.map(slot => `
+              <label style="display: block; padding: 8px; margin-bottom: 4px; border: 1px solid #eee; border-radius: 3px; cursor: pointer; transition: background 0.2s;" 
+                     onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background='white'">
+                <input type="checkbox" name="classTimeslots" value="${slot.ID}" style="margin-right: 8px;">
+                <strong>${convertTo12Hour(slot.StartTime)} - ${convertTo12Hour(slot.EndTime)}</strong> on ${slot.Date}
+              </label>
+            `).join('')}
+          </div>
+          <small style="color: var(--text-light); display: block; margin-top: 5px;">Select all timeslots (sessions) when this class will be offered</small>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Create Class</button>
+          <button type="button" onclick="closeModal('createClassModal')" class="btn btn-outline">Cancel</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+// Now the DOMContentLoaded handler
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!checkAuth()) {
+    window.location.href = '/login.html';
+    return;
+  }
+
+  const user = getCurrentUser();
+  
+  // Only run for Club Directors
+  if (user.role !== 'ClubDirector') {
+    return;
+  }
+  
+  clubDirectorUser = user;
+  document.getElementById('userDisplayName').textContent = `${user.firstName} ${user.lastName}`;
+
+  // Get the director's club and event from JWT
+  clubDirectorClubId = user.clubId;
+  clubDirectorEventId = user.eventId;
+  
+  console.log('Club Director logged in - ClubID:', clubDirectorClubId, 'EventID:', clubDirectorEventId);
+
+  // Get club info to confirm event
+  if (clubDirectorClubId) {
+    try {
+      const clubResponse = await fetchWithAuth(`/api/clubs/details/${clubDirectorClubId}`);
+      const club = await clubResponse.json();
+      if (club) {
+        clubDirectorEventId = club.EventID;
+      }
+    } catch (error) {
+      console.error('Error loading club:', error);
+    }
+  }
+
+  // Check event status and show banner if closed
+  await checkEventStatus();
+  
+  // Load data
+  await loadEvents();
+  await loadUsers();
+  
+  // Override functions - expose to window so they can be called from HTML
+  window.switchTab = clubdirectorSwitchTab;
+  window.showCreateUserForm = showCreateUserFormClubDirector;
+  window.editUser = editUserClubDirector;
+  window.showCreateClassForm = showCreateClassFormClubDirector;
+  
+  // Override editClass to use clubDirectorClasses array
+  window.editClass = async function editClassClubDirector(classId) {
+    const cls = clubDirectorClasses.find(c => c.ID === classId);
+    if (!cls) return;
+    
+    const eventId = clubDirectorEventId;
+    
+    // Load honors, teachers, locations for dropdowns
+    const [honorsRes, locationsRes, teachersRes] = await Promise.all([
+      fetchWithAuth('/api/classes/honors'),
+      fetchWithAuth(`/api/events/${eventId}/locations`),
+      fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Teacher`)
+    ]);
+    
+    const honors = await honorsRes.json();
+    const locations = await locationsRes.json();
+    const teachers = await teachersRes.json();
+    
+    const modal = document.createElement('div');
+    modal.id = 'editClassModal';
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+      <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+          <h2>Edit Class</h2>
+          <button onclick="closeModal('editClassModal')" class="btn btn-outline">×</button>
+        </div>
+        <form id="editClassForm" onsubmit="handleEditClass(${classId})">
+          <div class="form-group">
+            <label>Honor</label>
+            <input type="text" value="${cls.HonorName || 'Unknown'}" class="form-control" disabled>
+            <small style="color: var(--text-light);">Cannot change honor after creation</small>
+          </div>
+          <div class="form-group">
+            <label for="editClassTeacher">Teacher</label>
+            <select id="editClassTeacher" name="editClassTeacher" class="form-control">
+              <option value="">Unassigned</option>
+              ${teachers.map(t => `<option value="${t.ID}" ${cls.TeacherID === t.ID ? 'selected' : ''}>${t.FirstName} ${t.LastName}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="editClassLocation">Location</label>
+            <select id="editClassLocation" name="editClassLocation" class="form-control">
+              <option value="">No Location</option>
+              ${locations.map(l => `<option value="${l.ID}" ${cls.LocationID === l.ID ? 'selected' : ''}>${l.Name} (Capacity: ${l.MaxCapacity})</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="editClassMaxCapacity">Max Capacity</label>
+            <input type="number" id="editClassMaxCapacity" name="editClassMaxCapacity" class="form-control" min="1" value="${cls.TeacherMaxStudents || cls.MaxCapacity}">
+            <small style="color: var(--text-light);">Will be limited by location capacity</small>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Update Class</button>
+            <button type="button" onclick="closeModal('editClassModal')" class="btn btn-outline">Cancel</button>
+          </div>
+        </form>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    
+    // Handle form submission
+    document.getElementById('editClassForm').onsubmit = async function(e) {
+      e.preventDefault();
+      const form = e.target;
+      
+      const classData = {
+        TeacherID: form.editClassTeacher?.value || null,
+        LocationID: form.editClassLocation?.value || null,
+        TeacherMaxStudents: parseInt(form.editClassMaxCapacity?.value) || 0
+      };
+      
+      try {
+        const response = await fetchWithAuth(`/api/classes/${classId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(classData)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+          showNotification('Class updated successfully', 'success');
+          closeModal('editClassModal');
+          await renderClasses(); // Reload classes list
+        } else {
+          showNotification(result.error || 'Error updating class', 'error');
+        }
+      } catch (error) {
+        showNotification('Error updating class: ' + error.message, 'error');
+      }
+    };
+  };
+  
+  // Override handleCreateClass for Club Directors - NO location field
+  window.handleCreateClass = async function handleCreateClassClubDirector(e) {
+    e.preventDefault();
+    const form = e.target;
+    
+    const selectedTimeslots = Array.from(form.querySelectorAll('input[name="classTimeslots"]:checked')).map(cb => cb.value);
+    
+    if (selectedTimeslots.length === 0) {
+      showNotification('Please select at least one timeslot (session) for this class', 'error');
+      return;
+    }
+    
+    const classData = {
+      EventID: clubDirectorEventId, // Use the director's event
+      HonorID: form.classHonor?.value,
+      TeacherID: form.classTeacher?.value,
+      LocationID: null, // Club Directors don't set location - admins do this
+      TeacherMaxStudents: parseInt(form.classMaxCapacity?.value) || 0
+    };
+    
+    if (!classData.HonorID || !classData.TeacherID || !classData.TeacherMaxStudents) {
+      showNotification('Please fill in all required fields', 'error');
+      return;
+    }
+    
+    try {
+      // Create a separate class for each selected timeslot
+      const results = [];
+      for (const timeslotId of selectedTimeslots) {
+        const classDataForTimeslot = {
+          ...classData,
+          TimeslotID: timeslotId
+        };
+        
+        const response = await fetchWithAuth(`/api/classes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(classDataForTimeslot)
+        });
+        
+        const result = await response.json();
+        results.push(result);
+      }
+      
+      if (results.length > 0 && results[0].ID) {
+        showNotification(`Created ${results.length} class session(s) successfully. Admin will assign location later.`, 'success');
+        closeModal('createClassModal');
+        await renderClasses(); // Reload classes list
+      } else {
+        showNotification('Error creating classes', 'error');
+      }
+    } catch (error) {
+      showNotification('Error creating class: ' + error.message, 'error');
+    }
+  };
+  
+  // Expose handleCreateUser and handleEditUser
+  window.handleCreateUser = async function handleCreateUserClubDirector(e) {
+    e.preventDefault();
+    const form = e.target;
+    
+    const userData = {
+      FirstName: form.firstName?.value?.trim() || '',
+      LastName: form.lastName?.value?.trim() || '',
+      DateOfBirth: form.dateOfBirth?.value || '',
+      Email: form.email?.value?.trim() || null,
+      Phone: form.phone?.value?.trim() || null,
+      Role: form.role?.value || '',
+      InvestitureLevel: form.investitureLevel?.value || 'None',
+      EventID: form.eventId?.value || null,
+      ClubID: form.clubId?.value || null,
+      Password: form.password?.value || 'password123',
+      BackgroundCheck: form.backgroundCheck?.checked || false
+    };
+
+    // Validate
+    if (!userData.FirstName || !userData.LastName || !userData.DateOfBirth || !userData.Role) {
+      showNotification('Please fill in all required fields', 'error');
+      return;
+    }
+
+    try {
+      const response = await fetchWithAuth('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        showNotification('User created successfully', 'success');
+        closeModal('createUserModal');
+        await loadUsers(); // Load ONLY club users
+      } else {
+        showNotification(result.error || 'Error creating user', 'error');
+      }
+    } catch (error) {
+      showNotification('Error creating user: ' + error.message, 'error');
+    }
+  };
+  
+  window.handleEditUser = async function handleEditUserClubDirector(e, userId) {
+    e.preventDefault();
+    const form = e.target;
+    
+    const userData = {
+      FirstName: form.editFirstName?.value?.trim() || '',
+      LastName: form.editLastName?.value?.trim() || '',
+      DateOfBirth: form.editDateOfBirth?.value || '',
+      Email: form.editEmail?.value?.trim() || null,
+      Phone: form.editPhone?.value?.trim() || null,
+      Role: form.editRole?.value || '',
+      InvestitureLevel: form.editInvestitureLevel?.value || 'None',
+      ClubID: form.editClubId?.value || null,
+      EventID: form.editEventId?.value || null,
+      Password: form.editPassword?.value || null
+    };
+
+    // Validate
+    if (!userData.FirstName || !userData.LastName || !userData.DateOfBirth || !userData.Role) {
+      showNotification('Please fill in all required fields', 'error');
+      return;
+    }
+
+    // If password provided, add it to update
+    if (userData.Password) {
+      userData.Password = userData.Password;
+    } else {
+      delete userData.Password;
+    }
+
+    try {
+      const response = await fetchWithAuth(`/api/users/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        showNotification('User updated successfully', 'success');
+        closeModal('editUserModal');
+        await loadUsers(); // Load ONLY club users
+      } else {
+        showNotification(result.error || 'Error updating user', 'error');
+      }
+    } catch (error) {
+      showNotification('Error updating user: ' + error.message, 'error');
+    }
+  };
+  
+  // Registration code functions
+  async function renderCodes() {
+    const container = document.getElementById('codesList');
+    if (!container) return;
+    
+    container.innerHTML = '<p class="text-center">Loading codes...</p>';
+    
+    try {
+      console.log('Fetching codes for club:', clubDirectorClubId);
+      const response = await fetchWithAuth(`/api/codes/club/${clubDirectorClubId}`);
+      const codes = await response.json();
+      
+      console.log('Received codes:', codes);
+      
+      if (!codes || codes.length === 0) {
+        container.innerHTML = '<p class="text-center">No registration codes yet. Generate your first code!</p>';
+        return;
+      }
+      
+      container.innerHTML = `
+        <table class="data-table" style="width: 100%;">
+          <thead>
+            <tr>
+              <th style="padding: 12px 8px; text-align: left;">Code</th>
+              <th style="padding: 12px 8px; text-align: left;">Created</th>
+              <th style="padding: 12px 8px; text-align: left;">Expires</th>
+              <th style="padding: 12px 8px; text-align: left;">Status</th>
+              <th style="padding: 12px 8px; text-align: center;">Copy</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${codes.map(code => `
+              <tr style="border-bottom: 1px solid #e0e0e0;">
+                <td style="padding: 12px 8px;"><strong>${code.Code}</strong></td>
+                <td style="padding: 12px 8px;">${new Date(code.CreatedAt).toLocaleDateString()}</td>
+                <td style="padding: 12px 8px;">${new Date(code.ExpiresAt).toLocaleDateString()}</td>
+                <td style="padding: 12px 8px;">
+                  ${new Date(code.ExpiresAt) > new Date()
+                    ? '<span class="badge bg-success">Active</span>' 
+                    : '<span class="badge bg-danger">Expired</span>'
+                  }
+                </td>
+                <td style="padding: 12px 8px; text-align: center;">
+                  <button onclick="copyRegistrationCode('${code.Code}')" class="btn btn-sm btn-primary">Copy</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    } catch (error) {
+      console.error('Error loading codes:', error);
+      container.innerHTML = `<p class="text-center" style="color: red;">Error loading codes: ${error.message}</p>`;
+    }
+  }
+
+  async function generateRegistrationCode() {
+    const days = prompt('How many days should this code be valid? (Default: 30)', '30');
+    if (days === null) return;
+    
+    const expiresInDays = parseInt(days) || 30;
+    
+    try {
+      const response = await fetchWithAuth('/api/codes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clubId: clubDirectorClubId,
+          eventId: clubDirectorEventId,
+          expiresInDays
+        })
+      });
+      
+      const code = await response.json();
+      
+      if (response.ok) {
+        showNotification(`Code generated: ${code.Code}`, 'success');
+        await renderCodes();
+      } else {
+        showNotification(code.error || 'Error generating code', 'error');
+      }
+    } catch (error) {
+      showNotification('Error generating code: ' + error.message, 'error');
+    }
+  }
+
+  // Expose functions globally
+  window.renderCodes = renderCodes;
+  window.generateRegistrationCode = generateRegistrationCode;
+  
+  // Create copyCode wrapper that can be called from HTML onclick
+  window.copyRegistrationCode = function(code) {
+    navigator.clipboard.writeText(code).then(() => {
+      showNotification(`Code "${code}" copied to clipboard!`, 'success');
+    }).catch(() => {
+      showNotification('Failed to copy code', 'error');
+    });
+  };
+  
+  async function checkEventStatus() {
+    try {
+      const response = await fetch('/api/events/current/status');
+      const data = await response.json();
+      
+      const banner = document.getElementById('eventStatusBanner');
+      if (data.status === 'Closed') {
+        if (banner) banner.style.display = 'block';
+      } else {
+        if (banner) banner.style.display = 'none';
+      }
+    } catch (error) {
+      console.error('Error checking event status:', error);
+    }
+  }
+
+  // Start on Users tab
+  clubdirectorSwitchTab('users', null);
+});
+
+})(); // End IIFE - closes the wrapper around all Club Director code

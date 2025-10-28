@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register - Honors Festival</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="container" style="max-width: 600px; margin: 50px auto; padding: 20px;">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Honors Festival Registration</h2>
+      </div>
+      <div style="padding: 20px;">
+        <div id="codeEntrySection">
+          <p>Enter your registration code to begin.</p>
+          <div class="form-group">
+            <label for="registrationCode">Registration Code:</label>
+            <input type="text" id="registrationCode" class="form-control" placeholder="Enter code (e.g., A1B2C3D4)" style="text-transform: uppercase;">
+            <button onclick="validateCode()" class="btn btn-primary" style="margin-top: 10px; width: 100%;">Continue</button>
+          </div>
+        </div>
+
+        <div id="errorMessage" style="display: none; padding: 15px; background: #fee; border: 1px solid #fcc; border-radius: 4px; color: #c33; margin: 20px 0;"></div>
+
+        <div id="registrationForm" style="display: none;">
+          <div id="codeInfo" style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <p><strong>Club:</strong> <span id="clubName"></span></p>
+            <p><strong>Event:</strong> <span id="eventName"></span></p>
+          </div>
+
+          <form id="regForm" onsubmit="handleRegistration(event)">
+            <div class="form-group">
+              <label for="firstName">First Name *</label>
+              <input type="text" id="firstName" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+              <label for="lastName">Last Name *</label>
+              <input type="text" id="lastName" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+              <label for="dateOfBirth">Date of Birth</label>
+              <input type="date" id="dateOfBirth" class="form-control">
+            </div>
+
+            <div class="form-group">
+              <label for="email">Email Address *</label>
+              <input type="email" id="email" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+              <label for="phone">Phone</label>
+              <input type="tel" id="phone" class="form-control">
+            </div>
+
+            <div class="form-group">
+              <label for="role">Role *</label>
+              <select id="role" class="form-control" required>
+                <option value="">Select a role</option>
+                <option value="Student">Student</option>
+                <option value="Teacher">Teacher</option>
+                <option value="Staff">Staff</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="investitureLevel">Investiture Level</label>
+              <select id="investitureLevel" class="form-control">
+                <option value="">Select level</option>
+                <option value="None">None</option>
+                <option value="Friend">Friend</option>
+                <option value="Companion">Companion</option>
+                <option value="Explorer">Explorer</option>
+                <option value="Ranger">Ranger</option>
+                <option value="Voyager">Voyager</option>
+                <option value="Guide">Guide</option>
+                <option value="MasterGuide">MasterGuide</option>
+              </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 20px;">Submit Registration</button>
+          </form>
+        </div>
+
+        <div id="successMessage" style="display: none;">
+          <div style="background: #dfd; padding: 20px; border-radius: 8px; text-align: center;">
+            <h3 style="color: #060; margin-bottom: 10px;">Registration Successful!</h3>
+            <p>Your username is: <strong id="createdUsername"></strong></p>
+            <p>Default password: <strong>password123</strong></p>
+            <p style="margin-top: 15px;">
+              <a href="/login.html" class="btn btn-primary">Go to Login</a>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentCode = null;
+    let codeData = null;
+
+    async function validateCode() {
+      const code = document.getElementById('registrationCode').value.trim().toUpperCase();
+      
+      if (!code) {
+        showError('Please enter a registration code');
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/codes/${code}`);
+        const data = await response.json();
+
+        if (data.valid) {
+          currentCode = code;
+          codeData = data;
+          document.getElementById('clubName').textContent = data.club.name;
+          document.getElementById('eventName').textContent = data.event.name;
+          document.getElementById('codeEntrySection').style.display = 'none';
+          document.getElementById('errorMessage').style.display = 'none';
+          document.getElementById('registrationForm').style.display = 'block';
+        } else {
+          showError(data.error || 'Invalid code');
+        }
+      } catch (error) {
+        showError('Error validating code: ' + error.message);
+      }
+    }
+
+    async function handleRegistration(event) {
+      event.preventDefault();
+      
+      const firstName = document.getElementById('firstName').value;
+      const lastName = document.getElementById('lastName').value;
+      const dateOfBirth = document.getElementById('dateOfBirth').value;
+      const email = document.getElementById('email').value;
+      const phone = document.getElementById('phone').value;
+      const role = document.getElementById('role').value;
+      const investitureLevel = document.getElementById('investitureLevel').value;
+
+      try {
+        const response = await fetch('/api/codes/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: currentCode,
+            firstName,
+            lastName,
+            dateOfBirth,
+            email,
+            phone,
+            role,
+            investitureLevel
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          document.getElementById('registrationForm').style.display = 'none';
+          document.getElementById('errorMessage').style.display = 'none';
+          document.getElementById('createdUsername').textContent = data.username;
+          document.getElementById('successMessage').style.display = 'block';
+        } else {
+          showError(data.error || 'Registration failed');
+        }
+      } catch (error) {
+        showError('Error submitting registration: ' + error.message);
+      }
+    }
+
+    function showError(message) {
+      const errorDiv = document.getElementById('errorMessage');
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+    }
+
+    // Allow Enter key to validate code
+    document.getElementById('registrationCode').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        validateCode();
+      }
+    });
+
+    // Auto-uppercase code input
+    document.getElementById('registrationCode').addEventListener('input', (e) => {
+      e.target.value = e.target.value.toUpperCase();
+    });
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Dashboard - Honors Festival</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="top-banner">
+    <h1>Honors Festival</h1>
+    <div class="user-info">
+      <span id="eventName" class="event-info"></span>
+      <span id="userName">Welcome, <strong id="userDisplayName"></strong></span>
+      <button onclick="logout()" class="btn btn-outline">Logout</button>
+    </div>
+  </div>
+
+  <div id="eventStatusBanner" style="display: none;" class="status-banner status-banner-closed">
+    <strong>⚠ Registration Closed:</strong> The event registration is currently closed. You can view your registered classes but cannot add or drop classes.
+  </div>
+
+  <div class="container">
+    <div id="notifications"></div>
+
+    <div class="dashboard-split">
+      <!-- Left Panel: Class Browser -->
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Available Classes</h2>
+          </div>
+
+          <div class="class-filters">
+            <select id="timeslotFilter" class="form-control">
+              <option value="">All Timeslots</option>
+            </select>
+            <select id="teacherFilter" class="form-control">
+              <option value="">All Teachers</option>
+            </select>
+          </div>
+
+          <div id="classesList" class="mt-2">
+            <p class="text-center">Loading classes...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel: Calendar Grid -->
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">My Schedule</h2>
+          </div>
+          <div id="scheduleGrid">
+            <p class="text-center">Loading schedule...</p>
+          </div>
+        </div>
+
+        <!-- Registered and Waitlisted Classes -->
+        <div class="card mt-2">
+          <div class="card-header">
+            <h2 class="card-title">My Classes</h2>
+          </div>
+          <div id="myClasses">
+            <p class="text-center">Loading...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/utils.js"></script>
+  <script>
+    let currentEventId = null;
+    let currentUserId = null;
+    let allClasses = [];
+    let myRegistrations = [];
+
+    // Load dashboard on page load
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!checkAuth()) return;
+
+      const user = getCurrentUser();
+      currentUserId = user.id;
+      document.getElementById('userDisplayName').textContent = `${user.firstName} ${user.lastName}`;
+
+      await checkEventStatus();
+      await loadEvents();
+      await loadData();
+    });
+
+    async function checkEventStatus() {
+      try {
+        const response = await fetch('/api/events/current/status');
+        const data = await response.json();
+        
+        const banner = document.getElementById('eventStatusBanner');
+        if (data.status === 'Closed') {
+          banner.style.display = 'block';
+        } else {
+          banner.style.display = 'none';
+        }
+      } catch (error) {
+        console.error('Error checking event status:', error);
+      }
+    }
+
+    async function loadEvents() {
+      try {
+        const response = await fetchWithAuth('/api/events');
+        const events = await response.json();
+        
+        // Get first event (or active event)
+        const activeEvent = events.find(e => e.Status === 'Live') || events[0];
+        if (activeEvent) {
+          currentEventId = activeEvent.ID;
+          document.getElementById('eventName').textContent = activeEvent.Name;
+        }
+      } catch (error) {
+        console.error('Error loading events:', error);
+      }
+    }
+
+    async function loadData() {
+      if (!currentEventId) return;
+
+      try {
+        // Load classes
+        const classesResponse = await fetchWithAuth(`/api/classes/${currentEventId}`);
+        allClasses = await classesResponse.json();
+
+        // Load my registrations
+        const regResponse = await fetchWithAuth(`/api/registrations/user/${currentUserId}?eventId=${currentEventId}`);
+        myRegistrations = await regResponse.json();
+
+        // Load filters
+        await loadFilters();
+        renderClasses();
+        renderSchedule();
+        renderMyClasses();
+      } catch (error) {
+        console.error('Error loading data:', error);
+        showNotification('Error loading data', 'error');
+      }
+    }
+
+    async function loadFilters() {
+      try {
+        // Load timeslots
+        const timeslotsResponse = await fetchWithAuth(`/api/timeslots/event/${currentEventId}`);
+        const timeslots = await timeslotsResponse.json();
+        
+        const timeslotSelect = document.getElementById('timeslotFilter');
+        timeslots.forEach(ts => {
+          const option = document.createElement('option');
+          option.value = ts.ID;
+          // Format timeslot for display
+          function convertTo12Hour(time24) {
+            if (!time24) return '';
+            const [hours, minutes] = time24.split(':');
+            const hour = parseInt(hours);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            const hour12 = hour % 12 || 12;
+            return `${hour12}:${minutes} ${ampm}`;
+          }
+          option.textContent = `${ts.Date} - ${convertTo12Hour(ts.StartTime)} to ${convertTo12Hour(ts.EndTime)}`;
+          timeslotSelect.appendChild(option);
+        });
+        
+        // Load teachers
+        const teachersMap = new Map();
+        allClasses.forEach(c => {
+          if (c.TeacherID && c.TeacherFirstName && c.TeacherLastName) {
+            const key = `${c.TeacherID}`;
+            if (!teachersMap.has(key)) {
+              teachersMap.set(key, {
+                id: c.TeacherID,
+                name: `${c.TeacherFirstName} ${c.TeacherLastName}`
+              });
+            }
+          }
+        });
+        
+        const teacherSelect = document.getElementById('teacherFilter');
+        Array.from(teachersMap.values()).sort((a, b) => a.name.localeCompare(b.name)).forEach(teacher => {
+          const option = document.createElement('option');
+          option.value = teacher.id;
+          option.textContent = teacher.name;
+          teacherSelect.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Error loading filters:', error);
+      }
+    }
+
+    function renderClasses() {
+      const container = document.getElementById('classesList');
+      const timeslotFilter = document.getElementById('timeslotFilter').value;
+      const teacherFilter = document.getElementById('teacherFilter').value;
+
+      const filtered = allClasses.filter(c => {
+        // Always filter out inactive classes from student view
+        if (!c.Active) return false;
+        
+        if (timeslotFilter && c.TimeslotID && c.TimeslotID.toString() !== timeslotFilter) return false;
+        if (teacherFilter && c.TeacherID && c.TeacherID.toString() !== teacherFilter) return false;
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<p class="text-center">No classes available</p>';
+        return;
+      }
+
+      container.innerHTML = `
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Honor Name</th>
+              <th>Teacher</th>
+              <th>Location</th>
+              <th>Session Time</th>
+              <th>Remaining Spots</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filtered.map(c => {
+              const location = `${c.LocationName || 'TBA'}`;
+              const teacher = c.TeacherFirstName ? `${c.TeacherFirstName} ${c.TeacherLastName}` : 'TBA';
+              
+              // Check if user is registered for this class
+              const isRegistered = myRegistrations.some(r => r.ClassID === c.ID);
+              
+              // Check if user has an enrolled class in this timeslot
+              const hasEnrolledInTimeslot = myRegistrations.some(r => {
+                return r.TimeslotID === c.TimeslotID && r.Status === 'Enrolled';
+              });
+              
+              // Check if user has a waitlist spot for this class or any class in this timeslot
+              const hasWaitlistForThisClass = myRegistrations.some(r => r.ClassID === c.ID && r.Status === 'Waitlisted');
+              const hasWaitlistInTimeslot = myRegistrations.some(r => {
+                return r.TimeslotID === c.TimeslotID && r.Status === 'Waitlisted';
+              });
+              
+              const isFull = c.RemainingSpots <= 0;
+              
+              // Can register if: not registered for this class, not enrolled in timeslot, class not full
+              const canRegister = !isRegistered && !hasEnrolledInTimeslot && !isFull;
+              
+              // Can waitlist if: not registered for this class, not waitlisted in timeslot, class is full
+              const canWaitlist = !isRegistered && !hasWaitlistInTimeslot && isFull;
+              
+              // Format session time
+              function convertTo12Hour(time24) {
+                if (!time24) return '';
+                const [hours, minutes] = time24.split(':');
+                const hour = parseInt(hours);
+                const ampm = hour >= 12 ? 'PM' : 'AM';
+                const hour12 = hour % 12 || 12;
+                return `${hour12}:${minutes} ${ampm}`;
+              }
+              
+              const sessionTime = c.TimeslotDate && c.TimeslotStartTime && c.TimeslotEndTime
+                ? `${c.TimeslotDate}<br><small>${convertTo12Hour(c.TimeslotStartTime)} - ${convertTo12Hour(c.TimeslotEndTime)}</small>`
+                : 'TBA';
+
+              // Don't show this class at all if they're already registered for it
+              if (isRegistered) return '';
+
+              // Determine action message
+              let actionMsg = '';
+              if (hasEnrolledInTimeslot && !canWaitlist) {
+                actionMsg = '<span style="color: #999;">Already enrolled in a different class at this time</span>';
+              } else if (hasWaitlistInTimeslot && !canRegister) {
+                actionMsg = '<span style="color: #999;">Already waitlisted for another class at this time</span>';
+              }
+              
+              return `
+                <tr>
+                  <td>${c.HonorName || 'Unknown'}</td>
+                  <td>${teacher}</td>
+                  <td>${location}</td>
+                  <td>${sessionTime}</td>
+                  <td>${c.RemainingSpots}</td>
+                  <td>
+                    ${canRegister ? `<button onclick="register(${c.ID})" class="btn btn-primary btn-sm">Register</button>` : ''}
+                    ${canWaitlist ? `<button onclick="waitlist(${c.ID})" class="btn btn-warning btn-sm">Waitlist</button>` : ''}
+                    ${actionMsg}
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderSchedule() {
+      // Simplified schedule view for now
+      const container = document.getElementById('scheduleGrid');
+      const enrolled = myRegistrations.filter(r => r.Status === 'Enrolled');
+      
+      if (enrolled.length === 0) {
+        container.innerHTML = '<p class="text-center">No enrolled classes</p>';
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="timeslot-grid">
+          <div class="timeslot-row">
+            <strong>Timeslot</strong>
+            <strong>Class</strong>
+          </div>
+          ${enrolled.map(r => `
+            <div class="timeslot-row">
+              <span>${formatDateTime(r.TimeslotDate, r.TimeslotStartTime, r.TimeslotEndTime)}</span>
+              <span>
+                <strong>${r.HonorName}</strong><br>
+                <small>${r.TeacherFirstName} ${r.TeacherLastName}</small>
+              </span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function renderMyClasses() {
+      const container = document.getElementById('myClasses');
+      
+      if (myRegistrations.length === 0) {
+        container.innerHTML = '<p class="text-center">No registered classes</p>';
+        return;
+      }
+
+      const enrolled = myRegistrations.filter(r => r.Status === 'Enrolled');
+      const waitlisted = myRegistrations.filter(r => r.Status === 'Waitlisted');
+
+      container.innerHTML = `
+        <h3>Registered Classes (${enrolled.length})</h3>
+        ${enrolled.map(r => `
+          <div style="padding: 0.5rem; border: 1px solid var(--border); border-radius: 0.25rem; margin-bottom: 0.5rem;">
+            <strong>${r.HonorName}</strong><br>
+            <small>${formatDateTime(r.TimeslotDate, r.TimeslotStartTime, r.TimeslotEndTime)}</small><br>
+            <button onclick="dropClass(${r.ID})" class="btn btn-danger btn-sm mt-1">Drop</button>
+          </div>
+        `).join('')}
+        
+        ${waitlisted.length > 0 ? `
+          <h3 class="mt-2">Waitlisted Classes (${waitlisted.length})</h3>
+          ${waitlisted.map(r => `
+            <div style="padding: 0.5rem; border: 1px solid var(--border); border-radius: 0.25rem; margin-bottom: 0.5rem;">
+              <strong>${r.HonorName}</strong><br>
+              <small>Position ${r.WaitlistOrder} - ${formatDateTime(r.TimeslotDate, r.TimeslotStartTime, r.TimeslotEndTime)}</small><br>
+              <button onclick="dropClass(${r.ID})" class="btn btn-danger btn-sm mt-1">Drop Waitlist</button>
+            </div>
+          `).join('')}
+        ` : ''}
+      `;
+    }
+
+    async function register(classId) {
+      if (!confirm('Register for this class?')) return;
+
+      try {
+        const response = await fetchWithAuth('/api/registrations', {
+          method: 'POST',
+          body: JSON.stringify({ ClassID: classId })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showNotification('Successfully registered!', 'success');
+          await loadData();
+        } else {
+          showNotification(data.error, 'error');
+        }
+      } catch (error) {
+        showNotification('Error registering', 'error');
+      }
+    }
+
+    async function waitlist(classId) {
+      if (!confirm('Join waitlist for this class?')) return;
+
+      try {
+        const response = await fetchWithAuth('/api/registrations', {
+          method: 'POST',
+          body: JSON.stringify({ ClassID: classId })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showNotification('Added to waitlist!', 'info');
+          await loadData();
+        } else {
+          showNotification(data.error, 'error');
+        }
+      } catch (error) {
+        showNotification('Error joining waitlist', 'error');
+      }
+    }
+
+    async function dropClass(registrationId) {
+      if (!confirm('Drop this class?')) return;
+
+      try {
+        const response = await fetchWithAuth(`/api/registrations/${registrationId}`, {
+          method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showNotification('Class dropped', 'info');
+          await loadData();
+        } else {
+          showNotification(data.error, 'error');
+        }
+      } catch (error) {
+        showNotification('Error dropping class', 'error');
+      }
+    }
+
+    // Filter change handlers
+    document.getElementById('timeslotFilter').addEventListener('change', renderClasses);
+    document.getElementById('teacherFilter').addEventListener('change', renderClasses);
+  </script>
+</body>
+</html>
+
+
