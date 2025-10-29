@@ -32,7 +32,8 @@ function migrateDatabase() {
     const honors = db.prepare('SELECT ID, Name FROM Honors WHERE Name LIKE ?').all('%\\%');
     if (honors.length > 0) {
       console.log(`Cleaning ${honors.length} honor names with trailing backslashes...`);
-      db.exec(`UPDATE Honors SET Name = REPLACE(Name, '\\', '') WHERE Name LIKE '%\\%'`);
+      const updateStmt = db.prepare('UPDATE Honors SET Name = REPLACE(Name, ?, ?) WHERE Name LIKE ?');
+      updateStmt.run('\\', '', '%\\%');
       console.log('Honor names cleaned');
     }
     
