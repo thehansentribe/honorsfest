@@ -29,14 +29,10 @@ function migrateDatabase() {
     }
     
     // Clean up honor names (remove trailing backslashes)
-    const honors = db.prepare('SELECT ID, Name FROM Honors WHERE Name LIKE ?').all('%\\\\%');
+    const honors = db.prepare('SELECT ID, Name FROM Honors WHERE Name LIKE ?').all('%\\%');
     if (honors.length > 0) {
       console.log(`Cleaning ${honors.length} honor names with trailing backslashes...`);
-      const updateStmt = db.prepare('UPDATE Honors SET Name = ? WHERE ID = ?');
-      honors.forEach(honor => {
-        const cleanName = honor.Name.replace(/\\+$/, '');
-        updateStmt.run(cleanName, honor.ID);
-      });
+      db.exec(`UPDATE Honors SET Name = REPLACE(Name, '\\', '') WHERE Name LIKE '%\\%'`);
       console.log('Honor names cleaned');
     }
     
