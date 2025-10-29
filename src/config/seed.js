@@ -40,7 +40,9 @@ function seedDatabase() {
           const honorName = nameParts.join(' - ');
           
           if (category && honorName) {
-            insertHonor.run(honorName.trim(), category.trim());
+            // Remove trailing backslashes from honor name
+            let cleanHonorName = honorName.trim().replace(/\\+$/, '');
+            insertHonor.run(cleanHonorName, category.trim());
             inserted++;
           }
         }
