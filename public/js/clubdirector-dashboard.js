@@ -16,6 +16,7 @@ let clubDirectorClasses = [];
 // Override switchTab
 function clubdirectorSwitchTab(tabName, clickedElement = null) {
   clubDirectorTab = tabName;
+  try { localStorage.setItem('directorCurrentTab', tabName); } catch (e) {}
   
   // Update tab UI
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -558,6 +559,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.editUser = editUserClubDirector;
   window.showCreateClassForm = showCreateClassFormClubDirector;
   
+  // Restore last active tab or default to users
+  const savedTab = localStorage.getItem('directorCurrentTab') || 'users';
+  window.switchTab(savedTab);
+
   // Override editClass to use clubDirectorClasses array
   window.editClass = async function editClassClubDirector(classId) {
     const cls = clubDirectorClasses.find(c => c.ID === classId);

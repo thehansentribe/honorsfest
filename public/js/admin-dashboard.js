@@ -34,7 +34,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   await loadEvents();
   await loadUsers();
-  switchTab('events');
+  const savedTab = localStorage.getItem('adminCurrentTab') || 'events';
+  switchTab(savedTab);
 });
 
 // Toggle event dropdown based on role selection
@@ -194,6 +195,7 @@ window.loadClubsForEditUser = loadClubsForEditUser;
 
 async function switchTab(tabName, clickedElement = null) {
   currentTab = tabName;
+  try { localStorage.setItem('adminCurrentTab', tabName); } catch (e) {}
   
   // Update tab UI
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
