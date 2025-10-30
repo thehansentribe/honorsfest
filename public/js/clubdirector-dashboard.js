@@ -1035,11 +1035,100 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (response.ok) {
         showNotification(`Code generated: ${code.Code}`, 'success');
         await renderCodes();
+        // Show email template modal
+        showCodeEmailModal(code.Code);
       } else {
         showNotification(code.error || 'Error generating code', 'error');
       }
     } catch (error) {
       showNotification('Error generating code: ' + error.message, 'error');
+    }
+  }
+  
+  function showCodeEmailModal(code) {
+    // Get current site URL
+    const registrationUrl = window.location.origin + '/register.html';
+    
+    // Get event info for the email
+    const currentEvent = clubDirectorEvents.find(e => e.ID === parseInt(clubDirectorEventId));
+    const eventName = currentEvent ? currentEvent.Name : 'Event';
+    
+    const emailSubject = `Registration Code for ${eventName}`;
+    
+    const emailBody = `Hello,
+
+You have been invited to register for ${eventName}.
+
+REGISTRATION CODE: ${code}
+
+TO REGISTER:
+1. Click this link: ${registrationUrl}
+2. Enter your registration code: ${code}
+3. Fill out the registration form
+4. Submit your registration
+
+This code will expire in 30 days. Please register as soon as possible.
+
+If you have any questions, please contact your club director.
+
+Thank you!`;
+
+    const modal = document.createElement('div');
+    modal.id = 'codeEmailModal';
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+      <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-header">
+          <h2>Send Registration Code via Email</h2>
+          <button onclick="closeClubDirectorModal('codeEmailModal')" class="btn btn-outline">×</button>
+        </div>
+        <div style="padding: 20px;">
+          <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border);">
+            <p><strong>Ready to send!</strong> Copy the email below and send it to your registrants.</p>
+          </div>
+          
+          <div class="form-group">
+            <label><strong>Email Subject:</strong></label>
+            <input type="text" id="emailSubject" class="form-control" value="${emailSubject}" readonly style="background: #f5f5f5; cursor: pointer;" onclick="this.select(); document.execCommand('copy'); showNotification('Subject copied to clipboard!', 'success');">
+          </div>
+          
+          <div class="form-group">
+            <label><strong>Email Body:</strong></label>
+            <textarea id="emailBody" class="form-control" rows="15" readonly style="background: #f5f5f5; cursor: pointer; font-family: monospace; font-size: 13px;" onclick="this.select(); document.execCommand('copy'); showNotification('Email copied to clipboard!', 'success');">${emailBody}</textarea>
+          </div>
+          
+          <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button onclick="copyCodeEmail('${code}', '${registrationUrl}')" class="btn btn-primary" style="flex: 1;">
+              📋 Copy Full Email to Clipboard
+            </button>
+            <button onclick="closeClubDirectorModal('codeEmailModal')" class="btn btn-outline" style="flex: 1;">
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+  
+  function copyCodeEmail(code, registrationUrl) {
+    const emailSubject = document.getElementById('emailSubject').value;
+    const emailBody = document.getElementById('emailBody').value;
+    
+    const fullEmail = `Subject: ${emailSubject}\n\n${emailBody}`;
+    
+    navigator.clipboard.writeText(fullEmail).then(() => {
+      showNotification('Full email copied to clipboard!', 'success');
+    }).catch(() => {
+      showNotification('Failed to copy email', 'error');
+    });
+  }
+  
+  function closeClubDirectorModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.remove();
     }
   }
 
@@ -1060,6 +1149,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.toggleClubDirectorColumnFilter = toggleClubDirectorColumnFilter;
   window.updateClubDirectorFilter = updateClubDirectorFilter;
   window.renderUsers = renderUsers;
+  window.copyCodeEmail = copyCodeEmail;
+  window.closeClubDirectorModal = closeClubDirectorModal;
   
   async function checkEventStatus() {
     try {
