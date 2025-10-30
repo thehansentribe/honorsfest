@@ -247,6 +247,7 @@ router.get('/event/:eventId', requireRole('Admin', 'EventAdmin', 'ClubDirector')
       ? db.prepare(attendanceQuery).all(eventId, userClubId)
       : db.prepare(attendanceQuery).all(eventId);
     
+    const attendanceMap = {};
     attendanceRecords.forEach(record => {
       const key = `${record.UserID}-${record.ClassID}`;
       attendanceMap[key] = {

@@ -1279,7 +1279,13 @@ async function handleAddStudentToClass(classId) {
     if (response.ok) {
       showNotification('Student added successfully', 'success');
       closeModal('viewStudentsModal');
-      await viewClassStudents(classId); // Reload the modal
+      // Refresh the classes list to update counts
+      const currentTab = localStorage.getItem('adminCurrentTab') || 'events';
+      if (currentTab === 'classes') {
+        await renderClasses();
+      }
+      // Reload the modal to show updated student list
+      await viewClassStudents(classId);
     } else {
       showNotification(result.error || 'Error adding student', 'error');
     }
@@ -1298,11 +1304,15 @@ async function removeStudentFromClass(registrationId, classId) {
     
     if (response.ok) {
       showNotification('Student removed successfully', 'success');
-      // Reload the modal with the current class
+      // Close the modal first
       closeModal('viewStudentsModal');
+      // Refresh the classes list to update counts
+      const currentTab = localStorage.getItem('adminCurrentTab') || 'events';
+      if (currentTab === 'classes') {
+        await renderClasses();
+      }
+      // Reload the modal to show updated student list
       await viewClassStudents(classId);
-      // Also update the classes list
-      await renderClasses();
     } else {
       const result = await response.json();
       showNotification(result.error || 'Error removing student', 'error');
