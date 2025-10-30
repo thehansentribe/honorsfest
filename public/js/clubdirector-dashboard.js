@@ -344,30 +344,30 @@ async function renderClasses() {
       <table class="data-table">
         <thead>
           <tr>
-            <th style="width: 20%; padding: 12px 8px;">Honor</th>
-            <th style="width: 15%; padding: 12px 8px;">Teacher</th>
-            <th style="width: 15%; padding: 12px 8px;">Location</th>
-            <th style="width: 18%; padding: 12px 8px;">Date/Time</th>
-            <th style="width: 12%; padding: 12px 8px;">Capacity</th>
-            <th style="width: 10%; padding: 12px 8px;">Enrolled</th>
-            <th style="width: 10%; padding: 12px 8px;">Status</th>
-            <th style="width: 10%; padding: 12px 8px;">Actions</th>
+            <th style="width: 20%; padding: 12px 8px; text-align: left;">Honor</th>
+            <th style="width: 15%; padding: 12px 8px; text-align: left;">Teacher</th>
+            <th style="width: 15%; padding: 12px 8px; text-align: left;">Location</th>
+            <th style="width: 18%; padding: 12px 8px; text-align: left;">Date/Time</th>
+            <th style="width: 12%; padding: 12px 8px; text-align: left;">Capacity</th>
+            <th style="width: 10%; padding: 12px 8px; text-align: left;">Enrolled</th>
+            <th style="width: 10%; padding: 12px 8px; text-align: left;">Status</th>
+            <th style="width: 10%; padding: 12px 8px; text-align: left;">Actions</th>
           </tr>
         </thead>
         <tbody>
           ${activeClasses.map(cls => `
           <tr style="border-bottom: 1px solid #e0e0e0;">
-            <td style="padding: 12px 8px;"><strong>${cls.HonorName || 'N/A'}</strong></td>
-            <td style="padding: 12px 8px;">${cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
-            <td style="padding: 12px 8px;">${cls.LocationName || 'N/A'}</td>
-            <td style="padding: 12px 8px;">
+            <td style="padding: 12px 8px; text-align: left;"><strong>${cls.HonorName || 'N/A'}</strong></td>
+            <td style="padding: 12px 8px; text-align: left;">${cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
+            <td style="padding: 12px 8px; text-align: left;">${cls.LocationName || 'N/A'}</td>
+            <td style="padding: 12px 8px; text-align: left;">
               ${cls.TimeslotDate || 'N/A'}<br>
               <small style="color: var(--text-light);">${cls.TimeslotStartTime ? convertTo12Hour(cls.TimeslotStartTime) : ''} - ${cls.TimeslotEndTime ? convertTo12Hour(cls.TimeslotEndTime) : ''}</small>
             </td>
-            <td style="padding: 12px 8px;">${cls.EnrolledCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}</td>
-            <td style="padding: 12px 8px;">${cls.EnrolledCount || 0}</td>
-            <td style="padding: 12px 8px;"><span class="badge bg-success">Active</span></td>
-            <td style="padding: 12px 8px;">
+            <td style="padding: 12px 8px; text-align: left;">${cls.EnrolledCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}</td>
+            <td style="padding: 12px 8px; text-align: left;">${cls.EnrolledCount || 0}</td>
+            <td style="padding: 12px 8px; text-align: left;"><span class="badge bg-success">Active</span></td>
+            <td style="padding: 12px 8px; text-align: left;">
               <button onclick="viewClassStudents(${cls.ID})" class="btn btn-sm btn-info">Manage Students</button>
               <button onclick="editClass(${cls.ID})" class="btn btn-sm btn-secondary">Edit</button>
             </td>

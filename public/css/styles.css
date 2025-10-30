@@ -271,6 +271,29 @@ body {
   background-color: var(--background);
 }
 
+/* Data table styling - for dynamically generated tables */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table th {
+  background-color: var(--background);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.data-table tr:hover {
+  background-color: var(--background);
+}
+
 /* Tabs */
 .tabs {
   display: flex;

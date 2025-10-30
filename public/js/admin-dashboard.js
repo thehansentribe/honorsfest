@@ -463,7 +463,7 @@ async function loadClasses(eventId) {
   try {
     const response = await fetchWithAuth(`/api/classes/${eventId}`);
     allClasses = await response.json();
-    renderClassesList();
+    // renderClassesList is no longer used - new data-table version handles rendering
   } catch (error) {
     console.error('Error loading classes:', error);
     showNotification('Error loading classes', 'error');
@@ -742,60 +742,6 @@ function renderLocationsList() {
             <td>
               <button onclick="editLocation(${loc.ID})" class="btn btn-sm btn-secondary">Edit</button>
               <button onclick="deleteLocation(${loc.ID})" class="btn btn-sm btn-danger">Delete</button>
-            </td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
-  `;
-}
-
-async function renderClasses() {
-  const select = document.getElementById('classEventFilter');
-  const eventId = select?.value;
-  
-  if (!eventId) {
-    document.getElementById('classesList').innerHTML = '<p class="text-center">Select an event to view classes</p>';
-    return;
-  }
-  
-  await loadClasses(eventId);
-}
-
-function renderClassesList() {
-  const container = document.getElementById('classesList');
-  if (!container) return;
-  
-  if (allClasses.length === 0) {
-    container.innerHTML = '<p class="text-center">No classes for this event</p>';
-    return;
-  }
-  
-  container.innerHTML = `
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Honor</th>
-          <th>Teacher</th>
-          <th>Location</th>
-          <th>Timeslot</th>
-          <th>Capacity</th>
-          <th>Enrolled</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${allClasses.map(cls => `
-          <tr>
-            <td>${cls.HonorName || 'Unknown'}</td>
-            <td>${cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : 'Unassigned'}</td>
-            <td>${cls.LocationName || 'TBA'}</td>
-            <td>${formatDateTime(cls.TimeslotDate, cls.TimeslotStartTime, cls.TimeslotEndTime)}</td>
-            <td>${cls.ActualMaxCapacity || cls.MaxCapacity}</td>
-            <td>${cls.EnrolledCount || 0}</td>
-            <td>
-              <button onclick="viewClassStudents(${cls.ID})" class="btn btn-sm btn-info">Manage Students</button>
-              ${cls.Active ? `<button onclick="deactivateClass(${cls.ID})" class="btn btn-sm btn-danger">Deactivate</button>` : ''}
             </td>
           </tr>
         `).join('')}
@@ -2128,21 +2074,21 @@ async function renderTimeslots() {
       <table class="data-table">
         <thead>
           <tr>
-            <th style="width: 25%;">Date</th>
-            <th style="width: 20%;">Start Time</th>
-            <th style="width: 20%;">End Time</th>
-            <th style="width: 20%;">Duration</th>
-            <th style="width: 15%;">Actions</th>
+            <th style="width: 25%; text-align: left;">Date</th>
+            <th style="width: 20%; text-align: left;">Start Time</th>
+            <th style="width: 20%; text-align: left;">End Time</th>
+            <th style="width: 20%; text-align: left;">Duration</th>
+            <th style="width: 15%; text-align: left;">Actions</th>
           </tr>
         </thead>
         <tbody>
           ${allTimeslots.map(slot => `
           <tr>
-            <td>${slot.Date}</td>
-            <td>${convertTo12Hour(slot.StartTime)}</td>
-            <td>${convertTo12Hour(slot.EndTime)}</td>
-            <td>${calculateDuration(slot.StartTime, slot.EndTime)}</td>
-            <td>
+            <td style="text-align: left;">${slot.Date}</td>
+            <td style="text-align: left;">${convertTo12Hour(slot.StartTime)}</td>
+            <td style="text-align: left;">${convertTo12Hour(slot.EndTime)}</td>
+            <td style="text-align: left;">${calculateDuration(slot.StartTime, slot.EndTime)}</td>
+            <td style="text-align: left;">
               <button onclick="editTimeslot(${slot.ID})" class="btn btn-sm btn-secondary">Edit</button>
               <button onclick="deleteTimeslot(${slot.ID})" class="btn btn-sm btn-danger">Delete</button>
             </td>
@@ -2508,30 +2454,30 @@ async function renderClasses() {
       <table class="data-table">
         <thead>
           <tr>
-            <th style="width: 20%; padding: 12px 8px;">Honor</th>
-            <th style="width: 15%; padding: 12px 8px;">Teacher</th>
-            <th style="width: 15%; padding: 12px 8px;">Location</th>
-            <th style="width: 18%; padding: 12px 8px;">Date/Time</th>
-            <th style="width: 12%; padding: 12px 8px;">Capacity</th>
-            <th style="width: 10%; padding: 12px 8px;">Enrolled</th>
-            <th style="width: 10%; padding: 12px 8px;">Status</th>
-            <th style="width: 10%; padding: 12px 8px;">Actions</th>
+            <th style="width: 20%; padding: 12px 8px; text-align: left;">Honor</th>
+            <th style="width: 15%; padding: 12px 8px; text-align: left;">Teacher</th>
+            <th style="width: 15%; padding: 12px 8px; text-align: left;">Location</th>
+            <th style="width: 18%; padding: 12px 8px; text-align: left;">Date/Time</th>
+            <th style="width: 12%; padding: 12px 8px; text-align: left;">Capacity</th>
+            <th style="width: 10%; padding: 12px 8px; text-align: left;">Enrolled</th>
+            <th style="width: 10%; padding: 12px 8px; text-align: left;">Status</th>
+            <th style="width: 10%; padding: 12px 8px; text-align: left;">Actions</th>
           </tr>
         </thead>
         <tbody>
           ${activeClasses.map(cls => `
           <tr style="border-bottom: 1px solid #e0e0e0;">
-            <td style="padding: 12px 8px;"><strong>${cls.HonorName || 'N/A'}</strong></td>
-            <td style="padding: 12px 8px;">${cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
-            <td style="padding: 12px 8px;">${cls.LocationName || 'N/A'}</td>
-            <td style="padding: 12px 8px;">
+            <td style="padding: 12px 8px; text-align: left;"><strong>${cls.HonorName || 'N/A'}</strong></td>
+            <td style="padding: 12px 8px; text-align: left;">${cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
+            <td style="padding: 12px 8px; text-align: left;">${cls.LocationName || 'N/A'}</td>
+            <td style="padding: 12px 8px; text-align: left;">
               ${cls.TimeslotDate || 'N/A'}<br>
               <small style="color: var(--text-light);">${cls.TimeslotStartTime ? convertTo12Hour(cls.TimeslotStartTime) : ''} - ${cls.TimeslotEndTime ? convertTo12Hour(cls.TimeslotEndTime) : ''}</small>
             </td>
-            <td style="padding: 12px 8px;">${cls.EnrolledCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}</td>
-            <td style="padding: 12px 8px;">${cls.EnrolledCount || 0}</td>
-            <td style="padding: 12px 8px;"><span class="badge bg-success">Active</span></td>
-            <td style="padding: 12px 8px;">
+            <td style="padding: 12px 8px; text-align: left;">${cls.EnrolledCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}</td>
+            <td style="padding: 12px 8px; text-align: left;">${cls.EnrolledCount || 0}</td>
+            <td style="padding: 12px 8px; text-align: left;"><span class="badge bg-success">Active</span></td>
+            <td style="padding: 12px 8px; text-align: left;">
               <button onclick="viewClassStudents(${cls.ID})" class="btn btn-sm btn-info">Manage Students</button>
               <button onclick="editClass(${cls.ID})" class="btn btn-sm btn-secondary">Edit</button> 
               <button onclick="deactivateClass(${cls.ID})" class="btn btn-sm btn-danger">Deactivate</button>
@@ -2544,17 +2490,17 @@ async function renderClasses() {
           </tr>
           ${inactiveClasses.map(cls => `
           <tr style="border-bottom: 1px solid #e0e0e0; opacity: 0.7; background: #f9f9f9;">
-            <td style="padding: 12px 8px;"><strong>${cls.HonorName || 'N/A'}</strong></td>
-            <td style="padding: 12px 8px;">${cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
-            <td style="padding: 12px 8px;">${cls.LocationName || 'N/A'}</td>
-            <td style="padding: 12px 8px;">
+            <td style="padding: 12px 8px; text-align: left;"><strong>${cls.HonorName || 'N/A'}</strong></td>
+            <td style="padding: 12px 8px; text-align: left;">${cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
+            <td style="padding: 12px 8px; text-align: left;">${cls.LocationName || 'N/A'}</td>
+            <td style="padding: 12px 8px; text-align: left;">
               ${cls.TimeslotDate || 'N/A'}<br>
               <small style="color: var(--text-light);">${cls.TimeslotStartTime ? convertTo12Hour(cls.TimeslotStartTime) : ''} - ${cls.TimeslotEndTime ? convertTo12Hour(cls.TimeslotEndTime) : ''}</small>
             </td>
-            <td style="padding: 12px 8px;">${cls.EnrolledCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}</td>
-            <td style="padding: 12px 8px; text-align: center;">${cls.EnrolledCount || 0}</td>
-            <td style="padding: 12px 8px;"><span class="badge bg-danger">Inactive</span></td>
-            <td style="padding: 12px 8px;">
+            <td style="padding: 12px 8px; text-align: left;">${cls.EnrolledCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}</td>
+            <td style="padding: 12px 8px; text-align: left;">${cls.EnrolledCount || 0}</td>
+            <td style="padding: 12px 8px; text-align: left;"><span class="badge bg-danger">Inactive</span></td>
+            <td style="padding: 12px 8px; text-align: left;">
               <button onclick="activateClass(${cls.ID})" class="btn btn-sm btn-success">Activate</button>
             </td>
           </tr>
@@ -2599,19 +2545,19 @@ async function renderClubs() {
       <table class="data-table">
         <thead>
           <tr>
-            <th style="width: 30%; padding: 12px 8px;">Name</th>
-            <th style="width: 25%; padding: 12px 8px;">Church</th>
-            <th style="width: 25%; padding: 12px 8px;">Director</th>
-            <th style="width: 20%; padding: 12px 8px;">Actions</th>
+            <th style="width: 30%; padding: 12px 8px; text-align: left;">Name</th>
+            <th style="width: 25%; padding: 12px 8px; text-align: left;">Church</th>
+            <th style="width: 25%; padding: 12px 8px; text-align: left;">Director</th>
+            <th style="width: 20%; padding: 12px 8px; text-align: left;">Actions</th>
           </tr>
         </thead>
         <tbody>
           ${allClubs.map(club => `
           <tr style="border-bottom: 1px solid #e0e0e0;">
-            <td style="padding: 12px 8px;"><strong>${club.Name}</strong></td>
-            <td style="padding: 12px 8px;">${club.Church || '-'}</td>
-            <td style="padding: 12px 8px;">${club.DirectorFirstName ? `${club.DirectorFirstName} ${club.DirectorLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
-            <td style="padding: 12px 8px;">
+            <td style="padding: 12px 8px; text-align: left;"><strong>${club.Name}</strong></td>
+            <td style="padding: 12px 8px; text-align: left;">${club.Church || '-'}</td>
+            <td style="padding: 12px 8px; text-align: left;">${club.DirectorFirstName ? `${club.DirectorFirstName} ${club.DirectorLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
+            <td style="padding: 12px 8px; text-align: left;">
               <button onclick="editClub(${club.ID})" class="btn btn-sm btn-secondary" style="margin-right: 8px;">Edit</button>
               <button onclick="showMoveClubModal(${club.ID})" class="btn btn-sm btn-info">Move to Event</button>
             </td>
