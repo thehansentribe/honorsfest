@@ -27,6 +27,20 @@ function migrateDatabase() {
     } else {
       console.log('Database schema is up to date');
     }
+
+    // Check Events table for role label columns
+    const eventsTableInfo = db.prepare("PRAGMA table_info(Events)").all();
+    const hasRoleLabels = eventsTableInfo.some(col => col.name === 'RoleLabelStudent');
+    
+    if (!hasRoleLabels) {
+      console.log('Adding role label columns to Events table...');
+      db.exec('ALTER TABLE Events ADD COLUMN RoleLabelStudent TEXT DEFAULT \'Student\'');
+      db.exec('ALTER TABLE Events ADD COLUMN RoleLabelTeacher TEXT DEFAULT \'Teacher\'');
+      db.exec('ALTER TABLE Events ADD COLUMN RoleLabelStaff TEXT DEFAULT \'Staff\'');
+      db.exec('ALTER TABLE Events ADD COLUMN RoleLabelClubDirector TEXT DEFAULT \'Club Director\'');
+      db.exec('ALTER TABLE Events ADD COLUMN RoleLabelEventAdmin TEXT DEFAULT \'Event Admin\'');
+      console.log('Role label columns added successfully');
+    }
     
   } catch (error) {
     console.error('Migration error:', error);

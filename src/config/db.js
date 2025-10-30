@@ -42,7 +42,12 @@ function initializeDatabase() {
         Street TEXT,
         City TEXT,
         State TEXT,
-        ZIP TEXT
+        ZIP TEXT,
+        RoleLabelStudent TEXT DEFAULT 'Student',
+        RoleLabelTeacher TEXT DEFAULT 'Teacher',
+        RoleLabelStaff TEXT DEFAULT 'Staff',
+        RoleLabelClubDirector TEXT DEFAULT 'Club Director',
+        RoleLabelEventAdmin TEXT DEFAULT 'Event Admin'
       );
 
       CREATE TABLE IF NOT EXISTS Locations (

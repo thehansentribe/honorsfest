@@ -2,11 +2,11 @@ const { db } = require('../config/db');
 
 class Event {
   static create(eventData) {
-    const { Name, StartDate, EndDate, Status, Description, CoordinatorName, LocationDescription, Street, City, State, ZIP } = eventData;
+    const { Name, StartDate, EndDate, Status, Description, CoordinatorName, LocationDescription, Street, City, State, ZIP, RoleLabelStudent, RoleLabelTeacher, RoleLabelStaff, RoleLabelClubDirector, RoleLabelEventAdmin } = eventData;
     
     const stmt = db.prepare(`
-      INSERT INTO Events (Name, StartDate, EndDate, Status, Description, CoordinatorName, LocationDescription, Street, City, State, ZIP)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO Events (Name, StartDate, EndDate, Status, Description, CoordinatorName, LocationDescription, Street, City, State, ZIP, RoleLabelStudent, RoleLabelTeacher, RoleLabelStaff, RoleLabelClubDirector, RoleLabelEventAdmin)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -20,7 +20,12 @@ class Event {
       Street || null,
       City || null,
       State || null,
-      ZIP || null
+      ZIP || null,
+      RoleLabelStudent || 'Student',
+      RoleLabelTeacher || 'Teacher',
+      RoleLabelStaff || 'Staff',
+      RoleLabelClubDirector || 'Club Director',
+      RoleLabelEventAdmin || 'Event Admin'
     );
 
     return this.findById(result.lastInsertRowid);
@@ -35,7 +40,7 @@ class Event {
   }
 
   static update(id, updates) {
-    const allowedUpdates = ['Name', 'StartDate', 'EndDate', 'Status', 'Description', 'CoordinatorName', 'LocationDescription', 'Street', 'City', 'State', 'ZIP'];
+    const allowedUpdates = ['Name', 'StartDate', 'EndDate', 'Status', 'Description', 'CoordinatorName', 'LocationDescription', 'Street', 'City', 'State', 'ZIP', 'RoleLabelStudent', 'RoleLabelTeacher', 'RoleLabelStaff', 'RoleLabelClubDirector', 'RoleLabelEventAdmin'];
     const setClause = [];
     const values = [];
 
@@ -69,6 +74,23 @@ class Event {
     stmt.run(...values);
 
     return this.findById(id);
+  }
+
+  // Get role label for a given role type
+  static getRoleLabel(eventId, roleType) {
+    const event = this.findById(eventId);
+    if (!event) return roleType; // Fallback to role type if event not found
+    
+    const labelMap = {
+      'Student': event.RoleLabelStudent || 'Student',
+      'Teacher': event.RoleLabelTeacher || 'Teacher',
+      'Staff': event.RoleLabelStaff || 'Staff',
+      'ClubDirector': event.RoleLabelClubDirector || 'Club Director',
+      'EventAdmin': event.RoleLabelEventAdmin || 'Event Admin',
+      'Admin': 'Admin' // Admin is system-wide and not customizable
+    };
+    
+    return labelMap[roleType] || roleType;
   }
 }
 

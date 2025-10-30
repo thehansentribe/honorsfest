@@ -95,12 +95,15 @@ router.get('/club/:clubId', requireRole('ClubDirector', 'Admin'), (req, res) => 
       `""` // Empty line
     ];
 
+    // Get role label for students
+    const studentLabel = event.RoleLabelStudent || 'Student';
+    
     // Create header row: Student Name, then all class names
     const classHeaders = classes.map(cls => {
       const timeStr = cls.StartTime ? cls.StartTime.substring(0, 5) : '';
       return `"${cls.HonorName} (${cls.Date} ${timeStr})"`;
     });
-    const headerRow = ['"Student Name"', '"Club"', ...classHeaders];
+    const headerRow = [`"${studentLabel} Name"`, '"Club"', ...classHeaders];
     csvLines.push(headerRow.join(','));
 
     // Create data rows: user info and attendance for each class
@@ -252,6 +255,9 @@ router.get('/event/:eventId', requireRole('Admin', 'EventAdmin', 'ClubDirector')
       };
     });
 
+    // Get role label for students
+    const studentLabel = event.RoleLabelStudent || 'Student';
+    
     // Create CSV with event info at top
     const csvLines = [
       `"Event: ${event.Name}"`,
@@ -265,7 +271,7 @@ router.get('/event/:eventId', requireRole('Admin', 'EventAdmin', 'ClubDirector')
       const timeStr = cls.StartTime ? cls.StartTime.substring(0, 5) : '';
       return `"${cls.HonorName} (${cls.Date} ${timeStr})"`;
     });
-    const headerRow = ['"Student Name"', '"Club"', ...classHeaders];
+    const headerRow = [`"${studentLabel} Name"`, '"Club"', ...classHeaders];
     csvLines.push(headerRow.join(','));
 
     // Create data rows: user info and attendance for each class

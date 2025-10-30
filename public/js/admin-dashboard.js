@@ -697,6 +697,29 @@ async function editEvent(eventId) {
           <label for="editLocationDescription">Location Description</label>
           <input type="text" id="editLocationDescription" name="editLocationDescription" class="form-control" value="${event.LocationDescription || ''}">
         </div>
+        <hr style="margin: 20px 0; border-color: var(--border);">
+        <h3 style="margin: 0 0 15px 0; font-size: 16px; color: var(--primary);">Custom Role Names</h3>
+        <small style="color: var(--text-light); margin-bottom: 15px; display: block;">Configure how role names appear for this event.</small>
+        <div class="form-group">
+          <label for="editRoleLabelStudent">Student Label</label>
+          <input type="text" id="editRoleLabelStudent" name="editRoleLabelStudent" class="form-control" value="${event.RoleLabelStudent || 'Student'}">
+        </div>
+        <div class="form-group">
+          <label for="editRoleLabelTeacher">Teacher Label</label>
+          <input type="text" id="editRoleLabelTeacher" name="editRoleLabelTeacher" class="form-control" value="${event.RoleLabelTeacher || 'Teacher'}">
+        </div>
+        <div class="form-group">
+          <label for="editRoleLabelStaff">Staff Label</label>
+          <input type="text" id="editRoleLabelStaff" name="editRoleLabelStaff" class="form-control" value="${event.RoleLabelStaff || 'Staff'}">
+        </div>
+        <div class="form-group">
+          <label for="editRoleLabelClubDirector">Club Director Label</label>
+          <input type="text" id="editRoleLabelClubDirector" name="editRoleLabelClubDirector" class="form-control" value="${event.RoleLabelClubDirector || 'Club Director'}">
+        </div>
+        <div class="form-group">
+          <label for="editRoleLabelEventAdmin">Event Admin Label</label>
+          <input type="text" id="editRoleLabelEventAdmin" name="editRoleLabelEventAdmin" class="form-control" value="${event.RoleLabelEventAdmin || 'Event Admin'}">
+        </div>
         <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 20px;">Update Event</button>
       </form>
     </div>
@@ -718,7 +741,12 @@ async function handleEditEvent(event, eventId) {
     City: form.editCity.value.trim() || null,
     State: form.editState.value.trim() || null,
     ZIP: form.editZIP.value.trim() || null,
-    LocationDescription: form.editLocationDescription.value.trim() || null
+    LocationDescription: form.editLocationDescription.value.trim() || null,
+    RoleLabelStudent: form.editRoleLabelStudent.value.trim() || 'Student',
+    RoleLabelTeacher: form.editRoleLabelTeacher.value.trim() || 'Teacher',
+    RoleLabelStaff: form.editRoleLabelStaff.value.trim() || 'Staff',
+    RoleLabelClubDirector: form.editRoleLabelClubDirector.value.trim() || 'Club Director',
+    RoleLabelEventAdmin: form.editRoleLabelEventAdmin.value.trim() || 'Event Admin'
   };
 
   try {
@@ -1205,6 +1233,29 @@ function showCreateEventForm() {
           <label for="locationDescription">Location Description</label>
           <input type="text" id="locationDescription" name="locationDescription" class="form-control" placeholder="e.g., Community Center Main Hall">
         </div>
+        <hr style="margin: 20px 0; border-color: var(--border);">
+        <h3 style="margin: 0 0 15px 0; font-size: 16px; color: var(--primary);">Custom Role Names</h3>
+        <small style="color: var(--text-light); margin-bottom: 15px; display: block;">Optional: Configure how role names appear for this event.</small>
+        <div class="form-group">
+          <label for="roleLabelStudent">Student Label</label>
+          <input type="text" id="roleLabelStudent" name="roleLabelStudent" class="form-control" value="Student">
+        </div>
+        <div class="form-group">
+          <label for="roleLabelTeacher">Teacher Label</label>
+          <input type="text" id="roleLabelTeacher" name="roleLabelTeacher" class="form-control" value="Teacher">
+        </div>
+        <div class="form-group">
+          <label for="roleLabelStaff">Staff Label</label>
+          <input type="text" id="roleLabelStaff" name="roleLabelStaff" class="form-control" value="Staff">
+        </div>
+        <div class="form-group">
+          <label for="roleLabelClubDirector">Club Director Label</label>
+          <input type="text" id="roleLabelClubDirector" name="roleLabelClubDirector" class="form-control" value="Club Director">
+        </div>
+        <div class="form-group">
+          <label for="roleLabelEventAdmin">Event Admin Label</label>
+          <input type="text" id="roleLabelEventAdmin" name="roleLabelEventAdmin" class="form-control" value="Event Admin">
+        </div>
         <div class="form-actions">
           <button type="submit" class="btn btn-primary">Create Event</button>
           <button type="button" onclick="closeModal('createEventModal')" class="btn btn-outline">Cancel</button>
@@ -1240,6 +1291,11 @@ async function handleCreateEvent(e) {
     State: form.state?.value?.trim() || null,
     ZIP: form.zip?.value?.trim() || null,
     LocationDescription: form.locationDescription?.value?.trim() || null,
+    RoleLabelStudent: form.roleLabelStudent?.value?.trim() || 'Student',
+    RoleLabelTeacher: form.roleLabelTeacher?.value?.trim() || 'Teacher',
+    RoleLabelStaff: form.roleLabelStaff?.value?.trim() || 'Staff',
+    RoleLabelClubDirector: form.roleLabelClubDirector?.value?.trim() || 'Club Director',
+    RoleLabelEventAdmin: form.roleLabelEventAdmin?.value?.trim() || 'Event Admin',
     Status: 'Closed'
   };
 
