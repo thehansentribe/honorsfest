@@ -42,6 +42,18 @@ function migrateDatabase() {
       console.log('Role label columns added successfully');
     }
     
+    // Check Classes table for CreatedBy column
+    const classesTableInfo = db.prepare("PRAGMA table_info(Classes)").all();
+    const hasCreatedBy = classesTableInfo.some(col => col.name === 'CreatedBy');
+    
+    if (!hasCreatedBy) {
+      console.log('Adding CreatedBy column to Classes table...');
+      db.exec('ALTER TABLE Classes ADD COLUMN CreatedBy INTEGER');
+      // Set existing classes to null (created by admin/system)
+      db.exec('UPDATE Classes SET CreatedBy = NULL WHERE CreatedBy IS NULL');
+      console.log('CreatedBy column added successfully');
+    }
+    
   } catch (error) {
     console.error('Migration error:', error);
     // Don't throw, just log

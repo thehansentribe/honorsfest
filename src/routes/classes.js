@@ -72,7 +72,11 @@ router.get('/details/:id', (req, res) => {
 // POST /api/classes - Create class (Admin, EventAdmin, ClubDirector)
 router.post('/', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) => {
   try {
-    const classData = Class.create(req.body);
+    // Set CreatedBy from authenticated user
+    const classData = Class.create({
+      ...req.body,
+      CreatedBy: req.user.id
+    });
     res.status(201).json(classData);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -82,7 +86,30 @@ router.post('/', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) 
 // PUT /api/classes/:id - Update class
 router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) => {
   try {
-    const classData = Class.update(parseInt(req.params.id), req.body);
+    const classId = parseInt(req.params.id);
+    const existingClass = Class.findById(classId);
+    
+    if (!existingClass) {
+      return res.status(404).json({ error: 'Class not found' });
+    }
+    
+    // ClubDirectors can only edit classes they created
+    if (req.user.role === 'ClubDirector' && existingClass.CreatedBy !== req.user.id) {
+      return res.status(403).json({ error: 'You can only edit classes that you created' });
+    }
+    
+    // ClubDirectors can only edit TeacherID and TeacherMaxStudents (max capacity)
+    // They cannot edit LocationID or other fields
+    if (req.user.role === 'ClubDirector') {
+      const allowedFields = ['TeacherID', 'TeacherMaxStudents'];
+      const restrictedFields = Object.keys(req.body).filter(key => !allowedFields.includes(key) && key !== 'CreatedBy');
+      
+      if (restrictedFields.length > 0) {
+        return res.status(403).json({ error: `You can only edit teacher and max capacity. Cannot edit: ${restrictedFields.join(', ')}` });
+      }
+    }
+    
+    const classData = Class.update(classId, req.body);
     if (!classData) {
       return res.status(404).json({ error: 'Class not found' });
     }

@@ -2,7 +2,7 @@ const { db } = require('../config/db');
 
 class Class {
   static create(classData) {
-    const { EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents } = classData;
+    const { EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents, CreatedBy } = classData;
     
     // Validate no duplicate honor by same teacher in same timeslot
     const duplicate = db.prepare(`
@@ -25,8 +25,8 @@ class Class {
     }
 
     const stmt = db.prepare(`
-      INSERT INTO Classes (EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO Classes (EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents, CreatedBy)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -36,7 +36,8 @@ class Class {
       LocationID,
       TimeslotID,
       actualCapacity,
-      TeacherMaxStudents
+      TeacherMaxStudents,
+      CreatedBy || null
     );
 
     return this.findById(result.lastInsertRowid);

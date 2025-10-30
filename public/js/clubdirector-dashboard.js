@@ -355,7 +355,10 @@ async function renderClasses() {
           </tr>
         </thead>
         <tbody>
-          ${activeClasses.map(cls => `
+          ${activeClasses.map(cls => {
+            // Check if current director created this class
+            const canEdit = cls.CreatedBy === clubDirectorUser?.id;
+            return `
           <tr style="border-bottom: 1px solid #e0e0e0;">
             <td style="padding: 12px 8px; text-align: left;"><strong>${cls.HonorName || 'N/A'}</strong></td>
             <td style="padding: 12px 8px; text-align: left;">${cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
@@ -369,10 +372,11 @@ async function renderClasses() {
             <td style="padding: 12px 8px; text-align: left;"><span class="badge bg-success">Active</span></td>
             <td style="padding: 12px 8px; text-align: left;">
               <button onclick="viewClassStudents(${cls.ID})" class="btn btn-sm btn-info">Manage Students</button>
-              <button onclick="editClass(${cls.ID})" class="btn btn-sm btn-secondary">Edit</button>
+              ${canEdit ? `<button onclick="editClass(${cls.ID})" class="btn btn-sm btn-secondary">Edit</button>` : ''}
             </td>
           </tr>
-        `).join('')}
+        `;
+        }).join('')}
         </tbody>
       </table>
     `;
@@ -752,10 +756,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
           <div class="form-group">
             <label for="editClassLocation">Location</label>
-            <select id="editClassLocation" name="editClassLocation" class="form-control">
+            <select id="editClassLocation" name="editClassLocation" class="form-control" disabled>
               <option value="">No Location</option>
               ${locations.map(l => `<option value="${l.ID}" ${cls.LocationID === l.ID ? 'selected' : ''}>${l.Name} (Capacity: ${l.MaxCapacity})</option>`).join('')}
             </select>
+            <small style="color: var(--text-light);">Location can only be changed by Admins</small>
           </div>
           <div class="form-group">
             <label for="editClassMaxCapacity">Max Capacity</label>
@@ -776,9 +781,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       e.preventDefault();
       const form = e.target;
       
+      // Club Directors can only edit TeacherID and TeacherMaxStudents
       const classData = {
         TeacherID: form.editClassTeacher?.value || null,
-        LocationID: form.editClassLocation?.value || null,
         TeacherMaxStudents: parseInt(form.editClassMaxCapacity?.value) || 0
       };
       

@@ -102,11 +102,13 @@ function initializeDatabase() {
         MaxCapacity INTEGER NOT NULL,
         TeacherMaxStudents INTEGER NOT NULL,
         Active BOOLEAN NOT NULL DEFAULT 1,
+        CreatedBy INTEGER,
         FOREIGN KEY (EventID) REFERENCES Events(ID),
         FOREIGN KEY (HonorID) REFERENCES Honors(ID),
         FOREIGN KEY (TeacherID) REFERENCES Users(ID),
         FOREIGN KEY (LocationID) REFERENCES Locations(ID),
-        FOREIGN KEY (TimeslotID) REFERENCES Timeslots(ID)
+        FOREIGN KEY (TimeslotID) REFERENCES Timeslots(ID),
+        FOREIGN KEY (CreatedBy) REFERENCES Users(ID)
       );
 
       CREATE TABLE IF NOT EXISTS Registrations (
