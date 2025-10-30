@@ -984,7 +984,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               <th style="padding: 12px 8px; text-align: left;">Created</th>
               <th style="padding: 12px 8px; text-align: left;">Expires</th>
               <th style="padding: 12px 8px; text-align: left;">Status</th>
-              <th style="padding: 12px 8px; text-align: center;">Copy</th>
+              <th style="padding: 12px 8px; text-align: left;">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -999,8 +999,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     : '<span class="badge bg-danger">Expired</span>'
                   }
                 </td>
-                <td style="padding: 12px 8px; text-align: center;">
-                  <button onclick="copyRegistrationCode('${code.Code}')" class="btn btn-sm btn-primary">Copy</button>
+                <td style="padding: 12px 8px; text-align: left;">
+                  <button onclick="shareRegistrationCode('${code.Code}')" class="btn btn-sm btn-info" style="margin-right: 8px;">Share</button>
+                  <button onclick="deleteRegistrationCode('${code.Code}')" class="btn btn-sm btn-danger">Delete</button>
                 </td>
               </tr>
             `).join('')}
@@ -1145,12 +1146,43 @@ Thank you!`;
     });
   };
   
+  // Share registration code (opens email modal)
+  function shareRegistrationCode(code) {
+    showCodeEmailModal(code);
+  }
+  
+  // Delete registration code
+  async function deleteRegistrationCode(code) {
+    if (!confirm('Are you sure you want to delete this registration code? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      const response = await fetchWithAuth(`/api/codes/${code}`, {
+        method: 'DELETE'
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        showNotification('Registration code deleted successfully', 'success');
+        await renderCodes();
+      } else {
+        showNotification(result.error || 'Error deleting code', 'error');
+      }
+    } catch (error) {
+      showNotification('Error deleting code: ' + error.message, 'error');
+    }
+  }
+  
   // Export filter functions
   window.toggleClubDirectorColumnFilter = toggleClubDirectorColumnFilter;
   window.updateClubDirectorFilter = updateClubDirectorFilter;
   window.renderUsers = renderUsers;
   window.copyCodeEmail = copyCodeEmail;
   window.closeClubDirectorModal = closeClubDirectorModal;
+  window.shareRegistrationCode = shareRegistrationCode;
+  window.deleteRegistrationCode = deleteRegistrationCode;
   
   async function checkEventStatus() {
     try {

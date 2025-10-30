@@ -128,5 +128,27 @@ router.get('/club/:clubId', verifyToken, requireRole('ClubDirector'), (req, res)
   }
 });
 
+// DELETE /api/codes/:code - Delete a registration code (ClubDirector only)
+router.delete('/:code', verifyToken, requireRole('ClubDirector'), (req, res) => {
+  try {
+    const code = req.params.code.toUpperCase();
+    const codeData = RegistrationCode.findByCode(code);
+    
+    if (!codeData) {
+      return res.status(404).json({ error: 'Registration code not found' });
+    }
+    
+    // Verify the director is associated with this club
+    if (req.user.clubId !== codeData.ClubID) {
+      return res.status(403).json({ error: 'You can only delete codes for your own club' });
+    }
+    
+    RegistrationCode.delete(code);
+    res.json({ message: 'Registration code deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
 

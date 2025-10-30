@@ -58,6 +58,10 @@ class RegistrationCode {
       ORDER BY c.CreatedAt DESC
     `).all(clubId);
   }
+
+  static delete(code) {
+    return db.prepare('DELETE FROM RegistrationCodes WHERE Code = ?').run(code);
+  }
 }
 
 module.exports = RegistrationCode;
