@@ -794,7 +794,7 @@ function renderClassesList() {
             <td>${cls.ActualMaxCapacity || cls.MaxCapacity}</td>
             <td>${cls.EnrolledCount || 0}</td>
             <td>
-              <button onclick="viewClassStudents(${cls.ID})" class="btn btn-sm btn-info">View Students</button>
+              <button onclick="viewClassStudents(${cls.ID})" class="btn btn-sm btn-info">Manage Students</button>
               ${cls.Active ? `<button onclick="deactivateClass(${cls.ID})" class="btn btn-sm btn-danger">Deactivate</button>` : ''}
             </td>
           </tr>
@@ -1162,7 +1162,7 @@ async function viewClassStudents(classId) {
                 const waitlisted = roster.filter(s => s.Status === 'Waitlisted');
                 
                 return `
-                  <h3 style="margin-bottom: 15px;">Enrolled Students (${enrolled.length})</h3>
+                  <h3 style="margin-bottom: 15px;">Enrolled Students (${enrolled.length}/${classData.ActualMaxCapacity || classData.MaxCapacity})</h3>
                   ${enrolled.length > 0 ? `
                     <table class="table" style="margin-bottom: 30px;">
                       <thead>
@@ -1278,13 +1278,7 @@ async function handleAddStudentToClass(classId) {
     
     if (response.ok) {
       showNotification('Student added successfully', 'success');
-      closeModal('viewStudentsModal');
-      // Refresh the classes list to update counts
-      const currentTab = localStorage.getItem('adminCurrentTab') || 'events';
-      if (currentTab === 'classes') {
-        await renderClasses();
-      }
-      // Reload the modal to show updated student list
+      // Don't close or refresh - just reload the modal content
       await viewClassStudents(classId);
     } else {
       showNotification(result.error || 'Error adding student', 'error');
@@ -1304,14 +1298,7 @@ async function removeStudentFromClass(registrationId, classId) {
     
     if (response.ok) {
       showNotification('Student removed successfully', 'success');
-      // Close the modal first
-      closeModal('viewStudentsModal');
-      // Refresh the classes list to update counts
-      const currentTab = localStorage.getItem('adminCurrentTab') || 'events';
-      if (currentTab === 'classes') {
-        await renderClasses();
-      }
-      // Reload the modal to show updated student list
+      // Don't close or refresh - just reload the modal content
       await viewClassStudents(classId);
     } else {
       const result = await response.json();
@@ -1443,6 +1430,14 @@ function closeModal(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) {
     modal.remove();
+    
+    // If closing the viewStudentsModal, refresh the classes list to update counts
+    if (modalId === 'viewStudentsModal') {
+      const currentTab = localStorage.getItem('adminCurrentTab') || 'events';
+      if (currentTab === 'classes') {
+        renderClasses();
+      }
+    }
   }
 }
 
@@ -2534,10 +2529,10 @@ async function renderClasses() {
               <small style="color: var(--text-light);">${cls.TimeslotStartTime ? convertTo12Hour(cls.TimeslotStartTime) : ''} - ${cls.TimeslotEndTime ? convertTo12Hour(cls.TimeslotEndTime) : ''}</small>
             </td>
             <td style="padding: 12px 8px;">${cls.EnrolledCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}</td>
-            <td style="padding: 12px 8px; text-align: center;">${cls.EnrolledCount || 0}</td>
-            <td style="padding: 12px 8px; text-align: center;"><span class="badge bg-success">Active</span></td>
-            <td style="padding: 12px 8px; text-align: center;">
-              <button onclick="viewClassStudents(${cls.ID})" class="btn btn-sm btn-info">View Students</button>
+            <td style="padding: 12px 8px;">${cls.EnrolledCount || 0}</td>
+            <td style="padding: 12px 8px;"><span class="badge bg-success">Active</span></td>
+            <td style="padding: 12px 8px;">
+              <button onclick="viewClassStudents(${cls.ID})" class="btn btn-sm btn-info">Manage Students</button>
               <button onclick="editClass(${cls.ID})" class="btn btn-sm btn-secondary">Edit</button> 
               <button onclick="deactivateClass(${cls.ID})" class="btn btn-sm btn-danger">Deactivate</button>
             </td>
@@ -2558,8 +2553,8 @@ async function renderClasses() {
             </td>
             <td style="padding: 12px 8px;">${cls.EnrolledCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}</td>
             <td style="padding: 12px 8px; text-align: center;">${cls.EnrolledCount || 0}</td>
-            <td style="padding: 12px 8px; text-align: center;"><span class="badge bg-danger">Inactive</span></td>
-            <td style="padding: 12px 8px; text-align: center;">
+            <td style="padding: 12px 8px;"><span class="badge bg-danger">Inactive</span></td>
+            <td style="padding: 12px 8px;">
               <button onclick="activateClass(${cls.ID})" class="btn btn-sm btn-success">Activate</button>
             </td>
           </tr>

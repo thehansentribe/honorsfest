@@ -365,10 +365,10 @@ async function renderClasses() {
               <small style="color: var(--text-light);">${cls.TimeslotStartTime ? convertTo12Hour(cls.TimeslotStartTime) : ''} - ${cls.TimeslotEndTime ? convertTo12Hour(cls.TimeslotEndTime) : ''}</small>
             </td>
             <td style="padding: 12px 8px;">${cls.EnrolledCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}</td>
-            <td style="padding: 12px 8px; text-align: center;">${cls.EnrolledCount || 0}</td>
-            <td style="padding: 12px 8px; text-align: center;"><span class="badge bg-success">Active</span></td>
-            <td style="padding: 12px 8px; text-align: center;">
-              <button onclick="viewClassStudents(${cls.ID})" class="btn btn-sm btn-info">View Students</button>
+            <td style="padding: 12px 8px;">${cls.EnrolledCount || 0}</td>
+            <td style="padding: 12px 8px;"><span class="badge bg-success">Active</span></td>
+            <td style="padding: 12px 8px;">
+              <button onclick="viewClassStudents(${cls.ID})" class="btn btn-sm btn-info">Manage Students</button>
               <button onclick="editClass(${cls.ID})" class="btn btn-sm btn-secondary">Edit</button>
             </td>
           </tr>
