@@ -125,11 +125,11 @@ function seedDatabase() {
     
     // Create clubs for each event if they don't exist
     const events = db.prepare('SELECT ID FROM Events ORDER BY ID').all();
-    const clubs = [
-      { Name: 'Adventurer Club Alpha', Church: 'First Baptist Church' },
-      { Name: 'Adventurer Club Beta', Church: 'Grace Community Church' },
-      { Name: 'Adventurer Club Gamma', Church: 'Hope Presbyterian Church' },
-      { Name: 'Adventurer Club Delta', Church: 'St. Mary\'s Catholic Church' }
+  const clubs = [
+      { Name: 'Club 1', Church: 'Church 1' },
+      { Name: 'Club 2', Church: 'Church 2' },
+      { Name: 'Club 3', Church: 'Church 3' },
+      { Name: 'Club 4', Church: 'Church 4' }
     ];
     
     events.forEach(event => {
@@ -138,9 +138,25 @@ function seedDatabase() {
         const insertClub = db.prepare('INSERT INTO Clubs (EventID, Name, Church) VALUES (?, ?, ?)');
         
         clubs.forEach((club, index) => {
-          const result = insertClub.run(event.ID, `${club.Name} - Event ${event.ID}`, club.Church);
+          const result = insertClub.run(event.ID, club.Name, club.Church);
           const clubId = result.lastInsertRowid;
-          console.log(`Created club: ${club.Name} - Event ${event.ID} (ID: ${clubId})`);
+          console.log(`Created club: ${club.Name} (Event ${event.ID}) (ID: ${clubId})`);
+          
+          // Create a club director and assign to this club
+          const directorRes = insertUser.run(
+            `Director${index + 1}`,
+            'Leader',
+            `director${index + 1}.club${clubId}`,
+            new Date(new Date().getFullYear() - 35, 0, 1).toISOString().split('T')[0],
+            passwordHash,
+            'ClubDirector',
+            1,
+            1
+          );
+          const directorId = directorRes.lastInsertRowid;
+          db.prepare('UPDATE Users SET ClubID = ?, EventID = ?, InvestitureLevel = ? WHERE ID = ?')
+            .run(clubId, event.ID, 'MasterGuide', directorId);
+          db.prepare('UPDATE Clubs SET DirectorID = ? WHERE ID = ?').run(directorId, clubId);
           
           // Create users for this club
           const userIndex = (event.ID - 1) * 4 + index;
@@ -185,6 +201,74 @@ function seedDatabase() {
           
           console.log(`Created 8 users for club ${clubId}`);
         });
+      }
+
+      // Seed 4 locations per event if none exist
+      const locCount = db.prepare('SELECT COUNT(*) as count FROM Locations WHERE EventID = ?').get(event.ID);
+      if (locCount.count === 0) {
+        const insertLoc = db.prepare('INSERT INTO Locations (EventID, Name, Description, MaxCapacity) VALUES (?, ?, ?, ?)');
+        const locs = [
+          { Name: 'Gymnasium', Desc: 'Main gym', Cap: 40 },
+          { Name: 'Auditorium', Desc: 'Large hall', Cap: 60 },
+          { Name: 'Classroom A', Desc: 'Standard room', Cap: 25 },
+          { Name: 'Classroom B', Desc: 'Standard room', Cap: 25 }
+        ];
+        locs.forEach((l) => insertLoc.run(event.ID, `${l.Name} - Event ${event.ID}`, l.Desc, l.Cap));
+        console.log(`Created 4 locations for event ${event.ID}`);
+      }
+
+      // Seed 2 timeslots per event if none exist
+      const tsCount = db.prepare('SELECT COUNT(*) as count FROM Timeslots WHERE EventID = ?').get(event.ID);
+      if (tsCount.count === 0) {
+        const insertTs = db.prepare('INSERT INTO Timeslots (EventID, Date, StartTime, EndTime) VALUES (?, ?, ?, ?)');
+        // Derive two days from event dates
+        const ev = db.prepare('SELECT StartDate, EndDate FROM Events WHERE ID = ?').get(event.ID);
+        const d1 = ev.StartDate;
+        const d2 = ev.EndDate;
+        insertTs.run(event.ID, d1, '09:00', '10:30');
+        insertTs.run(event.ID, d1, '11:00', '12:30');
+        insertTs.run(event.ID, d2, '09:00', '10:30');
+        insertTs.run(event.ID, d2, '11:00', '12:30');
+        console.log(`Created 4 timeslots for event ${event.ID}`);
+      }
+
+      // Seed 4 classes per event if none exist
+      const classCount = db.prepare('SELECT COUNT(*) as count FROM Classes WHERE EventID = ?').get(event.ID);
+      if (classCount.count === 0) {
+        const insertClass = db.prepare(`
+          INSERT INTO Classes (EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents, Active)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        `);
+
+        // Pick 4 honors
+        const honors = db.prepare('SELECT ID FROM Honors ORDER BY ID LIMIT 4').all();
+        // Pick teachers for this event (any teacher linked to a club in this event)
+        const teacherIds = db.prepare(`
+          SELECT u.ID
+          FROM Users u
+          JOIN Clubs c ON u.ClubID = c.ID
+          WHERE u.Role = 'Teacher' AND c.EventID = ?
+          ORDER BY u.ID
+        `).all(event.ID).map(r => r.ID);
+        // Locations and timeslots for this event
+        const locIds = db.prepare('SELECT ID FROM Locations WHERE EventID = ? ORDER BY ID').all(event.ID).map(r => r.ID);
+        const tsIds = db.prepare('SELECT ID FROM Timeslots WHERE EventID = ? ORDER BY Date, StartTime').all(event.ID).map(r => r.ID);
+
+        // Ensure we have enough associations
+        if (honors.length >= 4 && teacherIds.length >= 4 && locIds.length >= 4 && tsIds.length >= 2) {
+          for (let i = 0; i < 4; i++) {
+            const honorId = honors[i].ID;
+            const teacherId = teacherIds[i % teacherIds.length];
+            const locId = locIds[i % locIds.length];
+            const tsId = tsIds[i % tsIds.length];
+            const teacherCap = 20;
+            const maxCap = 20;
+            insertClass.run(event.ID, honorId, teacherId, locId, tsId, maxCap, teacherCap);
+          }
+          console.log(`Created 4 classes for event ${event.ID}`);
+        } else {
+          console.warn(`Skipping class seeding for event ${event.ID} due to insufficient data`);
+        }
       }
     });
 

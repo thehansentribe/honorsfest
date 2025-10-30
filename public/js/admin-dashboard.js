@@ -380,6 +380,26 @@ function updateEventDropdowns() {
         option.textContent = event.Name;
         select.appendChild(option);
       });
+
+      // Restore saved selection per filter
+      const keyMap = {
+        'locationEventFilter': 'adminFilter_location',
+        'timeslotEventFilter': 'adminFilter_timeslot',
+        'clubEventFilter': 'adminFilter_club',
+        'classEventFilter': 'adminFilter_class',
+        'reportEventFilter': 'adminFilter_report'
+      };
+      const storageKey = keyMap[select.id];
+      try {
+        const saved = storageKey ? localStorage.getItem(storageKey) : null;
+        if (saved) select.value = saved;
+      } catch (e) {}
+
+      // Save on change
+      select.addEventListener('change', () => {
+        const k = keyMap[select.id];
+        try { if (k) localStorage.setItem(k, select.value || ''); } catch (e) {}
+      }, { once: false });
     }
   });
 }
