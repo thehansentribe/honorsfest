@@ -38,6 +38,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   switchTab(savedTab);
 });
 
+// Helper function to get role label from event
+function getRoleLabel(role, eventId) {
+  if (!eventId || !allEvents) return role;
+  const event = allEvents.find(e => e.ID === eventId);
+  if (!event) return role;
+  
+  const labelMap = {
+    'Student': event.RoleLabelStudent || 'Student',
+    'Teacher': event.RoleLabelTeacher || 'Teacher',
+    'Staff': event.RoleLabelStaff || 'Staff',
+    'ClubDirector': event.RoleLabelClubDirector || 'Club Director',
+    'EventAdmin': event.RoleLabelEventAdmin || 'Event Admin',
+    'Admin': 'Admin' // Admin is not customizable
+  };
+  
+  return labelMap[role] || role;
+}
+
 // Toggle event dropdown based on role selection
 async function toggleEventDropdown(role) {
   const eventContainer = document.getElementById('eventContainer');
@@ -506,9 +524,9 @@ function renderUsers() {
           <th>Name</th>
           <th>Username</th>
           <th>Role</th>
+          <th>Event</th>
           <th>Club</th>
           <th>Age (DOB)</th>
-          <th>Active</th>
           <th>BG Check</th>
           <th>Actions</th>
         </tr>
@@ -518,10 +536,10 @@ function renderUsers() {
           <tr>
             <td>${user.FirstName} ${user.LastName}</td>
             <td>${user.Username}</td>
-            <td>${user.Role}</td>
+            <td>${getRoleLabel(user.Role, user.EventID)}</td>
+            <td>${user.EventName ? user.EventName : '<span style="color: #999;">N/A</span>'}</td>
             <td>${user.ClubName ? `<strong>${user.ClubName}</strong>` : '<span style="color: #d32f2f;">None</span>'}</td>
             <td>${user.Age !== null ? user.Age : 'N/A'}</td>
-            <td>${user.Active ? 'Yes' : 'No'}</td>
             <td>${user.BackgroundCheck ? '✓' : '-'}</td>
             <td>
               <button onclick="editUser(${user.ID})" class="btn btn-sm btn-secondary">Edit</button>

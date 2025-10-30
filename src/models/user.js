@@ -140,7 +140,7 @@ class User {
   }
 
   static getAll(filters = {}) {
-    let query = 'SELECT u.*, c.Name as ClubName FROM Users u LEFT JOIN Clubs c ON u.ClubID = c.ID WHERE 1=1';
+    let query = 'SELECT u.*, c.Name as ClubName, e.Name as EventName, e.ID as EventID FROM Users u LEFT JOIN Clubs c ON u.ClubID = c.ID LEFT JOIN Events e ON u.EventID = e.ID WHERE 1=1';
     const params = [];
 
     if (filters.role) {
