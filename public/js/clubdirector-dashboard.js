@@ -11,6 +11,11 @@ let clubDirectorUsers = [];
 let clubDirectorEvents = [];
 let clubDirectorClasses = [];
 
+// Filter state for user table
+let clubDirectorFilters = {};
+let clubDirectorSortColumn = null;
+let clubDirectorSortDirection = 'asc';
+
 // Define functions BEFORE they're called in DOMContentLoaded
 
 // Override switchTab
@@ -117,22 +122,125 @@ function renderUsers() {
     return;
   }
   
+  // Apply filters
+  let filteredUsers = [...clubDirectorUsers];
+  
+  if (Object.keys(clubDirectorFilters).length > 0) {
+    filteredUsers = filteredUsers.filter(user => {
+      return Object.entries(clubDirectorFilters).every(([column, filterValue]) => {
+        if (!filterValue) return true;
+        const lowerFilter = filterValue.toLowerCase();
+        
+        switch(column) {
+          case 'name':
+            return `${user.FirstName} ${user.LastName}`.toLowerCase().includes(lowerFilter);
+          case 'username':
+            return user.Username.toLowerCase().includes(lowerFilter);
+          case 'role':
+            return user.Role.toLowerCase().includes(lowerFilter);
+          case 'club':
+            return (user.ClubName || 'None').toLowerCase().includes(lowerFilter);
+          case 'age':
+            return (user.Age !== null ? user.Age.toString() : 'N/A').toLowerCase().includes(lowerFilter);
+          case 'active':
+            return (user.Active ? 'yes' : 'no').includes(lowerFilter);
+          case 'bgcheck':
+            return (user.BackgroundCheck ? 'yes' : 'no').includes(lowerFilter);
+          default:
+            return true;
+        }
+      });
+    });
+  }
+  
+  // Apply sorting
+  if (clubDirectorSortColumn) {
+    filteredUsers.sort((a, b) => {
+      let aVal, bVal;
+      
+      switch(clubDirectorSortColumn) {
+        case 'name':
+          aVal = `${a.FirstName} ${a.LastName}`;
+          bVal = `${b.FirstName} ${b.LastName}`;
+          break;
+        case 'username':
+          aVal = a.Username;
+          bVal = b.Username;
+          break;
+        case 'role':
+          aVal = a.Role;
+          bVal = b.Role;
+          break;
+        case 'club':
+          aVal = a.ClubName || '';
+          bVal = b.ClubName || '';
+          break;
+        case 'age':
+          aVal = a.Age !== null ? a.Age : 0;
+          bVal = b.Age !== null ? b.Age : 0;
+          break;
+        case 'active':
+          aVal = a.Active ? 1 : 0;
+          bVal = b.Active ? 1 : 0;
+          break;
+        case 'bgcheck':
+          aVal = a.BackgroundCheck ? 1 : 0;
+          bVal = b.BackgroundCheck ? 1 : 0;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (typeof aVal === 'string') {
+        return clubDirectorSortDirection === 'asc' 
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      } else {
+        return clubDirectorSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+    });
+  }
+  
   container.innerHTML = `
     <table class="table">
       <thead>
         <tr>
-          <th>Name</th>
-          <th>Username</th>
-          <th>Role</th>
-          <th>Club</th>
-          <th>Age (DOB)</th>
-          <th>Active</th>
-          <th>BG Check</th>
+          <th class="filterable ${clubDirectorFilters.name ? 'filter-active' : ''}" onclick="toggleClubDirectorColumnFilter('name')">Name ${clubDirectorSortColumn === 'name' ? (clubDirectorSortDirection === 'asc' ? '↑' : '↓') : ''}</th>
+          <th class="filterable ${clubDirectorFilters.username ? 'filter-active' : ''}" onclick="toggleClubDirectorColumnFilter('username')">Username ${clubDirectorSortColumn === 'username' ? (clubDirectorSortDirection === 'asc' ? '↑' : '↓') : ''}</th>
+          <th class="filterable ${clubDirectorFilters.role ? 'filter-active' : ''}" onclick="toggleClubDirectorColumnFilter('role')">Role ${clubDirectorSortColumn === 'role' ? (clubDirectorSortDirection === 'asc' ? '↑' : '↓') : ''}</th>
+          <th class="filterable ${clubDirectorFilters.club ? 'filter-active' : ''}" onclick="toggleClubDirectorColumnFilter('club')">Club ${clubDirectorSortColumn === 'club' ? (clubDirectorSortDirection === 'asc' ? '↑' : '↓') : ''}</th>
+          <th class="filterable ${clubDirectorFilters.age ? 'filter-active' : ''}" onclick="toggleClubDirectorColumnFilter('age')">Age (DOB) ${clubDirectorSortColumn === 'age' ? (clubDirectorSortDirection === 'asc' ? '↑' : '↓') : ''}</th>
+          <th class="filterable ${clubDirectorFilters.active ? 'filter-active' : ''}" onclick="toggleClubDirectorColumnFilter('active')">Active ${clubDirectorSortColumn === 'active' ? (clubDirectorSortDirection === 'asc' ? '↑' : '↓') : ''}</th>
+          <th class="filterable ${clubDirectorFilters.bgcheck ? 'filter-active' : ''}" onclick="toggleClubDirectorColumnFilter('bgcheck')">BG Check ${clubDirectorSortColumn === 'bgcheck' ? (clubDirectorSortDirection === 'asc' ? '↑' : '↓') : ''}</th>
           <th>Actions</th>
+        </tr>
+        <tr class="filter-row" id="clubDirectorFilterRow" style="display: ${Object.keys(clubDirectorFilters).length > 0 ? 'table-row' : 'none'};">
+          <td class="filter-cell">
+            <input type="text" class="filter-input" id="filter-cd-name" value="${clubDirectorFilters.name || ''}" oninput="updateClubDirectorFilter('name', this.value)" placeholder="Filter...">
+          </td>
+          <td class="filter-cell">
+            <input type="text" class="filter-input" id="filter-cd-username" value="${clubDirectorFilters.username || ''}" oninput="updateClubDirectorFilter('username', this.value)" placeholder="Filter...">
+          </td>
+          <td class="filter-cell">
+            <input type="text" class="filter-input" id="filter-cd-role" value="${clubDirectorFilters.role || ''}" oninput="updateClubDirectorFilter('role', this.value)" placeholder="Filter...">
+          </td>
+          <td class="filter-cell">
+            <input type="text" class="filter-input" id="filter-cd-club" value="${clubDirectorFilters.club || ''}" oninput="updateClubDirectorFilter('club', this.value)" placeholder="Filter...">
+          </td>
+          <td class="filter-cell">
+            <input type="text" class="filter-input" id="filter-cd-age" value="${clubDirectorFilters.age || ''}" oninput="updateClubDirectorFilter('age', this.value)" placeholder="Filter...">
+          </td>
+          <td class="filter-cell">
+            <input type="text" class="filter-input" id="filter-cd-active" value="${clubDirectorFilters.active || ''}" oninput="updateClubDirectorFilter('active', this.value)" placeholder="Filter...">
+          </td>
+          <td class="filter-cell">
+            <input type="text" class="filter-input" id="filter-cd-bgcheck" value="${clubDirectorFilters.bgcheck || ''}" oninput="updateClubDirectorFilter('bgcheck', this.value)" placeholder="Filter...">
+          </td>
+          <td class="filter-cell"></td>
         </tr>
       </thead>
       <tbody>
-        ${clubDirectorUsers.map(user => `
+        ${filteredUsers.length === 0 ? '<tr><td colspan="8" class="text-center">No users match the current filters</td></tr>' : filteredUsers.map(user => `
           <tr>
             <td>${user.FirstName} ${user.LastName}</td>
             <td>${user.Username}</td>
@@ -149,6 +257,44 @@ function renderUsers() {
       </tbody>
     </table>
   `;
+}
+
+function toggleClubDirectorColumnFilter(column) {
+  // Show filter row if hidden and add filter for this column
+  const filterRow = document.getElementById('clubDirectorFilterRow');
+  if (filterRow && filterRow.style.display === 'none') {
+    filterRow.style.display = 'table-row';
+  }
+  
+  // Focus on the filter input for this column
+  const filterInput = document.getElementById(`filter-cd-${column}`);
+  if (filterInput) {
+    filterInput.focus();
+  }
+  
+  // Toggle sorting
+  if (clubDirectorSortColumn === column) {
+    clubDirectorSortDirection = clubDirectorSortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    clubDirectorSortColumn = column;
+    clubDirectorSortDirection = 'asc';
+  }
+  
+  renderUsers();
+}
+
+function updateClubDirectorFilter(column, value) {
+  if (value.trim()) {
+    clubDirectorFilters[column] = value.trim();
+  } else {
+    delete clubDirectorFilters[column];
+    // Hide filter row if no filters active
+    if (Object.keys(clubDirectorFilters).length === 0) {
+      const filterRow = document.getElementById('clubDirectorFilterRow');
+      if (filterRow) filterRow.style.display = 'none';
+    }
+  }
+  renderUsers();
 }
 
 // Helper function for time conversion
@@ -909,6 +1055,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       showNotification('Failed to copy code', 'error');
     });
   };
+  
+  // Export filter functions
+  window.toggleClubDirectorColumnFilter = toggleClubDirectorColumnFilter;
+  window.updateClubDirectorFilter = updateClubDirectorFilter;
+  window.renderUsers = renderUsers;
   
   async function checkEventStatus() {
     try {

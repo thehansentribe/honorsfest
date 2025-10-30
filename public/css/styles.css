@@ -231,6 +231,42 @@ body {
   color: var(--text);
 }
 
+.table th.filterable {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  padding: 8px;
+}
+
+.table th.filterable:hover {
+  background-color: #f1f5f9;
+}
+
+.table th.filterable.filter-active::after {
+  content: " 🔍";
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.filter-input {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 13px;
+  margin-top: 4px;
+  box-sizing: border-box;
+}
+
+.filter-row {
+  display: table-row;
+}
+
+.filter-cell {
+  display: table-cell;
+  padding: 4px 8px 8px 8px;
+}
+
 .table tr:hover {
   background-color: var(--background);
 }

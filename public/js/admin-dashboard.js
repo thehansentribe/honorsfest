@@ -9,6 +9,11 @@ let allClubs = [];
 let allClasses = [];
 let currentUser = null;
 
+// Filter state for user table
+let userFilters = {};
+let userSortColumn = null;
+let userSortDirection = 'asc';
+
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', async () => {
   if (!checkAuth()) {
@@ -517,22 +522,125 @@ function renderUsers() {
     return;
   }
   
+  // Apply filters
+  let filteredUsers = [...allUsers];
+  
+  if (Object.keys(userFilters).length > 0) {
+    filteredUsers = filteredUsers.filter(user => {
+      return Object.entries(userFilters).every(([column, filterValue]) => {
+        if (!filterValue) return true;
+        const lowerFilter = filterValue.toLowerCase();
+        
+        switch(column) {
+          case 'name':
+            return `${user.FirstName} ${user.LastName}`.toLowerCase().includes(lowerFilter);
+          case 'username':
+            return user.Username.toLowerCase().includes(lowerFilter);
+          case 'role':
+            return getRoleLabel(user.Role, user.EventID).toLowerCase().includes(lowerFilter);
+          case 'event':
+            return (user.EventName || 'N/A').toLowerCase().includes(lowerFilter);
+          case 'club':
+            return (user.ClubName || 'None').toLowerCase().includes(lowerFilter);
+          case 'age':
+            return (user.Age !== null ? user.Age.toString() : 'N/A').toLowerCase().includes(lowerFilter);
+          case 'bgcheck':
+            return (user.BackgroundCheck ? 'yes' : 'no').includes(lowerFilter);
+          default:
+            return true;
+        }
+      });
+    });
+  }
+  
+  // Apply sorting
+  if (userSortColumn) {
+    filteredUsers.sort((a, b) => {
+      let aVal, bVal;
+      
+      switch(userSortColumn) {
+        case 'name':
+          aVal = `${a.FirstName} ${a.LastName}`;
+          bVal = `${b.FirstName} ${b.LastName}`;
+          break;
+        case 'username':
+          aVal = a.Username;
+          bVal = b.Username;
+          break;
+        case 'role':
+          aVal = getRoleLabel(a.Role, a.EventID);
+          bVal = getRoleLabel(b.Role, b.EventID);
+          break;
+        case 'event':
+          aVal = a.EventName || '';
+          bVal = b.EventName || '';
+          break;
+        case 'club':
+          aVal = a.ClubName || '';
+          bVal = b.ClubName || '';
+          break;
+        case 'age':
+          aVal = a.Age !== null ? a.Age : 0;
+          bVal = b.Age !== null ? b.Age : 0;
+          break;
+        case 'bgcheck':
+          aVal = a.BackgroundCheck ? 1 : 0;
+          bVal = b.BackgroundCheck ? 1 : 0;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (typeof aVal === 'string') {
+        return userSortDirection === 'asc' 
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      } else {
+        return userSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+    });
+  }
+  
   container.innerHTML = `
     <table class="table">
       <thead>
         <tr>
-          <th>Name</th>
-          <th>Username</th>
-          <th>Role</th>
-          <th>Event</th>
-          <th>Club</th>
-          <th>Age (DOB)</th>
-          <th>BG Check</th>
+          <th class="filterable ${userFilters.name ? 'filter-active' : ''}" onclick="toggleUserColumnFilter('name')">Name ${userSortColumn === 'name' ? (userSortDirection === 'asc' ? '↑' : '↓') : ''}</th>
+          <th class="filterable ${userFilters.username ? 'filter-active' : ''}" onclick="toggleUserColumnFilter('username')">Username ${userSortColumn === 'username' ? (userSortDirection === 'asc' ? '↑' : '↓') : ''}</th>
+          <th class="filterable ${userFilters.role ? 'filter-active' : ''}" onclick="toggleUserColumnFilter('role')">Role ${userSortColumn === 'role' ? (userSortDirection === 'asc' ? '↑' : '↓') : ''}</th>
+          <th class="filterable ${userFilters.event ? 'filter-active' : ''}" onclick="toggleUserColumnFilter('event')">Event ${userSortColumn === 'event' ? (userSortDirection === 'asc' ? '↑' : '↓') : ''}</th>
+          <th class="filterable ${userFilters.club ? 'filter-active' : ''}" onclick="toggleUserColumnFilter('club')">Club ${userSortColumn === 'club' ? (userSortDirection === 'asc' ? '↑' : '↓') : ''}</th>
+          <th class="filterable ${userFilters.age ? 'filter-active' : ''}" onclick="toggleUserColumnFilter('age')">Age (DOB) ${userSortColumn === 'age' ? (userSortDirection === 'asc' ? '↑' : '↓') : ''}</th>
+          <th class="filterable ${userFilters.bgcheck ? 'filter-active' : ''}" onclick="toggleUserColumnFilter('bgcheck')">BG Check ${userSortColumn === 'bgcheck' ? (userSortDirection === 'asc' ? '↑' : '↓') : ''}</th>
           <th>Actions</th>
+        </tr>
+        <tr class="filter-row" id="userFilterRow" style="display: ${Object.keys(userFilters).length > 0 ? 'table-row' : 'none'};">
+          <td class="filter-cell">
+            <input type="text" class="filter-input" id="filter-name" value="${userFilters.name || ''}" oninput="updateUserFilter('name', this.value)" placeholder="Filter...">
+          </td>
+          <td class="filter-cell">
+            <input type="text" class="filter-input" id="filter-username" value="${userFilters.username || ''}" oninput="updateUserFilter('username', this.value)" placeholder="Filter...">
+          </td>
+          <td class="filter-cell">
+            <input type="text" class="filter-input" id="filter-role" value="${userFilters.role || ''}" oninput="updateUserFilter('role', this.value)" placeholder="Filter...">
+          </td>
+          <td class="filter-cell">
+            <input type="text" class="filter-input" id="filter-event" value="${userFilters.event || ''}" oninput="updateUserFilter('event', this.value)" placeholder="Filter...">
+          </td>
+          <td class="filter-cell">
+            <input type="text" class="filter-input" id="filter-club" value="${userFilters.club || ''}" oninput="updateUserFilter('club', this.value)" placeholder="Filter...">
+          </td>
+          <td class="filter-cell">
+            <input type="text" class="filter-input" id="filter-age" value="${userFilters.age || ''}" oninput="updateUserFilter('age', this.value)" placeholder="Filter...">
+          </td>
+          <td class="filter-cell">
+            <input type="text" class="filter-input" id="filter-bgcheck" value="${userFilters.bgcheck || ''}" oninput="updateUserFilter('bgcheck', this.value)" placeholder="Filter...">
+          </td>
+          <td class="filter-cell"></td>
         </tr>
       </thead>
       <tbody>
-        ${allUsers.map(user => `
+        ${filteredUsers.length === 0 ? '<tr><td colspan="8" class="text-center">No users match the current filters</td></tr>' : filteredUsers.map(user => `
           <tr>
             <td>${user.FirstName} ${user.LastName}</td>
             <td>${user.Username}</td>
@@ -552,6 +660,43 @@ function renderUsers() {
       </tbody>
     </table>
   `;
+}
+
+function toggleUserColumnFilter(column) {
+  // Show filter row if hidden and add filter for this column
+  const filterRow = document.getElementById('userFilterRow');
+  if (filterRow.style.display === 'none') {
+    filterRow.style.display = 'table-row';
+  }
+  
+  // Focus on the filter input for this column
+  const filterInput = document.getElementById(`filter-${column}`);
+  if (filterInput) {
+    filterInput.focus();
+  }
+  
+  // Toggle sorting
+  if (userSortColumn === column) {
+    userSortDirection = userSortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    userSortColumn = column;
+    userSortDirection = 'asc';
+  }
+  
+  renderUsers();
+}
+
+function updateUserFilter(column, value) {
+  if (value.trim()) {
+    userFilters[column] = value.trim();
+  } else {
+    delete userFilters[column];
+    // Hide filter row if no filters active
+    if (Object.keys(userFilters).length === 0) {
+      document.getElementById('userFilterRow').style.display = 'none';
+    }
+  }
+  renderUsers();
 }
 
 async function renderLocations() {
@@ -2732,4 +2877,7 @@ window.handleCreateUser = handleCreateUser;
 window.handleEditUser = handleEditUser;
 window.closeModal = closeModal;
 window.handleCreateEvent = handleCreateEvent;
+window.toggleUserColumnFilter = toggleUserColumnFilter;
+window.updateUserFilter = updateUserFilter;
+window.renderUsers = renderUsers;
 
