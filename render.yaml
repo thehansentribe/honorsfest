@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: honorsfest
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install
+    startCommand: node src/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_PATH
+        value: /var/lib/render/database.sqlite
+    disk:
+      name: database-disk
+      mountPath: /var/lib/render
+      sizeGB: 1
+
