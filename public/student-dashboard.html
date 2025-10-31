@@ -129,6 +129,21 @@
         // Load classes
         const classesResponse = await fetchWithAuth(`/api/classes/${currentEventId}`);
         allClasses = await classesResponse.json();
+        
+        // Debug: Log all classes loaded
+        console.log('Loaded classes from API:', allClasses.length);
+        console.log('All classes details:', allClasses.map(c => ({
+          ID: c.ID,
+          HonorName: c.HonorName,
+          TeacherID: c.TeacherID,
+          TeacherName: c.TeacherFirstName + ' ' + c.TeacherLastName,
+          LocationID: c.LocationID,
+          LocationName: c.LocationName,
+          TimeslotID: c.TimeslotID,
+          TimeslotDate: c.TimeslotDate,
+          TimeslotStartTime: c.TimeslotStartTime,
+          Active: c.Active
+        })));
 
         // Load my registrations
         const regResponse = await fetchWithAuth(`/api/registrations/user/${currentUserId}?eventId=${currentEventId}`);
@@ -199,6 +214,7 @@
       const timeslotFilter = document.getElementById('timeslotFilter').value;
       const teacherFilter = document.getElementById('teacherFilter').value;
 
+      // Filter classes - make sure we're not deduplicating
       const filtered = allClasses.filter(c => {
         // Always filter out inactive classes from student view
         if (!c.Active) return false;
@@ -207,6 +223,12 @@
         if (teacherFilter && c.TeacherID && c.TeacherID.toString() !== teacherFilter) return false;
         return true;
       });
+
+      // Debug logging
+      console.log('Total classes loaded:', allClasses.length);
+      console.log('Filtered classes count:', filtered.length);
+      console.log('All classes:', allClasses);
+      console.log('Filtered classes:', filtered);
 
       if (filtered.length === 0) {
         container.innerHTML = '<p class="text-center">No classes available</p>';
@@ -282,11 +304,17 @@
                 actionButtons = '<span style="color: #999;">Already waitlisted for another class at this time</span>';
               }
               
+              // Ensure each class is uniquely displayed - show all distinguishing info
+              // Include class ID in data attribute for debugging
+              // Make sure teacher and location are always visible, even if "TBA"
+              const displayTeacher = teacher === 'TBA' ? '<span style="color: #999;">TBA</span>' : teacher;
+              const displayLocation = location === 'TBA' ? '<span style="color: #999;">TBA</span>' : location;
+              
               return `
-                <tr>
+                <tr data-class-id="${c.ID}" data-honor-id="${c.HonorID || ''}" data-teacher-id="${c.TeacherID || ''}" data-location-id="${c.LocationID || ''}" data-timeslot-id="${c.TimeslotID || ''}">
                   <td>${c.HonorName || 'Unknown'}</td>
-                  <td>${teacher}</td>
-                  <td>${location}</td>
+                  <td>${displayTeacher}</td>
+                  <td>${displayLocation}</td>
                   <td>${sessionTime}</td>
                   <td>${c.RemainingSpots}</td>
                   <td>
@@ -294,7 +322,7 @@
                   </td>
                 </tr>
               `;
-            }).join('')}
+            }).filter(html => html.trim() !== '').join('')}
           </tbody>
         </table>
       `;
