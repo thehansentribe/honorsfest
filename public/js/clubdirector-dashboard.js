@@ -28,6 +28,13 @@ function clubdirectorSwitchTab(tabName, clickedElement = null) {
   
   if (clickedElement) {
     clickedElement.classList.add('active');
+  } else {
+    // Find the clicked tab by text content
+    document.querySelectorAll('.tab').forEach(t => {
+      if (t.textContent.trim().toLowerCase() === tabName.toLowerCase()) {
+        t.classList.add('active');
+      }
+    });
   }
   
   // Load tab content

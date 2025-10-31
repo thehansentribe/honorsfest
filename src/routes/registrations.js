@@ -60,14 +60,22 @@ router.post('/', (req, res) => {
     // If trying to register when full, check timeslot conflicts
     if (!isFull) {
       // Trying to enroll: check if already enrolled in this timeslot
-      const existingEnrolled = db.prepare(`
-        SELECT COUNT(*) as count FROM Registrations r
+      const conflictCheck = db.prepare(`
+        SELECT r.ID as RegistrationID, c.ID as ClassID, h.Name as HonorName, c.TimeslotID
+        FROM Registrations r
         JOIN Classes c ON r.ClassID = c.ID
+        LEFT JOIN Honors h ON c.HonorID = h.ID
         WHERE r.UserID = ? AND c.TimeslotID = ? AND c.EventID = ? AND r.Status = 'Enrolled'
       `).get(userId, classData.TimeslotID, classData.EventID);
       
-      if (existingEnrolled.count > 0) {
-        return res.status(400).json({ error: 'You can only enroll in one class per timeslot. You are already enrolled in a class during this time.' });
+      if (conflictCheck) {
+        // Return conflict details instead of error
+        return res.status(409).json({ 
+          conflict: true,
+          conflictClassId: conflictCheck.ClassID,
+          conflictClassName: conflictCheck.HonorName || 'Unknown Class',
+          conflictRegistrationId: conflictCheck.RegistrationID
+        });
       }
     } else {
       // Trying to waitlist when full: check if already waitlisted in this timeslot
