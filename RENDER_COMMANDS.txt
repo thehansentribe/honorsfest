@@ -1,0 +1,48 @@
+===========================================
+RENDER DATABASE RESET AND SEED COMMANDS
+===========================================
+Copy and paste these commands into the Render Shell
+(Open your Render service → Shell tab)
+
+===========================================
+STEP 1: Navigate to project directory
+===========================================
+cd ~/project/src
+
+===========================================
+STEP 2: (Optional) Backup existing database
+===========================================
+cp ../../database.sqlite ../../database.sqlite.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || echo "No database to backup"
+
+===========================================
+STEP 3: Delete existing database
+===========================================
+rm -f ../../database.sqlite
+rm -f database.sqlite
+rm -f ./database.sqlite
+
+===========================================
+STEP 4: Run the new seed script
+===========================================
+node -e "require('./config/seed-new').seedDatabase();"
+
+===========================================
+VERIFICATION (optional)
+===========================================
+# Check that data was created:
+sqlite3 ../../database.sqlite "SELECT COUNT(*) as AdminCount FROM Users WHERE Role='Admin';"
+sqlite3 ../../database.sqlite "SELECT COUNT(*) as EventCount FROM Events;"
+sqlite3 ../../database.sqlite "SELECT COUNT(*) as ClubCount FROM Clubs;"
+sqlite3 ../../database.sqlite "SELECT COUNT(*) as ClassCount FROM Classes;"
+
+===========================================
+NOTES:
+===========================================
+- All users have password: password123
+- Admin users: jason.hansen, jamie.jesse, valerie.rexin
+- Each event has: 1 Event Admin, 4 Clubs, 4 Locations, 4 Timeslots
+- Each club has: 1 Director, 2 Teachers, 2 Staff, 4 Students
+- Each club creates 1 class = 4 classes per event
+
+===========================================
+
