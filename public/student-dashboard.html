@@ -269,12 +269,17 @@
               // Don't show this class at all if they're already registered for it
               if (isRegistered) return '';
 
-              // Determine action message
-              let actionMsg = '';
-              if (hasEnrolledInTimeslot && !canWaitlist) {
-                actionMsg = '<span style="color: #999;">Already enrolled in a different class at this time</span>';
+              // Determine action buttons
+              let actionButtons = '';
+              if (canRegister) {
+                actionButtons = `<button onclick="register(${c.ID})" class="btn btn-primary btn-sm">Register</button>`;
+              } else if (hasEnrolledInTimeslot && !canWaitlist && !isFull) {
+                // Show light blue register button when there's a timeslot conflict (not full)
+                actionButtons = `<button onclick="register(${c.ID})" class="btn btn-sm" style="background-color: #87CEEB; color: #000; border-color: #87CEEB;">Register</button>`;
+              } else if (canWaitlist) {
+                actionButtons = `<button onclick="waitlist(${c.ID})" class="btn btn-warning btn-sm">Waitlist</button>`;
               } else if (hasWaitlistInTimeslot && !canRegister) {
-                actionMsg = '<span style="color: #999;">Already waitlisted for another class at this time</span>';
+                actionButtons = '<span style="color: #999;">Already waitlisted for another class at this time</span>';
               }
               
               return `
@@ -285,9 +290,7 @@
                   <td>${sessionTime}</td>
                   <td>${c.RemainingSpots}</td>
                   <td>
-                    ${canRegister ? `<button onclick="register(${c.ID})" class="btn btn-primary btn-sm">Register</button>` : ''}
-                    ${canWaitlist ? `<button onclick="waitlist(${c.ID})" class="btn btn-warning btn-sm">Waitlist</button>` : ''}
-                    ${actionMsg}
+                    ${actionButtons}
                   </td>
                 </tr>
               `;
