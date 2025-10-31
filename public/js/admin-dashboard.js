@@ -270,6 +270,9 @@ async function switchTab(tabName, clickedElement = null) {
       content.innerHTML = await getReportsTab();
       updateEventDropdowns(); // Populate event dropdown
       break;
+    case 'system':
+      content.innerHTML = getSystemTab();
+      break;
   }
 }
 
@@ -369,6 +372,77 @@ function getReportsTab() {
       <button id="generateReportBtn" onclick="generateReport()" class="btn btn-primary" disabled>Generate CSV Report</button>
     </div>
   `;
+}
+
+function getSystemTab() {
+  return `
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">System Administration</h2>
+      </div>
+      <div style="padding: 20px;">
+        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ffc107;">
+          <strong>⚠️ Warning:</strong> Resetting the database will delete all data except admin users and honors. This action cannot be undone.
+        </div>
+        <div class="form-group">
+          <label><strong>Database Reset & Reseed</strong></label>
+          <p style="color: #666; margin: 10px 0;">This will:</p>
+          <ul style="color: #666; margin: 10px 0 20px 20px;">
+            <li>Delete all events, clubs, users (except admins), classes, locations, timeslots, and registrations</li>
+            <li>Reseed the database with fresh test data</li>
+            <li>Create 2 events, 8 clubs, test users, locations, timeslots, and classes</li>
+          </ul>
+          <button onclick="reseedDatabase()" class="btn btn-danger" id="reseedBtn">
+            Reset & Reseed Database
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function reseedDatabase() {
+  if (!confirm('Are you absolutely sure you want to reset and reseed the database?\n\nThis will delete ALL data except admin users and honors.\n\nThis action CANNOT be undone!')) {
+    return;
+  }
+  
+  // Double confirmation
+  const confirmText = prompt('Type "RESET" to confirm:');
+  if (confirmText !== 'RESET') {
+    showNotification('Reset cancelled', 'info');
+    return;
+  }
+  
+  const btn = document.getElementById('reseedBtn');
+  btn.disabled = true;
+  btn.textContent = 'Resetting...';
+  
+  try {
+    const response = await fetchWithAuth('/api/admin/reseed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: true })
+    });
+    
+    const result = await response.json();
+    
+    if (response.ok) {
+      showNotification('Database reset and reseeded successfully! Page will reload in 3 seconds...', 'success');
+      
+      // Reload page after 3 seconds to see new data
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000);
+    } else {
+      showNotification(result.error || 'Error resetting database', 'error');
+      btn.disabled = false;
+      btn.textContent = 'Reset & Reseed Database';
+    }
+  } catch (error) {
+    showNotification('Error resetting database: ' + error.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Reset & Reseed Database';
+  }
 }
 
 // Load data
@@ -2115,6 +2189,7 @@ window.removeStudentFromClass = removeStudentFromClass;
 window.showConflictModal = showConflictModal;
 window.resolveConflict = resolveConflict;
 window.generateReport = generateReport;
+window.reseedDatabase = reseedDatabase;
 window.updateReportButton = updateReportButton;
 window.renderLocations = renderLocations;
 // Timeslot management functions

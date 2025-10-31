@@ -13,6 +13,7 @@ const locationRoutes = require('./routes/locations');
 const timeslotRoutes = require('./routes/timeslots');
 const clubRoutes = require('./routes/clubs');
 const codeRoutes = require('./routes/registrationCodes');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -33,6 +34,7 @@ app.use('/api/registrations', registrationRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/codes', codeRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Serve frontend
 app.get('*', (req, res) => {
