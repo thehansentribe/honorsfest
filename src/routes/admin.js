@@ -16,18 +16,35 @@ router.post('/reseed', requireRole('Admin'), async (req, res) => {
 
     console.log('Admin initiated database reset and reseed...');
 
-    // Clear existing data (except honors)
+    // Disable foreign key constraints temporarily
+    db.pragma('foreign_keys = OFF');
+
+    // Clear existing data in correct order (children first, then parents)
+    // Delete child records first
     db.exec(`
-      DELETE FROM Registrations;
       DELETE FROM Attendance;
+      DELETE FROM Registrations;
       DELETE FROM Classes;
+      DELETE FROM RegistrationCodes;
+    `);
+    
+    // Delete users (except admins) - must be before clubs since clubs reference directors
+    db.exec(`DELETE FROM Users WHERE Role != 'Admin'`);
+    
+    // Delete clubs (references events and users)
+    db.exec(`DELETE FROM Clubs`);
+    
+    // Delete timeslots and locations (references events)
+    db.exec(`
       DELETE FROM Timeslots;
       DELETE FROM Locations;
-      DELETE FROM RegistrationCodes;
-      DELETE FROM Users WHERE Role != 'Admin';
-      DELETE FROM Clubs;
-      DELETE FROM Events;
     `);
+    
+    // Delete events (last, since everything references them)
+    db.exec(`DELETE FROM Events`);
+
+    // Re-enable foreign key constraints
+    db.pragma('foreign_keys = ON');
 
     console.log('Database cleared, starting seed...');
 

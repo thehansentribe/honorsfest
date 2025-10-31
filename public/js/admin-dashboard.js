@@ -406,13 +406,6 @@ async function reseedDatabase() {
     return;
   }
   
-  // Double confirmation
-  const confirmText = prompt('Type "RESET" to confirm:');
-  if (confirmText !== 'RESET') {
-    showNotification('Reset cancelled', 'info');
-    return;
-  }
-  
   const btn = document.getElementById('reseedBtn');
   btn.disabled = true;
   btn.textContent = 'Resetting...';
