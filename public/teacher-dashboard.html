@@ -10,6 +10,7 @@
   <div class="top-banner">
     <h1>Teacher Dashboard</h1>
     <div class="user-info">
+      <span id="eventName" class="event-info"></span>
       <span id="userName">Welcome, <strong id="userDisplayName"></strong></span>
       <button onclick="logout()" class="btn btn-outline">Logout</button>
     </div>
@@ -80,6 +81,12 @@
         if (!activeEvent) {
           document.getElementById('myClasses').innerHTML = '<p>No active events</p>';
           return;
+        }
+
+        // Display event name
+        const eventNameEl = document.getElementById('eventName');
+        if (eventNameEl && activeEvent) {
+          eventNameEl.textContent = activeEvent.Name;
         }
 
         const classesResponse = await fetchWithAuth(`/api/classes/${activeEvent.ID}?teacherId=${currentUserId}`);

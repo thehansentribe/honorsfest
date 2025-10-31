@@ -1114,6 +1114,12 @@ async function activateClass(classId) {
 
 async function viewClassStudents(classId) {
   try {
+    // Remove existing modal if present
+    const existingModal = document.getElementById('viewStudentsModal');
+    if (existingModal) {
+      existingModal.remove();
+    }
+    
     // Fetch the roster
     const [classResponse, rosterResponse] = await Promise.all([
       fetchWithAuth(`/api/classes/details/${classId}`),

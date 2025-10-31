@@ -703,6 +703,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       const club = await clubResponse.json();
       if (club) {
         clubDirectorEventId = club.EventID;
+        
+        // Load and display event name
+        if (clubDirectorEventId) {
+          try {
+            const eventResponse = await fetchWithAuth(`/api/events/${clubDirectorEventId}`);
+            const event = await eventResponse.json();
+            const eventNameEl = document.getElementById('eventName');
+            if (eventNameEl && event) {
+              eventNameEl.textContent = event.Name;
+            }
+          } catch (error) {
+            console.error('Error loading event name:', error);
+          }
+        }
       }
     } catch (error) {
       console.error('Error loading club:', error);
@@ -1212,6 +1226,12 @@ Thank you!`;
   // Manage students functions (copied from admin-dashboard.js with conflict handling)
   async function viewClassStudents(classId) {
     try {
+      // Remove existing modal if present
+      const existingModal = document.getElementById('viewStudentsModal');
+      if (existingModal) {
+        existingModal.remove();
+      }
+      
       // Fetch the roster
       const [classResponse, rosterResponse] = await Promise.all([
         fetchWithAuth(`/api/classes/details/${classId}`),
