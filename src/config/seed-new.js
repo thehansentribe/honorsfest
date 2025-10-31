@@ -31,6 +31,19 @@ function seedDatabase() {
       INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, PasswordHash, Role, Active, BackgroundCheck, ClubID, EventID, InvestitureLevel)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
+    
+    // Helper function to safely insert user (handles duplicates)
+    function safeInsertUser(...args) {
+      try {
+        return insertUser.run(...args);
+      } catch (error) {
+        if (error.message.includes('UNIQUE constraint') || error.message.includes('Username')) {
+          console.warn(`Skipping duplicate username: ${args[2]}`);
+          return { lastInsertRowid: null };
+        }
+        throw error;
+      }
+    }
 
     // Seed honors if they don't exist
     const honorCount = db.prepare('SELECT COUNT(*) as count FROM Honors').get();
@@ -69,7 +82,7 @@ function seedDatabase() {
       }
     }
 
-    // Create 3 admin users
+    // Create 3 admin users (only if they don't exist)
     console.log('Creating admin users...');
     const admins = [
       { FirstName: 'Jason', LastName: 'Hansen', Username: 'jason.hansen' },
@@ -78,9 +91,16 @@ function seedDatabase() {
     ];
     
     const birthDate = new Date(new Date().getFullYear() - 99, 0, 1).toISOString().split('T')[0];
+    const checkUser = db.prepare('SELECT ID FROM Users WHERE Username = ?');
+    
     admins.forEach(admin => {
-      insertUser.run(admin.FirstName, admin.LastName, admin.Username, birthDate, passwordHash, 'Admin', 1, 1, null, null, 'MasterGuide');
-      console.log(`Created admin: ${admin.Username}`);
+      const existing = checkUser.get(admin.Username);
+      if (!existing) {
+        insertUser.run(admin.FirstName, admin.LastName, admin.Username, birthDate, passwordHash, 'Admin', 1, 1, null, null, 'MasterGuide');
+        console.log(`Created admin: ${admin.Username}`);
+      } else {
+        console.log(`Admin ${admin.Username} already exists, skipping`);
+      }
     });
 
     // Create 2 events
