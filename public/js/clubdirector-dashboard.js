@@ -29,10 +29,16 @@ function clubdirectorSwitchTab(tabName, clickedElement = null) {
   if (clickedElement) {
     clickedElement.classList.add('active');
   } else {
-    // Find the clicked tab by text content
+    // Find the tab by data-tab attribute or text content
     document.querySelectorAll('.tab').forEach(t => {
-      if (t.textContent.trim().toLowerCase() === tabName.toLowerCase()) {
+      const dataTab = t.getAttribute('data-tab');
+      if (dataTab === tabName) {
         t.classList.add('active');
+      } else if (!dataTab) {
+        // Fallback to text matching
+        if (t.textContent.trim().toLowerCase() === tabName.toLowerCase()) {
+          t.classList.add('active');
+        }
       }
     });
   }
@@ -1144,6 +1150,22 @@ Thank you!`;
       modal.remove();
     }
   }
+  
+  // Close modal function that also refreshes classes when exiting viewStudentsModal
+  function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.remove();
+      
+      // If closing the viewStudentsModal, refresh the classes list to update counts
+      if (modalId === 'viewStudentsModal') {
+        const currentTab = localStorage.getItem('directorCurrentTab') || 'users';
+        if (currentTab === 'classes') {
+          renderClasses();
+        }
+      }
+    }
+  }
 
   // Expose functions globally
   window.renderCodes = renderCodes;
@@ -1462,6 +1484,7 @@ Thank you!`;
   window.renderUsers = renderUsers;
   window.copyCodeEmail = copyCodeEmail;
   window.closeClubDirectorModal = closeClubDirectorModal;
+  window.closeModal = closeModal;
   window.shareRegistrationCode = shareRegistrationCode;
   window.deleteRegistrationCode = deleteRegistrationCode;
   
@@ -1487,9 +1510,6 @@ Thank you!`;
       console.error('Error checking event status:', error);
     }
   }
-
-  // Start on Users tab
-  clubdirectorSwitchTab('users', null);
 });
 
 })(); // End IIFE - closes the wrapper around all Club Director code
