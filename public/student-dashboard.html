@@ -224,11 +224,26 @@
         return true;
       });
 
-      // Debug logging
+      // Debug logging - expand arrays to see full details
       console.log('Total classes loaded:', allClasses.length);
       console.log('Filtered classes count:', filtered.length);
-      console.log('All classes:', allClasses);
-      console.log('Filtered classes:', filtered);
+      console.log('All classes (expanded):', JSON.parse(JSON.stringify(allClasses)));
+      console.log('Filtered classes (expanded):', JSON.parse(JSON.stringify(filtered)));
+      
+      // Count classes by honor name and timeslot to check for duplicates
+      const classesByHonorTimeslot = {};
+      filtered.forEach(c => {
+        const key = `${c.HonorName}_${c.TimeslotID}`;
+        if (!classesByHonorTimeslot[key]) {
+          classesByHonorTimeslot[key] = [];
+        }
+        classesByHonorTimeslot[key].push({
+          ID: c.ID,
+          Teacher: `${c.TeacherFirstName || ''} ${c.TeacherLastName || ''}`.trim() || 'TBA',
+          Location: c.LocationName || 'TBA'
+        });
+      });
+      console.log('Classes grouped by Honor + Timeslot:', classesByHonorTimeslot);
 
       if (filtered.length === 0) {
         container.innerHTML = '<p class="text-center">No classes available</p>';
@@ -248,12 +263,14 @@
             </tr>
           </thead>
           <tbody>
-            ${filtered.map(c => {
-              const location = `${c.LocationName || 'TBA'}`;
-              const teacher = c.TeacherFirstName ? `${c.TeacherFirstName} ${c.TeacherLastName}` : 'TBA';
-              
-              // Check if user is registered for this class
-              const isRegistered = myRegistrations.some(r => r.ClassID === c.ID);
+            ${(() => {
+              let renderedCount = 0;
+              const rows = filtered.map(c => {
+                const location = `${c.LocationName || 'TBA'}`;
+                const teacher = c.TeacherFirstName ? `${c.TeacherFirstName} ${c.TeacherLastName}` : 'TBA';
+                
+                // Check if user is registered for this class
+                const isRegistered = myRegistrations.some(r => r.ClassID === c.ID);
               
               // Check if user has an enrolled class in this timeslot
               const hasEnrolledInTimeslot = myRegistrations.some(r => {
@@ -289,7 +306,13 @@
                 : 'TBA';
 
               // Don't show this class at all if they're already registered for it
-              if (isRegistered) return '';
+              if (isRegistered) {
+                console.log('Skipping class ID', c.ID, 'because student is already registered');
+                return '';
+              }
+
+              renderedCount++;
+              console.log(`Rendering class ID ${c.ID}: ${c.HonorName} - Teacher: ${teacher} - Location: ${location} - Timeslot: ${c.TimeslotID}`);
 
               // Determine action buttons
               let actionButtons = '';
@@ -322,7 +345,10 @@
                   </td>
                 </tr>
               `;
-            }).filter(html => html.trim() !== '').join('')}
+            }).filter(html => html.trim() !== '');
+            console.log(`Total rows rendered: ${renderedCount} out of ${filtered.length} filtered classes`);
+            return rows.join('');
+            })()}
           </tbody>
         </table>
       `;
