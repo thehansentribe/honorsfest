@@ -106,6 +106,7 @@ router.post('/register', (req, res) => {
     res.status(201).json({
       message: 'Account created successfully',
       username: user.Username,
+      checkInNumber: user.CheckInNumber,
       clubId: user.ClubID,
       eventId: user.EventID
     });

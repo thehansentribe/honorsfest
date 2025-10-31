@@ -38,7 +38,8 @@ router.get('/club/:clubId', requireRole('ClubDirector', 'Admin'), (req, res) => 
       SELECT DISTINCT
         u.ID as UserID,
         u.FirstName || ' ' || u.LastName as StudentName,
-        clb.Name as Club
+        clb.Name as Club,
+        u.CheckedIn
       FROM Registrations r
       JOIN Users u ON r.UserID = u.ID
       LEFT JOIN Clubs clb ON u.ClubID = clb.ID
@@ -98,17 +99,18 @@ router.get('/club/:clubId', requireRole('ClubDirector', 'Admin'), (req, res) => 
     // Get role label for students
     const studentLabel = event.RoleLabelStudent || 'Student';
     
-    // Create header row: Student Name, then all class names
+    // Create header row: Student Name, Attendee, Club, then all class names
     const classHeaders = classes.map(cls => {
       const timeStr = cls.StartTime ? cls.StartTime.substring(0, 5) : '';
       return `"${cls.HonorName} (${cls.Date} ${timeStr})"`;
     });
-    const headerRow = [`"${studentLabel} Name"`, '"Club"', ...classHeaders];
+    const headerRow = [`"${studentLabel} Name"`, '"Attendee"', '"Club"', ...classHeaders];
     csvLines.push(headerRow.join(','));
 
     // Create data rows: user info and attendance for each class
     users.forEach(user => {
-      const row = [user.StudentName, user.Club];
+      const attendeeStatus = user.CheckedIn ? 'Attended' : 'Not Attended';
+      const row = [user.StudentName, attendeeStatus, user.Club];
       
       classes.forEach(cls => {
         const key = `${user.UserID}-${cls.ClassID}`;
@@ -156,7 +158,8 @@ router.get('/event/:eventId', requireRole('Admin', 'EventAdmin', 'ClubDirector')
       SELECT DISTINCT
         u.ID as UserID,
         u.FirstName || ' ' || u.LastName as StudentName,
-        clb.Name as Club
+        clb.Name as Club,
+        u.CheckedIn
       FROM Registrations r
       JOIN Users u ON r.UserID = u.ID
       LEFT JOIN Clubs clb ON u.ClubID = clb.ID
@@ -267,17 +270,18 @@ router.get('/event/:eventId', requireRole('Admin', 'EventAdmin', 'ClubDirector')
       `""` // Empty line
     ];
 
-    // Create header row: Student Name, Club, then all class names
+    // Create header row: Student Name, Attendee, Club, then all class names
     const classHeaders = classes.map(cls => {
       const timeStr = cls.StartTime ? cls.StartTime.substring(0, 5) : '';
       return `"${cls.HonorName} (${cls.Date} ${timeStr})"`;
     });
-    const headerRow = [`"${studentLabel} Name"`, '"Club"', ...classHeaders];
+    const headerRow = [`"${studentLabel} Name"`, '"Attendee"', '"Club"', ...classHeaders];
     csvLines.push(headerRow.join(','));
 
     // Create data rows: user info and attendance for each class
     users.forEach(user => {
-      const row = [user.StudentName, user.Club];
+      const attendeeStatus = user.CheckedIn ? 'Attended' : 'Not Attended';
+      const row = [user.StudentName, attendeeStatus, user.Club];
       
       classes.forEach(cls => {
         const key = `${user.UserID}-${cls.ClassID}`;

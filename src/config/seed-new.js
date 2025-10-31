@@ -11,10 +11,19 @@ function seedDatabase() {
     console.log('Starting database seeding...');
     const passwordHash = bcrypt.hashSync('password123', 10);
 
+    // Helper function to generate check-in number
+    let nextCheckInNumber = 1000;
+    function getNextCheckInNumber() {
+      const maxResult = db.prepare('SELECT MAX(CheckInNumber) as maxNum FROM Users WHERE CheckInNumber IS NOT NULL').get();
+      const maxNum = maxResult?.maxNum || 999;
+      nextCheckInNumber = maxNum >= 1000 ? maxNum + 1 : 1000;
+      return nextCheckInNumber++;
+    }
+    
     // Prepare user insert statement
     const insertUser = db.prepare(`
-      INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, PasswordHash, Role, Active, BackgroundCheck, ClubID, EventID, InvestitureLevel)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, PasswordHash, Role, Active, BackgroundCheck, ClubID, EventID, InvestitureLevel, CheckInNumber, CheckedIn)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     // Seed honors (always seed fresh)
@@ -64,7 +73,7 @@ function seedDatabase() {
     const birthDate = new Date(new Date().getFullYear() - 99, 0, 1).toISOString().split('T')[0];
     
     admins.forEach(admin => {
-      insertUser.run(admin.FirstName, admin.LastName, admin.Username, birthDate, passwordHash, 'Admin', 1, 1, null, null, 'MasterGuide');
+      insertUser.run(admin.FirstName, admin.LastName, admin.Username, birthDate, passwordHash, 'Admin', 1, 1, null, null, 'MasterGuide', getNextCheckInNumber(), 0);
       console.log(`Created admin: ${admin.Username}`);
     });
 
@@ -116,7 +125,9 @@ function seedDatabase() {
         1,
         null,
         event.ID,
-        'MasterGuide'
+        'MasterGuide',
+        getNextCheckInNumber(),
+        0
       );
       const eventAdminId = eventAdminRes.lastInsertRowid;
       console.log(`Created Event Admin (ID: ${eventAdminId}) for event ${event.ID}`);
@@ -189,7 +200,9 @@ function seedDatabase() {
           1,
           clubId,
           event.ID,
-          'MasterGuide'
+          'MasterGuide',
+          getNextCheckInNumber(),
+          0
         );
         const directorId = directorRes.lastInsertRowid;
         db.prepare('UPDATE Clubs SET DirectorID = ? WHERE ID = ?').run(directorId, clubId);
@@ -210,7 +223,9 @@ function seedDatabase() {
             1,
             clubId,
             event.ID,
-            'MasterGuide'
+            'MasterGuide',
+            getNextCheckInNumber(),
+            0
           );
           const teacherId = teacherRes.lastInsertRowid;
           teacherIds.push(teacherId);
@@ -232,7 +247,9 @@ function seedDatabase() {
             1,
             clubId,
             event.ID,
-            'Guide'
+            'Guide',
+            getNextCheckInNumber(),
+            0
           );
           const staffId = staffRes.lastInsertRowid;
           staffIds.push(staffId);
@@ -256,7 +273,9 @@ function seedDatabase() {
             0,
             clubId,
             event.ID,
-            investitureLevels[st]
+            investitureLevels[st],
+            getNextCheckInNumber(),
+            0
           );
           const studentId = studentRes.lastInsertRowid;
           studentIds.push(studentId);

@@ -12,6 +12,7 @@
     <div class="user-info">
       <span id="eventName" class="event-info"></span>
       <span id="userName">Welcome, <strong id="userDisplayName"></strong></span>
+      <span id="checkInNumberDisplay" class="event-info" style="margin-left: 15px; font-weight: bold;"></span>
       <button onclick="logout()" class="btn btn-outline">Logout</button>
     </div>
   </div>
@@ -84,6 +85,17 @@
       const user = getCurrentUser();
       currentUserId = user.id;
       document.getElementById('userDisplayName').textContent = `${user.firstName} ${user.lastName}`;
+
+      // Load user details to get check-in number
+      try {
+        const userResponse = await fetchWithAuth(`/api/users/${user.id}`);
+        const userDetails = await userResponse.json();
+        if (userDetails && userDetails.CheckInNumber) {
+          document.getElementById('checkInNumberDisplay').textContent = `Check-In: #${userDetails.CheckInNumber}`;
+        }
+      } catch (error) {
+        console.error('Error loading user details:', error);
+      }
 
       await checkEventStatus();
       await loadEvents();

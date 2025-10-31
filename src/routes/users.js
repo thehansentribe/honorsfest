@@ -25,6 +25,46 @@ router.get('/', (req, res) => {
   }
 });
 
+// GET /api/users/search?firstName= - Search users by first name (for check-in dropdown)
+router.get('/search', requireRole('Admin'), (req, res) => {
+  try {
+    const firstName = req.query.firstName || '';
+    if (!firstName) {
+      return res.json([]);
+    }
+    
+    const users = User.getAll({});
+    const filtered = users.filter(u => 
+      u.FirstName.toLowerCase().includes(firstName.toLowerCase())
+    ).slice(0, 50); // Limit to 50 results
+    
+    res.json(filtered);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/users/checkin/:number - Get user by check-in number (Admin only)
+router.get('/checkin/:number', requireRole('Admin'), (req, res) => {
+  try {
+    const checkInNumber = parseInt(req.params.number);
+    if (isNaN(checkInNumber)) {
+      return res.status(400).json({ error: 'Invalid check-in number' });
+    }
+    
+    const user = User.findByCheckInNumber(checkInNumber);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found with that check-in number' });
+    }
+    
+    // Get club name if applicable
+    const userWithClub = User.findByIdWithClub(user.ID);
+    res.json(userWithClub || user);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/users/:id - Get user by ID
 router.get('/:id', (req, res) => {
   try {

@@ -54,6 +54,28 @@ function migrateDatabase() {
       console.log('CreatedBy column added successfully');
     }
     
+    // Check Users table for CheckInNumber and CheckedIn columns
+    const usersTableInfo = db.prepare("PRAGMA table_info(Users)").all();
+    const hasCheckInNumber = usersTableInfo.some(col => col.name === 'CheckInNumber');
+    const hasCheckedIn = usersTableInfo.some(col => col.name === 'CheckedIn');
+    
+    if (!hasCheckInNumber) {
+      console.log('Adding CheckInNumber column to Users table...');
+      db.exec('ALTER TABLE Users ADD COLUMN CheckInNumber INTEGER');
+      // Generate check-in numbers for existing users
+      const users = db.prepare('SELECT ID FROM Users ORDER BY ID').all();
+      users.forEach((user, index) => {
+        db.prepare('UPDATE Users SET CheckInNumber = ? WHERE ID = ?').run(1000 + index + 1, user.ID);
+      });
+      console.log(`Generated check-in numbers for ${users.length} existing users`);
+    }
+    
+    if (!hasCheckedIn) {
+      console.log('Adding CheckedIn column to Users table...');
+      db.exec('ALTER TABLE Users ADD COLUMN CheckedIn BOOLEAN DEFAULT 0');
+      console.log('CheckedIn column added successfully');
+    }
+    
   } catch (error) {
     console.error('Migration error:', error);
     // Don't throw, just log

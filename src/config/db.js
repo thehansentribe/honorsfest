@@ -34,6 +34,8 @@ function initializeDatabase() {
         EventID INTEGER,
         Active BOOLEAN NOT NULL DEFAULT 1,
         BackgroundCheck BOOLEAN DEFAULT 0,
+        CheckInNumber INTEGER UNIQUE,
+        CheckedIn BOOLEAN DEFAULT 0,
         FOREIGN KEY (ClubID) REFERENCES Clubs(ID),
         FOREIGN KEY (EventID) REFERENCES Events(ID)
       );

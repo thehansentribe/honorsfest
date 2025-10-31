@@ -40,14 +40,24 @@ class User {
     return age !== null && age >= 18;
   }
 
+  static generateCheckInNumber() {
+    // Find the highest existing check-in number
+    const maxResult = db.prepare('SELECT MAX(CheckInNumber) as maxNum FROM Users WHERE CheckInNumber IS NOT NULL').get();
+    const maxNum = maxResult?.maxNum || 999;
+    
+    // Start from 1000 if no numbers exist, otherwise increment from max
+    return maxNum >= 1000 ? maxNum + 1 : 1000;
+  }
+
   static create(userData) {
     const { FirstName, LastName, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck } = userData;
     
     const Username = this.generateUsername(FirstName, LastName);
+    const CheckInNumber = this.generateCheckInNumber();
     
     const stmt = db.prepare(`
-      INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck, CheckInNumber, CheckedIn)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -63,7 +73,9 @@ class User {
       ClubID || null,
       EventID || null,
       Active !== undefined ? (Active ? 1 : 0) : 1,
-      BackgroundCheck !== undefined ? (BackgroundCheck ? 1 : 0) : 0
+      BackgroundCheck !== undefined ? (BackgroundCheck ? 1 : 0) : 0,
+      CheckInNumber,
+      0  // CheckedIn defaults to false
     );
 
     return this.findById(result.lastInsertRowid);
@@ -71,8 +83,8 @@ class User {
 
   static bulkCreate(users) {
     const insertStmt = db.prepare(`
-      INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck, CheckInNumber, CheckedIn)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const usersCreated = [];
@@ -81,6 +93,7 @@ class User {
         const { FirstName, LastName, DateOfBirth, Email, Phone, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck, PasswordHash } = userData;
         
         const Username = this.generateUsername(FirstName, LastName);
+        const CheckInNumber = this.generateCheckInNumber();
         
         const result = insertStmt.run(
           FirstName,
@@ -95,7 +108,9 @@ class User {
           ClubID || null,
           EventID || null,
           Active !== undefined ? (Active ? 1 : 0) : 1,
-          BackgroundCheck !== undefined ? (BackgroundCheck ? 1 : 0) : 0
+          BackgroundCheck !== undefined ? (BackgroundCheck ? 1 : 0) : 0,
+          CheckInNumber,
+          0  // CheckedIn defaults to false
         );
 
         const user = this.findById(result.lastInsertRowid);
@@ -176,7 +191,7 @@ class User {
   }
 
   static update(id, updates) {
-    const allowedUpdates = ['FirstName', 'LastName', 'DateOfBirth', 'Email', 'Phone', 'Role', 'InvestitureLevel', 'ClubID', 'EventID', 'Active', 'BackgroundCheck', 'PasswordHash'];
+    const allowedUpdates = ['FirstName', 'LastName', 'DateOfBirth', 'Email', 'Phone', 'Role', 'InvestitureLevel', 'ClubID', 'EventID', 'Active', 'BackgroundCheck', 'PasswordHash', 'CheckedIn'];
     const setClause = [];
     const values = [];
 
@@ -202,6 +217,15 @@ class User {
     stmt.run(...values);
 
     return this.findById(id);
+  }
+
+  static findByCheckInNumber(checkInNumber) {
+    const user = db.prepare('SELECT * FROM Users WHERE CheckInNumber = ?').get(checkInNumber);
+    if (user) {
+      user.Age = user.DateOfBirth ? this.calculateAge(user.DateOfBirth) : null;
+      user.IsAdult = user.DateOfBirth ? this.isAdult(user.DateOfBirth) : false;
+    }
+    return user;
   }
 
   static deactivate(id) {

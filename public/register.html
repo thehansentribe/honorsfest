@@ -89,7 +89,11 @@
           <div style="background: #dfd; padding: 20px; border-radius: 8px; text-align: center;">
             <h3 style="color: #060; margin-bottom: 10px;">Registration Successful!</h3>
             <p>Your username is: <strong id="createdUsername"></strong></p>
+            <p>Your check-in number is: <strong id="checkInNumber" style="font-size: 1.2em; color: #0066cc;">#</strong></p>
             <p>Default password: <strong>password123</strong></p>
+            <p style="background: #fff3cd; padding: 10px; border-radius: 5px; margin: 10px 0;">
+              <strong>Important:</strong> Please write down your check-in number. You will need it when you check in at the event.
+            </p>
             <p style="margin-top: 15px;">
               <a href="/login.html" class="btn btn-primary">Go to Login</a>
             </p>
@@ -164,6 +168,7 @@
           document.getElementById('registrationForm').style.display = 'none';
           document.getElementById('errorMessage').style.display = 'none';
           document.getElementById('createdUsername').textContent = data.username;
+          document.getElementById('checkInNumber').textContent = '#' + (data.checkInNumber || 'N/A');
           document.getElementById('successMessage').style.display = 'block';
         } else {
           showError(data.error || 'Registration failed');
