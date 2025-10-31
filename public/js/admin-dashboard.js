@@ -382,15 +382,15 @@ function getSystemTab() {
       </div>
       <div style="padding: 20px;">
         <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ffc107;">
-          <strong>⚠️ Warning:</strong> Resetting the database will delete all data except admin users and honors. This action cannot be undone.
+          <strong>⚠️ Warning:</strong> Resetting the database will delete ALL data including admin users, honors, events, clubs, classes, and registrations. Everything will be recreated fresh. This action cannot be undone.
         </div>
         <div class="form-group">
           <label><strong>Database Reset & Reseed</strong></label>
           <p style="color: #666; margin: 10px 0;">This will:</p>
           <ul style="color: #666; margin: 10px 0 20px 20px;">
-            <li>Delete all events, clubs, users (except admins), classes, locations, timeslots, and registrations</li>
+            <li>Delete ALL data: honors, events, clubs, all users, classes, locations, timeslots, and registrations</li>
             <li>Reseed the database with fresh test data</li>
-            <li>Create 2 events, 8 clubs, test users, locations, timeslots, and classes</li>
+            <li>Create honors list, 3 admin users, 2 events, 8 clubs, test users, locations, timeslots, and classes</li>
           </ul>
           <button onclick="reseedDatabase()" class="btn btn-danger" id="reseedBtn">
             Reset & Reseed Database
@@ -402,7 +402,7 @@ function getSystemTab() {
 }
 
 async function reseedDatabase() {
-  if (!confirm('Are you absolutely sure you want to reset and reseed the database?\n\nThis will delete ALL data except admin users and honors.\n\nThis action CANNOT be undone!')) {
+  if (!confirm('Are you absolutely sure you want to reset and reseed the database?\n\nThis will delete ALL data including admin users and honors, then recreate everything fresh.\n\nYou will need to log in again after the reset.\n\nThis action CANNOT be undone!')) {
     return;
   }
   
@@ -420,12 +420,12 @@ async function reseedDatabase() {
     const result = await response.json();
     
     if (response.ok) {
-      showNotification('Database reset and reseeded successfully! Page will reload in 3 seconds...', 'success');
+      showNotification('Database reset and reseeded successfully! Redirecting to login...', 'success');
       
-      // Reload page after 3 seconds to see new data
+      // Redirect to login after 2 seconds since the session will be invalid
       setTimeout(() => {
-        window.location.reload();
-      }, 3000);
+        window.location.href = '/login.html';
+      }, 2000);
     } else {
       showNotification(result.error || 'Error resetting database', 'error');
       btn.disabled = false;

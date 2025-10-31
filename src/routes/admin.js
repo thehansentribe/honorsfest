@@ -19,7 +19,7 @@ router.post('/reseed', requireRole('Admin'), async (req, res) => {
     // Disable foreign key constraints temporarily
     db.pragma('foreign_keys = OFF');
 
-    // Clear existing data in correct order (children first, then parents)
+    // Clear ALL existing data in correct order (children first, then parents)
     // Delete child records first
     db.exec(`
       DELETE FROM Attendance;
@@ -28,8 +28,8 @@ router.post('/reseed', requireRole('Admin'), async (req, res) => {
       DELETE FROM RegistrationCodes;
     `);
     
-    // Delete users (except admins) - must be before clubs since clubs reference directors
-    db.exec(`DELETE FROM Users WHERE Role != 'Admin'`);
+    // Delete ALL users (including admins) - fresh start
+    db.exec(`DELETE FROM Users`);
     
     // Delete clubs (references events and users)
     db.exec(`DELETE FROM Clubs`);
@@ -42,6 +42,9 @@ router.post('/reseed', requireRole('Admin'), async (req, res) => {
     
     // Delete events (last, since everything references them)
     db.exec(`DELETE FROM Events`);
+    
+    // Delete honors - will be re-seeded fresh
+    db.exec(`DELETE FROM Honors`);
 
     // Re-enable foreign key constraints
     db.pragma('foreign_keys = ON');

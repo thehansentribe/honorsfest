@@ -11,78 +11,49 @@ function seedDatabase() {
     console.log('Starting database seeding...');
     const passwordHash = bcrypt.hashSync('password123', 10);
 
-    // Clear existing data (except honors)
-    console.log('Clearing existing data...');
-    db.exec(`
-      DELETE FROM Registrations;
-      DELETE FROM Attendance;
-      DELETE FROM Classes;
-      DELETE FROM Timeslots;
-      DELETE FROM Locations;
-      DELETE FROM RegistrationCodes;
-      DELETE FROM Users WHERE Role != 'Admin';
-      DELETE FROM Clubs;
-      DELETE FROM Events;
-    `);
-    console.log('Existing data cleared');
-
     // Prepare user insert statement
     const insertUser = db.prepare(`
       INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, PasswordHash, Role, Active, BackgroundCheck, ClubID, EventID, InvestitureLevel)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    
-    // Helper function to safely insert user (handles duplicates)
-    function safeInsertUser(...args) {
-      try {
-        return insertUser.run(...args);
-      } catch (error) {
-        if (error.message.includes('UNIQUE constraint') || error.message.includes('Username')) {
-          console.warn(`Skipping duplicate username: ${args[2]}`);
-          return { lastInsertRowid: null };
+
+    // Seed honors (always seed fresh)
+    console.log('Seeding honors...');
+    const rtfPath = path.join(__dirname, '../../Honorslist.rtf');
+    if (fs.existsSync(rtfPath)) {
+      const fileContent = fs.readFileSync(rtfPath, 'utf8');
+      const lines = fileContent.split('\n');
+      const insertHonor = db.prepare('INSERT INTO Honors (Name, Category) VALUES (?, ?)');
+      
+      let inserted = 0;
+      for (let i = 9; i < lines.length; i++) {
+        let line = lines[i].trim();
+        if (!line || line.startsWith('{') || line.startsWith('}') || line.startsWith('\\')) {
+          continue;
         }
-        throw error;
-      }
-    }
 
-    // Seed honors if they don't exist
-    const honorCount = db.prepare('SELECT COUNT(*) as count FROM Honors').get();
-    if (honorCount.count === 0) {
-      console.log('Seeding honors...');
-      const rtfPath = path.join(__dirname, '../../Honorslist.rtf');
-      if (fs.existsSync(rtfPath)) {
-        const fileContent = fs.readFileSync(rtfPath, 'utf8');
-        const lines = fileContent.split('\n');
-        const insertHonor = db.prepare('INSERT INTO Honors (Name, Category) VALUES (?, ?)');
-        
-        let inserted = 0;
-        for (let i = 9; i < lines.length; i++) {
-          let line = lines[i].trim();
-          if (!line || line.startsWith('{') || line.startsWith('}') || line.startsWith('\\')) {
-            continue;
-          }
+        line = line.replace(/\\.*?\\/g, '');
+        line = line.replace(/\\'([a-f0-9]{2})/g, (match, hex) => {
+          return String.fromCharCode(parseInt(hex, 16));
+        });
 
-          line = line.replace(/\\.*?\\/g, '');
-          line = line.replace(/\\'([a-f0-9]{2})/g, (match, hex) => {
-            return String.fromCharCode(parseInt(hex, 16));
-          });
-
-          if (line.includes(' - ')) {
-            const [category, ...nameParts] = line.split(' - ');
-            const honorName = nameParts.join(' - ');
-            
-            if (category && honorName) {
-              let cleanHonorName = honorName.trim().replace(/\\+$/, '');
-              insertHonor.run(cleanHonorName, category.trim());
-              inserted++;
-            }
+        if (line.includes(' - ')) {
+          const [category, ...nameParts] = line.split(' - ');
+          const honorName = nameParts.join(' - ');
+          
+          if (category && honorName) {
+            let cleanHonorName = honorName.trim().replace(/\\+$/, '');
+            insertHonor.run(cleanHonorName, category.trim());
+            inserted++;
           }
         }
-        console.log(`Inserted ${inserted} honors`);
       }
+      console.log(`Inserted ${inserted} honors`);
+    } else {
+      console.warn('Honorslist.rtf not found, skipping honors seeding');
     }
 
-    // Create 3 admin users (only if they don't exist)
+    // Create 3 admin users (always create fresh)
     console.log('Creating admin users...');
     const admins = [
       { FirstName: 'Jason', LastName: 'Hansen', Username: 'jason.hansen' },
@@ -91,16 +62,10 @@ function seedDatabase() {
     ];
     
     const birthDate = new Date(new Date().getFullYear() - 99, 0, 1).toISOString().split('T')[0];
-    const checkUser = db.prepare('SELECT ID FROM Users WHERE Username = ?');
     
     admins.forEach(admin => {
-      const existing = checkUser.get(admin.Username);
-      if (!existing) {
-        insertUser.run(admin.FirstName, admin.LastName, admin.Username, birthDate, passwordHash, 'Admin', 1, 1, null, null, 'MasterGuide');
-        console.log(`Created admin: ${admin.Username}`);
-      } else {
-        console.log(`Admin ${admin.Username} already exists, skipping`);
-      }
+      insertUser.run(admin.FirstName, admin.LastName, admin.Username, birthDate, passwordHash, 'Admin', 1, 1, null, null, 'MasterGuide');
+      console.log(`Created admin: ${admin.Username}`);
     });
 
     // Create 2 events
