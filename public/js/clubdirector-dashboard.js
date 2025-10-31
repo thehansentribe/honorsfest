@@ -1180,6 +1180,275 @@ Thank you!`;
     }
   }
   
+  // Manage students functions (copied from admin-dashboard.js with conflict handling)
+  async function viewClassStudents(classId) {
+    try {
+      // Fetch the roster
+      const [classResponse, rosterResponse] = await Promise.all([
+        fetchWithAuth(`/api/classes/details/${classId}`),
+        fetchWithAuth(`/api/registrations/class/${classId}/roster`)
+      ]);
+      
+      const classData = await classResponse.json();
+      const roster = await rosterResponse.json();
+      
+      // Create the modal
+      const modal = document.createElement('div');
+      modal.id = 'viewStudentsModal';
+      modal.className = 'modal';
+      modal.style.display = 'flex';
+      
+      // Fetch event name for display
+      const eventResponse = await fetchWithAuth(`/api/events/${classData.EventID}`);
+      const event = await eventResponse.json();
+      
+      // Format timeslot for display
+      function convertTo12Hour(time24) {
+        if (!time24) return '';
+        const [hours, minutes] = time24.split(':');
+        const hour = parseInt(hours);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const hour12 = hour % 12 || 12;
+        return `${hour12}:${minutes} ${ampm}`;
+      }
+      
+      const timeslotText = classData.TimeslotDate && classData.TimeslotStartTime && classData.TimeslotEndTime
+        ? `${classData.TimeslotDate} from ${convertTo12Hour(classData.TimeslotStartTime)} - ${convertTo12Hour(classData.TimeslotEndTime)}`
+        : 'Not set';
+      
+      modal.innerHTML = `
+        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+          <div class="modal-header">
+            <h2>Manage Students: ${classData.HonorName || 'Unknown'}</h2>
+            <button onclick="closeModal('viewStudentsModal')" class="btn btn-outline">×</button>
+          </div>
+          <div style="padding: 20px;">
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <div>
+                  <strong style="color: var(--text-light); font-size: 0.875rem;">Event:</strong>
+                  <div style="font-size: 1rem; margin-top: 4px;">${event.Name || 'Unknown'}</div>
+                </div>
+                <div>
+                  <strong style="color: var(--text-light); font-size: 0.875rem;">Location:</strong>
+                  <div style="font-size: 1rem; margin-top: 4px;">${classData.LocationName || 'Not assigned'}</div>
+                </div>
+                <div>
+                  <strong style="color: var(--text-light); font-size: 0.875rem;">Timeslot:</strong>
+                  <div style="font-size: 1rem; margin-top: 4px;">${timeslotText}</div>
+                </div>
+              </div>
+            </div>
+            ${(() => {
+              const enrolled = roster.filter(s => s.Status === 'Enrolled');
+              const waitlisted = roster.filter(s => s.Status === 'Waitlisted');
+              
+              return `
+                <h3 style="margin-bottom: 15px;">Enrolled Students (${enrolled.length}/${classData.ActualMaxCapacity || classData.MaxCapacity})</h3>
+                ${enrolled.length > 0 ? `
+                  <table class="table" style="margin-bottom: 30px;">
+                    <thead>
+                      <tr>
+                        <th>Student Name</th>
+                        <th>Club</th>
+                        <th>Investiture Level</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="studentsList">
+                      ${enrolled.map(student => `
+                        <tr>
+                          <td>${student.FirstName} ${student.LastName}</td>
+                          <td>${student.ClubName || 'No Club'}</td>
+                          <td>${student.InvestitureLevel || 'None'}</td>
+                          <td>
+                            <button onclick="removeStudentFromClass(${student.RegistrationID}, ${classId})" class="btn btn-sm btn-danger">Remove</button>
+                          </td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                ` : '<p style="margin-bottom: 30px; color: #666;">No enrolled students</p>'}
+                
+                ${waitlisted.length > 0 ? `
+                  <hr style="margin: 20px 0;">
+                  <h3 style="margin-bottom: 15px;">Waitlist (${waitlisted.length})</h3>
+                  <table class="table" style="margin-bottom: 30px;">
+                    <thead>
+                      <tr>
+                        <th>Position</th>
+                        <th>Student Name</th>
+                        <th>Club</th>
+                        <th>Investiture Level</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${waitlisted.map(student => `
+                        <tr>
+                          <td><strong>#${student.WaitlistOrder}</strong></td>
+                          <td>${student.FirstName} ${student.LastName}</td>
+                          <td>${student.ClubName || 'No Club'}</td>
+                          <td>${student.InvestitureLevel || 'None'}</td>
+                          <td>
+                            <button onclick="removeStudentFromClass(${student.RegistrationID}, ${classId})" class="btn btn-sm btn-danger">Remove</button>
+                          </td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                ` : ''}
+              `;
+            })()}
+            <hr style="margin: 20px 0;">
+            <h3 style="margin-bottom: 15px;">Add Student</h3>
+            <div class="form-group">
+              <label for="addStudentSelect">Select Student</label>
+              <select id="addStudentSelect" class="form-control" style="margin-bottom: 10px;">
+                <option value="">Loading...</option>
+              </select>
+              <button onclick="handleAddStudentToClass(${classId})" class="btn btn-primary">Add Student</button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      
+      // Load available students - filter by club for Club Directors
+      const user = getCurrentUser();
+      let availableUrl = `/api/registrations/available/${classId}`;
+      if (user.role === 'ClubDirector' && user.clubId) {
+        availableUrl += `?clubId=${user.clubId}`;
+      }
+      
+      const availableResponse = await fetchWithAuth(availableUrl);
+      const availableStudents = await availableResponse.json();
+      
+      const select = document.getElementById('addStudentSelect');
+      select.innerHTML = '<option value="">Select a student...</option>';
+      if (availableStudents.length === 0) {
+        select.innerHTML = '<option value="">No available students</option>';
+        select.disabled = true;
+      } else {
+        select.innerHTML += availableStudents.map(s => 
+          `<option value="${s.id}">${s.lastName}, ${s.firstName} (${s.clubName})</option>`
+        ).join('');
+      }
+    } catch (error) {
+      showNotification('Error loading students: ' + error.message, 'error');
+    }
+  }
+  
+  async function handleAddStudentToClass(classId) {
+    const select = document.getElementById('addStudentSelect');
+    const studentId = select.value;
+    
+    if (!studentId) {
+      showNotification('Please select a student', 'error');
+      return;
+    }
+    
+    try {
+      const response = await fetchWithAuth('/api/registrations/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ UserID: studentId, ClassID: classId })
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        showNotification('Student added successfully', 'success');
+        await viewClassStudents(classId);
+      } else if (response.status === 409 && result.conflict) {
+        showConflictModalClubDirector(classId, studentId, result.conflictClassName, result.conflictRegistrationId);
+      } else {
+        showNotification(result.error || 'Error adding student', 'error');
+      }
+    } catch (error) {
+      showNotification('Error adding student: ' + error.message, 'error');
+    }
+  }
+  
+  function showConflictModalClubDirector(newClassId, userId, conflictClassName, conflictRegistrationId) {
+    const modal = document.createElement('div');
+    modal.id = 'conflictModal';
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+      <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+          <h2>Timeslot Conflict</h2>
+          <button onclick="closeModal('conflictModal')" class="btn btn-outline">×</button>
+        </div>
+        <div style="padding: 20px;">
+          <p style="margin-bottom: 20px;">This student is already enrolled in another class during this timeslot.</p>
+          <p style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <strong>Current Class:</strong> ${conflictClassName}
+          </p>
+          <p style="margin-bottom: 20px;">Would you like to move the student to the new class?</p>
+          <div style="display: flex; gap: 10px;">
+            <button onclick="resolveConflictClubDirector('${newClassId}', '${userId}', '${conflictRegistrationId}')" class="btn btn-primary" style="flex: 1;">
+              Yes, Move Student
+            </button>
+            <button onclick="closeModal('conflictModal')" class="btn btn-outline" style="flex: 1;">
+              No, Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+  
+  async function resolveConflictClubDirector(newClassId, userId, conflictRegistrationId) {
+    try {
+      const removeResponse = await fetchWithAuth(`/api/registrations/admin/${conflictRegistrationId}`, {
+        method: 'DELETE'
+      });
+      
+      if (!removeResponse.ok) {
+        throw new Error('Failed to remove student from conflict class');
+      }
+      
+      const addResponse = await fetchWithAuth('/api/registrations/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ UserID: userId, ClassID: newClassId })
+      });
+      
+      if (!addResponse.ok) {
+        throw new Error('Failed to add student to new class');
+      }
+      
+      closeModal('conflictModal');
+      await viewClassStudents(newClassId);
+      showNotification('Student moved successfully', 'success');
+    } catch (error) {
+      showNotification('Error moving student: ' + error.message, 'error');
+    }
+  }
+  
+  async function removeStudentFromClass(registrationId, classId) {
+    if (!confirm('Are you sure you want to remove this student from the class?')) return;
+    
+    try {
+      const response = await fetchWithAuth(`/api/registrations/admin/${registrationId}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        showNotification('Student removed successfully', 'success');
+        await viewClassStudents(classId);
+      } else {
+        const result = await response.json();
+        showNotification(result.error || 'Error removing student', 'error');
+      }
+    } catch (error) {
+      showNotification('Error removing student: ' + error.message, 'error');
+    }
+  }
+  
   // Export filter functions
   window.toggleClubDirectorColumnFilter = toggleClubDirectorColumnFilter;
   window.updateClubDirectorFilter = updateClubDirectorFilter;
@@ -1188,6 +1457,13 @@ Thank you!`;
   window.closeClubDirectorModal = closeClubDirectorModal;
   window.shareRegistrationCode = shareRegistrationCode;
   window.deleteRegistrationCode = deleteRegistrationCode;
+  
+  // Manage students functions
+  window.viewClassStudents = viewClassStudents;
+  window.handleAddStudentToClass = handleAddStudentToClass;
+  window.removeStudentFromClass = removeStudentFromClass;
+  window.showConflictModalClubDirector = showConflictModalClubDirector;
+  window.resolveConflictClubDirector = resolveConflictClubDirector;
   
   async function checkEventStatus() {
     try {

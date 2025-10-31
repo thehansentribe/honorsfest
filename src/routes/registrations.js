@@ -225,10 +225,24 @@ router.post('/admin', requireRole('Admin', 'EventAdmin', 'ClubDirector'), async 
       return res.status(403).json({ error: 'Registration is closed for this event.' });
     }
     
-    // Check timeslot conflict
-    const hasConflict = Registration.checkTimeslotConflict(UserID, classData.TimeslotID, classData.EventID);
-    if (hasConflict) {
-      return res.status(400).json({ error: 'Student is already enrolled in a class during this timeslot' });
+    // Check timeslot conflict and return details if conflict exists
+    const { db } = require('../config/db');
+    const conflictCheck = db.prepare(`
+      SELECT r.ID as RegistrationID, c.ID as ClassID, h.Name as HonorName, c.TimeslotID
+      FROM Registrations r
+      JOIN Classes c ON r.ClassID = c.ID
+      LEFT JOIN Honors h ON c.HonorID = h.ID
+      WHERE r.UserID = ? AND c.TimeslotID = ? AND c.EventID = ? AND r.Status = 'Enrolled'
+    `).get(UserID, classData.TimeslotID, classData.EventID);
+    
+    if (conflictCheck) {
+      // Return conflict details instead of error immediately
+      return res.status(409).json({ 
+        conflict: true,
+        conflictClassId: conflictCheck.ClassID,
+        conflictClassName: conflictCheck.HonorName || 'Unknown Class',
+        conflictRegistrationId: conflictCheck.RegistrationID
+      });
     }
     
     // Register the student

@@ -1226,11 +1226,79 @@ async function handleAddStudentToClass(classId) {
       showNotification('Student added successfully', 'success');
       // Don't close or refresh - just reload the modal content
       await viewClassStudents(classId);
+    } else if (response.status === 409 && result.conflict) {
+      // Show conflict modal
+      showConflictModal(classId, studentId, result.conflictClassName, result.conflictRegistrationId);
     } else {
       showNotification(result.error || 'Error adding student', 'error');
     }
   } catch (error) {
     showNotification('Error adding student: ' + error.message, 'error');
+  }
+}
+
+function showConflictModal(newClassId, userId, conflictClassName, conflictRegistrationId) {
+  const modal = document.createElement('div');
+  modal.id = 'conflictModal';
+  modal.className = 'modal';
+  modal.style.display = 'flex';
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2>Timeslot Conflict</h2>
+        <button onclick="closeModal('conflictModal')" class="btn btn-outline">×</button>
+      </div>
+      <div style="padding: 20px;">
+        <p style="margin-bottom: 20px;">This student is already enrolled in another class during this timeslot.</p>
+        <p style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+          <strong>Current Class:</strong> ${conflictClassName}
+        </p>
+        <p style="margin-bottom: 20px;">Would you like to move the student to the new class?</p>
+        <div style="display: flex; gap: 10px;">
+          <button onclick="resolveConflict('${newClassId}', '${userId}', '${conflictRegistrationId}')" class="btn btn-primary" style="flex: 1;">
+            Yes, Move Student
+          </button>
+          <button onclick="closeModal('conflictModal')" class="btn btn-outline" style="flex: 1;">
+            No, Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+async function resolveConflict(newClassId, userId, conflictRegistrationId) {
+  try {
+    // First, remove from the conflict class
+    const removeResponse = await fetchWithAuth(`/api/registrations/admin/${conflictRegistrationId}`, {
+      method: 'DELETE'
+    });
+    
+    if (!removeResponse.ok) {
+      throw new Error('Failed to remove student from conflict class');
+    }
+    
+    // Then, add to the new class
+    const addResponse = await fetchWithAuth('/api/registrations/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ UserID: userId, ClassID: newClassId })
+    });
+    
+    if (!addResponse.ok) {
+      throw new Error('Failed to add student to new class');
+    }
+    
+    // Close conflict modal
+    closeModal('conflictModal');
+    
+    // Refresh the manage students modal
+    await viewClassStudents(newClassId);
+    
+    showNotification('Student moved successfully', 'success');
+  } catch (error) {
+    showNotification('Error moving student: ' + error.message, 'error');
   }
 }
 
@@ -2044,6 +2112,8 @@ window.handleEditClass = handleEditClass;
 window.viewClassStudents = viewClassStudents;
 window.handleAddStudentToClass = handleAddStudentToClass;
 window.removeStudentFromClass = removeStudentFromClass;
+window.showConflictModal = showConflictModal;
+window.resolveConflict = resolveConflict;
 window.generateReport = generateReport;
 window.updateReportButton = updateReportButton;
 window.renderLocations = renderLocations;
