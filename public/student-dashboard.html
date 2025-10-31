@@ -131,12 +131,16 @@
         allClasses = await classesResponse.json();
         
         // Debug: Log all classes loaded
+        console.log('=== CLASS LOADING DEBUG ===');
+        console.log('Current Event ID:', currentEventId);
         console.log('Loaded classes from API:', allClasses.length);
         console.log('All classes details:', allClasses.map(c => ({
           ID: c.ID,
+          EventID: c.EventID,
           HonorName: c.HonorName,
+          HonorID: c.HonorID,
           TeacherID: c.TeacherID,
-          TeacherName: c.TeacherFirstName + ' ' + c.TeacherLastName,
+          TeacherName: (c.TeacherFirstName || '') + ' ' + (c.TeacherLastName || ''),
           LocationID: c.LocationID,
           LocationName: c.LocationName,
           TimeslotID: c.TimeslotID,
