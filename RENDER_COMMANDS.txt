@@ -5,26 +5,56 @@ Copy and paste these commands into the Render Shell
 (Open your Render service → Shell tab)
 
 ===========================================
-STEP 1: Navigate to project directory
+STEP 1: Find the correct directory and file
 ===========================================
-cd ~/project/src
+pwd
+ls -la
+find . -name "seed-new.js" 2>/dev/null
 
 ===========================================
-STEP 2: (Optional) Backup existing database
+STEP 2: Navigate to project directory (try these)
 ===========================================
-cp ../../database.sqlite ../../database.sqlite.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || echo "No database to backup"
+# Try option 1 (most common on Render)
+cd ~/project/src || cd src
+
+# If that doesn't work, try:
+cd ~/project
+ls -la
+cd src || cd .  # Stay in current if src doesn't exist
 
 ===========================================
-STEP 3: Delete existing database
+STEP 3: (Optional) Backup existing database
+===========================================
+# Try multiple possible database locations
+cp ../../database.sqlite ../../database.sqlite.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || \
+cp database.sqlite database.sqlite.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || \
+echo "No database to backup or already backed up"
+
+===========================================
+STEP 4: Delete existing database
 ===========================================
 rm -f ../../database.sqlite
 rm -f database.sqlite
 rm -f ./database.sqlite
+rm -f ~/project/database.sqlite
 
 ===========================================
-STEP 4: Run the new seed script
+STEP 5: Run the new seed script
 ===========================================
-node -e "require('./config/seed-new').seedDatabase();"
+# First verify the file exists
+ls -la config/seed-new.js
+
+# If file exists, run it directly (simplest method):
+node config/seed-new.js
+
+# If that doesn't work, try from the config directory:
+cd config
+node seed-new.js
+cd ..
+
+# OR if you need to use require, make sure you're in the right directory:
+cd ~/project/src
+node -e "const path = require('path'); const seedPath = path.join(__dirname, 'config', 'seed-new'); require(seedPath).seedDatabase();"
 
 ===========================================
 VERIFICATION (optional)

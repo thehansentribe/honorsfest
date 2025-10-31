@@ -1,0 +1,19 @@
+===========================================
+QUICK RESET AND SEED - COPY AND PASTE
+===========================================
+
+# Step 1: Navigate and verify
+cd ~/project/src
+pwd
+ls -la config/seed-new.js
+
+# Step 2: Delete database
+rm -f ../../database.sqlite database.sqlite ./database.sqlite
+
+# Step 3: Run seed script (SIMPLEST - run directly)
+node config/seed-new.js
+
+===========================================
+That's it! The seed script will run and create all data.
+===========================================
+
