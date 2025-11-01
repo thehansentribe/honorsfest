@@ -1,7 +1,7 @@
 const express = require('express');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const { seedDatabase } = require('../config/seed');
-const { db } = require('../config/db');
+const { db, initializeDatabase } = require('../config/db');
 
 const router = express.Router();
 router.use(verifyToken);
@@ -52,7 +52,24 @@ router.post('/reseed', requireRole('Admin'), async (req, res) => {
     // Re-enable foreign key constraints
     db.pragma('foreign_keys = ON');
 
-    console.log('Database cleared, starting seed...');
+    console.log('Database cleared, ensuring schema is up to date...');
+    
+    // Re-initialize database schema (creates tables with latest schema if needed)
+    initializeDatabase();
+    
+    // Run migrations to ensure all columns exist (handles existing tables)
+    try {
+      const { migrateEventActive } = require('../config/migrate-event-active');
+      migrateEventActive();
+      
+      const { migrateClubEvents } = require('../config/migrate-club-events');
+      migrateClubEvents();
+      
+      console.log('Schema migrations completed, starting seed...');
+    } catch (migrateError) {
+      console.warn('Migration warning (may be safe to ignore):', migrateError.message);
+      // Continue with seeding - migrations may have already run
+    }
 
     // Run the seed script - wrap in try/catch to handle any seed errors
     try {
