@@ -1,6 +1,6 @@
 const express = require('express');
 const { verifyToken, requireRole } = require('../middleware/auth');
-const { seedDatabase } = require('../config/seed-new');
+const { seedDatabase } = require('../config/seed');
 const { db } = require('../config/db');
 
 const router = express.Router();
