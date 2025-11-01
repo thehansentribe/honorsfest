@@ -5,8 +5,18 @@ const Club = require('../models/club');
 const router = express.Router();
 router.use(verifyToken);
 
-// GET /api/clubs/:eventId - Get clubs for event
-router.get('/:eventId', (req, res) => {
+// GET /api/clubs - Get all clubs (must come before /:id routes)
+router.get('/', (req, res) => {
+  try {
+    const clubs = Club.getAll();
+    res.json(clubs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/clubs/event/:eventId - Get clubs for event
+router.get('/event/:eventId', (req, res) => {
   try {
     const clubs = Club.findByEvent(parseInt(req.params.eventId));
     res.json(clubs);
@@ -15,7 +25,22 @@ router.get('/:eventId', (req, res) => {
   }
 });
 
-// GET /api/clubs/:id - Get club by ID
+// GET /api/clubs/:id/events - Get all events for a club (must come before /:id)
+router.get('/:id/events', (req, res) => {
+  try {
+    const club = Club.findById(parseInt(req.params.id));
+    if (!club) {
+      return res.status(404).json({ error: 'Club not found' });
+    }
+    
+    const events = Club.getEvents(parseInt(req.params.id));
+    res.json(events);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/clubs/details/:id - Get club by ID
 router.get('/details/:id', (req, res) => {
   try {
     const club = Club.findById(parseInt(req.params.id));
@@ -31,19 +56,23 @@ router.get('/details/:id', (req, res) => {
 // POST /api/clubs - Create club (Admin, EventAdmin)
 router.post('/', requireRole('Admin', 'EventAdmin'), (req, res) => {
   try {
-    const { EventID, Name, Church, DirectorID } = req.body;
-    const db = require('../config/db').db;
+    const { Name, Church, DirectorID, EventID } = req.body;
     const User = require('../models/user');
     
-    if (!EventID || !Name) {
-      return res.status(400).json({ error: 'EventID and Name are required' });
+    if (!Name) {
+      return res.status(400).json({ error: 'Name is required' });
     }
     
-    const club = Club.create(req.body);
+    const club = Club.create({ Name, Church, DirectorID });
     
     // If a director was assigned, automatically add them to the club
     if (DirectorID && club.ID) {
       User.update(parseInt(DirectorID), { ClubID: club.ID });
+    }
+    
+    // Optionally link to event if provided
+    if (EventID && club.ID) {
+      Club.addToEvent(club.ID, parseInt(EventID));
     }
     
     res.status(201).json(club);
@@ -73,20 +102,41 @@ router.put('/:id', requireRole('Admin', 'EventAdmin'), (req, res) => {
   }
 });
 
-// PUT /api/clubs/:id/move - Move club to different event
-router.put('/:id/move', requireRole('Admin', 'EventAdmin'), (req, res) => {
+// POST /api/clubs/:id/events - Link club to event
+router.post('/:id/events', requireRole('Admin', 'EventAdmin'), (req, res) => {
   try {
     const { EventID } = req.body;
     if (!EventID) {
       return res.status(400).json({ error: 'EventID is required' });
     }
     
-    // Update EventID
-    const club = Club.update(parseInt(req.params.id), { EventID });
+    const club = Club.findById(parseInt(req.params.id));
     if (!club) {
       return res.status(404).json({ error: 'Club not found' });
     }
-    res.json(club);
+    
+    Club.addToEvent(club.ID, parseInt(EventID));
+    const events = Club.getEvents(club.ID);
+    res.json({ club, events });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/clubs/:id/events/:eventId - Unlink club from event
+router.delete('/:id/events/:eventId', requireRole('Admin', 'EventAdmin'), (req, res) => {
+  try {
+    const club = Club.findById(parseInt(req.params.id));
+    if (!club) {
+      return res.status(404).json({ error: 'Club not found' });
+    }
+    
+    const removed = Club.removeFromEvent(club.ID, parseInt(req.params.eventId));
+    if (!removed) {
+      return res.status(404).json({ error: 'Club is not linked to this event' });
+    }
+    
+    res.json({ message: 'Club unlinked from event', club });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

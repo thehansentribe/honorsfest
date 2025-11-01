@@ -178,13 +178,17 @@ function seedDatabase() {
 
       // Create 4 clubs with directors, teachers, staff, and students
       console.log(`Creating 4 clubs for event ${event.ID}...`);
-      const insertClub = db.prepare('INSERT INTO Clubs (EventID, Name, Church) VALUES (?, ?, ?)');
+      const insertClub = db.prepare('INSERT INTO Clubs (Name, Church) VALUES (?, ?)');
+      const insertClubEvent = db.prepare('INSERT INTO ClubEvents (ClubID, EventID) VALUES (?, ?)');
       const churches = ['First Baptist Church', 'Grace Community Church', 'Hope Presbyterian Church', 'St. Mary\'s Catholic Church'];
       
       for (let clubIndex = 0; clubIndex < 4; clubIndex++) {
-        // Create club
-        const clubResult = insertClub.run(event.ID, `Club ${clubIndex + 1}`, churches[clubIndex]);
+        // Create club (without EventID)
+        const clubResult = insertClub.run(`Club ${clubIndex + 1}`, churches[clubIndex]);
         const clubId = clubResult.lastInsertRowid;
+        
+        // Link club to event via ClubEvents junction table
+        insertClubEvent.run(clubId, event.ID);
         console.log(`\n  Club ${clubIndex + 1} (ID: ${clubId}):`);
         
         // Create club director
@@ -325,9 +329,11 @@ function seedDatabase() {
     console.log('- 8 Locations (4 per event)');
     console.log('- 8 Timeslots (4 per event)');
     console.log('- 8 Classes (1 per club, 4 per event)');
+    console.log('- ClubEvents relationships: 8 (1 per club per event)');
     
   } catch (error) {
     console.error('Error seeding database:', error);
+    console.error('Error stack:', error.stack);
     throw error;
   }
 }

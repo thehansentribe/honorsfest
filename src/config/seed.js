@@ -133,13 +133,19 @@ function seedDatabase() {
     ];
     
     events.forEach(event => {
-      const clubCount = db.prepare('SELECT COUNT(*) as count FROM Clubs WHERE EventID = ?').get(event.ID);
+      const clubCount = db.prepare('SELECT COUNT(*) as count FROM ClubEvents WHERE EventID = ?').get(event.ID);
       if (clubCount.count === 0) {
-        const insertClub = db.prepare('INSERT INTO Clubs (EventID, Name, Church) VALUES (?, ?, ?)');
+        const insertClub = db.prepare('INSERT INTO Clubs (Name, Church) VALUES (?, ?)');
+        const insertClubEvent = db.prepare('INSERT INTO ClubEvents (ClubID, EventID) VALUES (?, ?)');
         
         clubs.forEach((club, index) => {
-          const result = insertClub.run(event.ID, club.Name, club.Church);
+          // Create club
+          const result = insertClub.run(club.Name, club.Church);
           const clubId = result.lastInsertRowid;
+          
+          // Link club to event
+          insertClubEvent.run(clubId, event.ID);
+          
           console.log(`Created club: ${club.Name} (Event ${event.ID}) (ID: ${clubId})`);
           
           // Create a club director and assign to this club
@@ -244,10 +250,11 @@ function seedDatabase() {
         const honors = db.prepare('SELECT ID FROM Honors ORDER BY ID LIMIT 4').all();
         // Pick teachers for this event (any teacher linked to a club in this event)
         const teacherIds = db.prepare(`
-          SELECT u.ID
+          SELECT DISTINCT u.ID
           FROM Users u
           JOIN Clubs c ON u.ClubID = c.ID
-          WHERE u.Role = 'Teacher' AND c.EventID = ?
+          JOIN ClubEvents ce ON c.ID = ce.ClubID
+          WHERE u.Role = 'Teacher' AND ce.EventID = ?
           ORDER BY u.ID
         `).all(event.ID).map(r => r.ID);
         // Locations and timeslots for this event

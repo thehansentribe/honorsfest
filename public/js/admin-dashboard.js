@@ -159,7 +159,7 @@ async function loadClubsForCreateUser(eventId) {
   }
   
   try {
-    const response = await fetchWithAuth(`/api/clubs/${eventId}`);
+    const response = await fetchWithAuth(`/api/clubs/event/${eventId}`);
     const clubs = await response.json();
     
     if (clubSelect) {
@@ -190,7 +190,7 @@ async function loadClubsForEditUser(eventId) {
   }
   
   try {
-    const response = await fetchWithAuth(`/api/clubs/${eventId}`);
+    const response = await fetchWithAuth(`/api/clubs/event/${eventId}`);
     const clubs = await response.json();
     
     if (clubSelect) {
@@ -643,7 +643,18 @@ async function reseedDatabase() {
       body: JSON.stringify({ confirm: true })
     });
     
-    const result = await response.json();
+    // Check if response is JSON
+    const contentType = response.headers.get('content-type');
+    let result;
+    
+    if (contentType && contentType.includes('application/json')) {
+      result = await response.json();
+    } else {
+      // If not JSON, read as text to see what we got
+      const text = await response.text();
+      console.error('Non-JSON response:', text);
+      throw new Error('Server returned non-JSON response. Check server logs.');
+    }
     
     if (response.ok) {
       showNotification('Database reset and reseeded successfully! Redirecting to login...', 'success');
@@ -658,6 +669,7 @@ async function reseedDatabase() {
       btn.textContent = 'Reset & Reseed Database';
     }
   } catch (error) {
+    console.error('Reseed error:', error);
     showNotification('Error resetting database: ' + error.message, 'error');
     btn.disabled = false;
     btn.textContent = 'Reset & Reseed Database';
@@ -669,6 +681,17 @@ async function loadEvents() {
   try {
     const response = await fetchWithAuth('/api/events');
     allEvents = await response.json();
+    
+    // Normalize Active field from SQLite (1/0) to boolean for consistent rendering
+    allEvents = allEvents.map(event => {
+      // SQLite returns Active as 1 or 0 (integer), convert to boolean for template rendering
+      const isActive = event.Active === 1 || event.Active === true || event.Active === '1';
+      return {
+        ...event,
+        Active: isActive  // Store as boolean (true/false) for easier template rendering
+      };
+    });
+    
     
     // Populate event filters every time
     updateEventDropdowns();
@@ -780,7 +803,6 @@ function renderEvents() {
           <th>Name</th>
           <th>Start Date</th>
           <th>End Date</th>
-          <th>Status</th>
           <th>Classes</th>
           <th>Actions</th>
         </tr>
@@ -788,16 +810,20 @@ function renderEvents() {
       <tbody>
         ${allEvents.map(event => `
           <tr>
-            <td><strong>${event.Name}</strong></td>
+            <td>
+              <strong>${event.Name}</strong>
+            </td>
             <td>${event.StartDate}</td>
             <td>${event.EndDate}</td>
-            <td><span class="badge ${event.Status === 'Live' ? 'badge-success' : 'badge-secondary'}">${event.Status}</span></td>
             <td>${event.ClassCount || 0}</td>
             <td>
-              <button onclick="toggleEventStatus(${event.ID}, '${event.Status}')" class="btn btn-sm ${event.Status === 'Live' ? 'btn-warning' : 'btn-success'}">
-                ${event.Status === 'Live' ? 'Close Event' : 'Set Live'}
+              <button onclick="toggleEventActive(${event.ID}, ${event.Active ? 'true' : 'false'})" class="btn btn-sm ${event.Active ? 'btn-success' : 'btn-secondary'}" style="margin-right: 5px;">
+                ${event.Active ? 'Event Open' : 'Event Closed'}
               </button>
-              <button onclick="editEvent(${event.ID})" class="btn btn-sm btn-secondary">Edit</button>
+              <button onclick="toggleEventStatus(${event.ID}, '${event.Status}')" class="btn btn-sm ${event.Status === 'Live' ? 'btn-success' : 'btn-secondary'}" style="margin-right: 5px;">
+                ${event.Status === 'Live' ? 'Registration Open' : 'Registration Closed'}
+              </button>
+              <button onclick="editEvent(${event.ID})" class="btn btn-sm btn-primary">Edit</button>
             </td>
           </tr>
         `).join('')}
@@ -1100,6 +1126,28 @@ async function editEvent(eventId) {
           <input type="text" id="editLocationDescription" name="editLocationDescription" class="form-control" value="${event.LocationDescription || ''}">
         </div>
         <hr style="margin: 20px 0; border-color: var(--border);">
+        <h3 style="margin: 0 0 15px 0; font-size: 16px; color: var(--primary);">Event Status</h3>
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="checkbox" id="editEventActive" name="editEventActive" ${event.Active ? 'checked' : ''} style="width: auto;">
+            <strong>Active</strong>
+          </label>
+          <small style="color: var(--text-light); display: block; margin-top: 5px;">
+            Active events are visible to clubs and participants. Inactive events are hidden.
+          </small>
+        </div>
+        <div class="form-group">
+          <label for="editEventStatus">Registration Status *</label>
+          <select id="editEventStatus" name="editEventStatus" class="form-control" required>
+            <option value="Closed" ${event.Status === 'Closed' ? 'selected' : ''}>Closed (View Only)</option>
+            <option value="Live" ${event.Status === 'Live' ? 'selected' : ''}>Live (Registration Open)</option>
+          </select>
+          <small style="color: var(--text-light); display: block; margin-top: 5px;">
+            <strong>Closed:</strong> Clubs can view classes but cannot register.<br>
+            <strong>Live:</strong> Clubs can view and register for classes.
+          </small>
+        </div>
+        <hr style="margin: 20px 0; border-color: var(--border);">
         <h3 style="margin: 0 0 15px 0; font-size: 16px; color: var(--primary);">Custom Role Names</h3>
         <small style="color: var(--text-light); margin-bottom: 15px; display: block;">Configure how role names appear for this event.</small>
         <div class="form-group">
@@ -1144,6 +1192,8 @@ async function handleEditEvent(event, eventId) {
     State: form.editState.value.trim() || null,
     ZIP: form.editZIP.value.trim() || null,
     LocationDescription: form.editLocationDescription.value.trim() || null,
+    Active: form.editEventActive?.checked ?? true,
+    Status: form.editEventStatus.value,
     RoleLabelStudent: form.editRoleLabelStudent.value.trim() || 'Student',
     RoleLabelTeacher: form.editRoleLabelTeacher.value.trim() || 'Teacher',
     RoleLabelStaff: form.editRoleLabelStaff.value.trim() || 'Staff',
@@ -1171,6 +1221,70 @@ async function handleEditEvent(event, eventId) {
   }
 }
 
+async function toggleEventActive(eventId, currentActiveStr) {
+  try {
+    // Handle string 'true'/'false' from onclick, or boolean/number from API
+    const isCurrentlyActive = currentActiveStr === 'true' || currentActiveStr === true || currentActiveStr === 1 || currentActiveStr === '1';
+    const newActive = !isCurrentlyActive;
+    
+    // Send as integer (1 or 0) to match SQLite BOOLEAN storage
+    const updates = { Active: newActive ? 1 : 0 };
+    
+    // If closing event (Active = 0), automatically close registration
+    // The backend will handle this automatically, but we can also set it here for clarity
+    if (!newActive) {
+      updates.Status = 'Closed';
+    }
+    // Note: If opening event (Active = 1), we do NOT automatically open registration
+    // Registration status remains unchanged and must be toggled separately
+    
+    const response = await fetchWithAuth(`/api/events/${eventId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    
+    if (response.ok) {
+      const updatedEvent = await response.json();
+      
+      // Determine the actual Active value (SQLite returns 1/0 as integers)
+      const isActive = updatedEvent.Active === 1 || updatedEvent.Active === true || updatedEvent.Active === '1';
+      
+      // Verify the update worked - if not, show error
+      if (isActive !== newActive) {
+        showNotification('Warning: Event status may not have updated correctly. Please refresh the page.', 'error');
+        // Still reload to show current state
+        await loadEvents();
+        return;
+      }
+      
+      // Force immediate update of the specific event in allEvents array
+      const eventIndex = allEvents.findIndex(e => e.ID === eventId);
+      if (eventIndex !== -1) {
+        allEvents[eventIndex] = {
+          ...allEvents[eventIndex],
+          Active: isActive,  // Store as boolean for consistency
+          Status: updatedEvent.Status
+        };
+        
+        // Immediately re-render with updated data
+        renderEvents();
+      }
+      
+      showNotification(`Event ${newActive ? 'opened' : 'closed'} successfully`, 'success');
+      
+      // Reload from server to ensure we have the latest data (this will call renderEvents again)
+      await loadEvents();
+    } else {
+      const error = await response.json();
+      showNotification(error.error || 'Error updating event status', 'error');
+    }
+  } catch (error) {
+    console.error('Error in toggleEventActive:', error);
+    showNotification('Error updating event active status: ' + error.message, 'error');
+  }
+}
+
 async function toggleEventStatus(eventId, currentStatus) {
   try {
     const newStatus = currentStatus === 'Live' ? 'Closed' : 'Live';
@@ -1181,11 +1295,11 @@ async function toggleEventStatus(eventId, currentStatus) {
     });
     
     if (response.ok) {
-      showNotification(`Event status updated to ${newStatus}`, 'success');
+      showNotification(`Class registration ${newStatus === 'Live' ? 'opened' : 'closed'} successfully`, 'success');
       await loadEvents();
     } else {
       const error = await response.json();
-      showNotification(error.error, 'error');
+      showNotification(error.error || 'Error updating registration status', 'error');
     }
   } catch (error) {
     showNotification('Error updating event status', 'error');
@@ -1707,6 +1821,28 @@ function showCreateEventForm() {
           <input type="text" id="locationDescription" name="locationDescription" class="form-control" placeholder="e.g., Community Center Main Hall">
         </div>
         <hr style="margin: 20px 0; border-color: var(--border);">
+        <h3 style="margin: 0 0 15px 0; font-size: 16px; color: var(--primary);">Event Status</h3>
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="checkbox" id="eventActive" name="eventActive" checked style="width: auto;">
+            <strong>Active</strong>
+          </label>
+          <small style="color: var(--text-light); display: block; margin-top: 5px;">
+            Active events are visible to clubs and participants. Inactive events are hidden.
+          </small>
+        </div>
+        <div class="form-group">
+          <label for="eventStatus">Registration Status *</label>
+          <select id="eventStatus" name="eventStatus" class="form-control" required>
+            <option value="Closed" selected>Closed (View Only)</option>
+            <option value="Live">Live (Registration Open)</option>
+          </select>
+          <small style="color: var(--text-light); display: block; margin-top: 5px;">
+            <strong>Closed:</strong> Clubs can view classes but cannot register.<br>
+            <strong>Live:</strong> Clubs can view and register for classes.
+          </small>
+        </div>
+        <hr style="margin: 20px 0; border-color: var(--border);">
         <h3 style="margin: 0 0 15px 0; font-size: 16px; color: var(--primary);">Custom Role Names</h3>
         <small style="color: var(--text-light); margin-bottom: 15px; display: block;">Optional: Configure how role names appear for this event.</small>
         <div class="form-group">
@@ -1777,7 +1913,8 @@ async function handleCreateEvent(e) {
     RoleLabelStaff: form.roleLabelStaff?.value?.trim() || 'Staff',
     RoleLabelClubDirector: form.roleLabelClubDirector?.value?.trim() || 'Club Director',
     RoleLabelEventAdmin: form.roleLabelEventAdmin?.value?.trim() || 'Event Admin',
-    Status: 'Closed'
+    Active: form.eventActive?.checked ?? true,
+    Status: form.eventStatus?.value || 'Closed'
   };
 
   console.log('Event data from form:', eventData);
@@ -2401,6 +2538,7 @@ async function handleEditLocation(e, locationId) {
 
 // Make functions globally available
 window.toggleEventStatus = toggleEventStatus;
+window.toggleEventActive = toggleEventActive;
 window.toggleUserStatus = toggleUserStatus;
 window.deactivateClass = deactivateClass;
 window.activateClass = activateClass;
@@ -2903,7 +3041,7 @@ async function renderClubs() {
   if (createBtn) createBtn.disabled = false;
   
   try {
-    const response = await fetchWithAuth(`/api/clubs/${eventId}`);
+    const response = await fetchWithAuth(`/api/clubs/event/${eventId}`);
     allClubs = await response.json();
     
     if (allClubs.length === 0) {
@@ -3151,22 +3289,23 @@ async function handleMoveClub(e, clubId) {
   }
   
   try {
-    const response = await fetchWithAuth(`/api/clubs/${clubId}/move`, {
-      method: 'PUT',
-      body: JSON.stringify({ EventID: eventId })
+    // Link club to event (clubs can now participate in multiple events)
+    const response = await fetchWithAuth(`/api/clubs/${clubId}/events`, {
+      method: 'POST',
+      body: JSON.stringify({ EventID: parseInt(eventId) })
     });
     
     const result = await response.json();
     
     if (response.ok) {
-      showNotification('Club moved successfully', 'success');
+      showNotification('Club linked to event successfully', 'success');
       closeModal('moveClubModal');
       await renderClubs();
     } else {
-      showNotification(result.error || 'Error moving club', 'error');
+      showNotification(result.error || 'Error linking club to event', 'error');
     }
   } catch (error) {
-    showNotification('Error moving club: ' + error.message, 'error');
+    showNotification('Error linking club to event: ' + error.message, 'error');
   }
 }
 

@@ -10,15 +10,24 @@
   <div class="top-banner">
     <h1>Honors Festival</h1>
     <div class="user-info">
-      <span id="eventName" class="event-info"></span>
-      <span id="userName">Welcome, <strong id="userDisplayName"></strong></span>
-      <span id="checkInNumberDisplay" class="event-info" style="margin-left: 15px; font-weight: bold;"></span>
-      <button onclick="logout()" class="btn btn-outline">Logout</button>
+      <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+        <span id="eventSelectorContainer" style="display: none;">
+          <select id="eventSelector" class="form-control" style="width: auto; min-width: 200px;" onchange="switchEvent()">
+            <option value="">Select Event...</option>
+          </select>
+        </span>
+        <span id="eventName" class="event-info"></span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <span id="userName">Welcome, <strong id="userDisplayName"></strong></span>
+        <span id="checkInNumberDisplay" class="event-info" style="font-weight: bold;"></span>
+        <button onclick="logout()" class="btn btn-outline">Logout</button>
+      </div>
     </div>
   </div>
 
   <div id="eventStatusBanner" style="display: none;" class="status-banner status-banner-closed">
-    <strong>⚠ Registration Closed:</strong> The event registration is currently closed. You can view your registered classes but cannot add or drop classes.
+    <strong>⚠ Registration Not Open:</strong> You can view classes and your registered classes, but registration is not currently open for this event.
   </div>
 
   <div class="container">
@@ -77,6 +86,7 @@
     let currentUserId = null;
     let allClasses = [];
     let myRegistrations = [];
+    let availableEvents = [];
 
     // Load dashboard on page load
     document.addEventListener('DOMContentLoaded', async () => {
@@ -97,40 +107,112 @@
         console.error('Error loading user details:', error);
       }
 
-      await checkEventStatus();
       await loadEvents();
       await loadData();
     });
 
-    async function checkEventStatus() {
+    async function loadEvents() {
       try {
-        const response = await fetch('/api/events/current/status');
-        const data = await response.json();
+        // Get events where user's club participates
+        const response = await fetchWithAuth('/api/events/my');
+        availableEvents = await response.json();
+        
+        if (availableEvents.length === 0) {
+          document.getElementById('eventName').textContent = 'No events available';
+          showNotification('Your club is not participating in any active events.', 'info');
+          return;
+        }
+
+        // Show event selector if multiple events
+        const eventSelectorContainer = document.getElementById('eventSelectorContainer');
+        const eventSelector = document.getElementById('eventSelector');
+        const eventNameSpan = document.getElementById('eventName');
+
+        if (availableEvents.length > 1) {
+          eventSelectorContainer.style.display = 'block';
+          eventSelector.innerHTML = '<option value="">Select Event...</option>';
+          availableEvents.forEach(event => {
+            const option = document.createElement('option');
+            option.value = event.ID;
+            option.textContent = `${event.Name} (${event.Status})`;
+            eventSelector.appendChild(option);
+          });
+        } else {
+          eventSelectorContainer.style.display = 'none';
+        }
+
+        // Get saved event from localStorage or default to first Live event or first event
+        const savedEventId = localStorage.getItem('selectedEventId');
+        let selectedEvent = availableEvents.find(e => e.ID.toString() === savedEventId) ||
+                          availableEvents.find(e => e.Status === 'Live') ||
+                          availableEvents[0];
+
+        if (selectedEvent) {
+          currentEventId = selectedEvent.ID;
+          eventNameSpan.textContent = selectedEvent.Name;
+          if (eventSelector) {
+            eventSelector.value = selectedEvent.ID;
+          }
+          
+          // Save to localStorage
+          localStorage.setItem('selectedEventId', selectedEvent.ID);
+          
+          // Update status banner
+          await checkEventStatus(selectedEvent);
+        }
+      } catch (error) {
+        console.error('Error loading events:', error);
+        showNotification('Error loading events: ' + error.message, 'error');
+      }
+    }
+
+    async function switchEvent() {
+      const eventSelector = document.getElementById('eventSelector');
+      const selectedEventId = parseInt(eventSelector.value);
+      
+      if (!selectedEventId) {
+        return;
+      }
+
+      const selectedEvent = availableEvents.find(e => e.ID === selectedEventId);
+      if (!selectedEvent) {
+        return;
+      }
+
+      currentEventId = selectedEventId;
+      document.getElementById('eventName').textContent = selectedEvent.Name;
+      localStorage.setItem('selectedEventId', selectedEventId);
+      
+      await checkEventStatus(selectedEvent);
+      await loadData();
+    }
+
+    async function checkEventStatus(event = null) {
+      try {
+        // If event not provided, get current event
+        if (!event && currentEventId) {
+          const response = await fetchWithAuth(`/api/events/${currentEventId}`);
+          event = await response.json();
+        }
+
+        if (!event) return;
         
         const banner = document.getElementById('eventStatusBanner');
-        if (data.status === 'Closed') {
+        
+        // Show banner if event is not Live (Closed or not Live yet)
+        if (event.Status !== 'Live') {
           banner.style.display = 'block';
+          banner.className = 'status-banner status-banner-closed';
+          if (event.Status === 'Closed') {
+            banner.innerHTML = '<strong>⚠ Registration Not Open:</strong> Registration is closed for this event. You can view classes but cannot register.';
+          } else {
+            banner.innerHTML = '<strong>⚠ Registration Not Open:</strong> Registration is not yet open for this event. You can view classes but cannot register.';
+          }
         } else {
           banner.style.display = 'none';
         }
       } catch (error) {
         console.error('Error checking event status:', error);
-      }
-    }
-
-    async function loadEvents() {
-      try {
-        const response = await fetchWithAuth('/api/events');
-        const events = await response.json();
-        
-        // Get first event (or active event)
-        const activeEvent = events.find(e => e.Status === 'Live') || events[0];
-        if (activeEvent) {
-          currentEventId = activeEvent.ID;
-          document.getElementById('eventName').textContent = activeEvent.Name;
-        }
-      } catch (error) {
-        console.error('Error loading events:', error);
       }
     }
 
@@ -229,6 +311,10 @@
       const container = document.getElementById('classesList');
       const timeslotFilter = document.getElementById('timeslotFilter').value;
       const teacherFilter = document.getElementById('teacherFilter').value;
+
+      // Get current event status to determine if registration is allowed
+      const currentEvent = availableEvents.find(e => e.ID === currentEventId);
+      const isEventLive = currentEvent && currentEvent.Status === 'Live';
 
       // Filter classes - make sure we're not deduplicating
       const filtered = allClasses.filter(c => {
@@ -330,9 +416,11 @@
               renderedCount++;
               console.log(`Rendering class ID ${c.ID}: ${c.HonorName} - Teacher: ${teacher} - Location: ${location} - Timeslot: ${c.TimeslotID}`);
 
-              // Determine action buttons
+              // Determine action buttons - only show if event is Live
               let actionButtons = '';
-              if (canRegister) {
+              if (!isEventLive) {
+                actionButtons = '<span style="color: #999;">Registration not open</span>';
+              } else if (canRegister) {
                 actionButtons = `<button onclick="register(${c.ID})" class="btn btn-primary btn-sm">Register</button>`;
               } else if (hasEnrolledInTimeslot && !canWaitlist && !isFull) {
                 // Show light blue register button when there's a timeslot conflict (not full)

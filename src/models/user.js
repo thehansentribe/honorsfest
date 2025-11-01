@@ -147,7 +147,7 @@ class User {
 
   static findByIdWithClub(id) {
     return db.prepare(`
-      SELECT u.*, c.Name as ClubName, c.EventID
+      SELECT u.*, c.Name as ClubName
       FROM Users u
       LEFT JOIN Clubs c ON u.ClubID = c.ID
       WHERE u.ID = ?
@@ -169,8 +169,10 @@ class User {
     }
 
     if (filters.eventId) {
-      query += ' AND c.EventID = ?';
-      params.push(filters.eventId);
+      // Filter by users whose club is linked to the event via ClubEvents
+      // OR users who have the eventID set directly (for backward compatibility)
+      query += ' AND (u.EventID = ? OR EXISTS (SELECT 1 FROM ClubEvents ce WHERE ce.ClubID = u.ClubID AND ce.EventID = ?))';
+      params.push(filters.eventId, filters.eventId);
     }
 
     if (filters.active !== undefined) {

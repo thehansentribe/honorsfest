@@ -14,15 +14,16 @@ function seedClubs() {
 
     const eventId = event.ID;
 
-    // Check if clubs already exist
-    const clubCount = db.prepare('SELECT COUNT(*) as count FROM Clubs WHERE EventID = ?').get(eventId);
+    // Check if clubs are already linked to this event
+    const clubCount = db.prepare('SELECT COUNT(*) as count FROM ClubEvents WHERE EventID = ?').get(eventId);
     if (clubCount.count > 0) {
-      console.log(`${clubCount.count} clubs already exist for this event`);
+      console.log(`${clubCount.count} clubs already linked to this event`);
       return;
     }
 
-    // Insert 3 new clubs
-    const insertClub = db.prepare('INSERT INTO Clubs (EventID, Name, Church) VALUES (?, ?, ?)');
+    // Insert 3 new clubs (without EventID)
+    const insertClub = db.prepare('INSERT INTO Clubs (Name, Church) VALUES (?, ?)');
+    const insertClubEvent = db.prepare('INSERT INTO ClubEvents (ClubID, EventID) VALUES (?, ?)');
     
     const clubs = [
       { Name: 'Adventurer Club Alpha', Church: 'First Baptist Church' },
@@ -31,8 +32,10 @@ function seedClubs() {
     ];
 
     clubs.forEach(club => {
-      insertClub.run(eventId, club.Name, club.Church);
-      console.log(`Created club: ${club.Name} at ${club.Church}`);
+      const result = insertClub.run(club.Name, club.Church);
+      const clubId = result.lastInsertRowid;
+      insertClubEvent.run(clubId, eventId);
+      console.log(`Created club: ${club.Name} at ${club.Church} (linked to event ${eventId})`);
     });
 
     console.log('Club seeding completed successfully');

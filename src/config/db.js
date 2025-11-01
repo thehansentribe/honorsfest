@@ -46,6 +46,7 @@ function initializeDatabase() {
         StartDate TEXT NOT NULL,
         EndDate TEXT NOT NULL,
         Status TEXT NOT NULL CHECK(Status IN ('Live', 'Closed')) DEFAULT 'Closed',
+        Active BOOLEAN NOT NULL DEFAULT 1,
         Description TEXT,
         CoordinatorName TEXT NOT NULL,
         LocationDescription TEXT,
@@ -71,11 +72,9 @@ function initializeDatabase() {
 
       CREATE TABLE IF NOT EXISTS Clubs (
         ID INTEGER PRIMARY KEY AUTOINCREMENT,
-        EventID INTEGER NOT NULL,
         Name TEXT NOT NULL,
         Church TEXT,
         DirectorID INTEGER,
-        FOREIGN KEY (EventID) REFERENCES Events(ID),
         FOREIGN KEY (DirectorID) REFERENCES Users(ID)
       );
 
@@ -147,6 +146,19 @@ function initializeDatabase() {
         FOREIGN KEY (EventID) REFERENCES Events(ID),
         FOREIGN KEY (CreatedBy) REFERENCES Users(ID)
       );
+
+      CREATE TABLE IF NOT EXISTS ClubEvents (
+        ID INTEGER PRIMARY KEY AUTOINCREMENT,
+        ClubID INTEGER NOT NULL,
+        EventID INTEGER NOT NULL,
+        CreatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (ClubID) REFERENCES Clubs(ID),
+        FOREIGN KEY (EventID) REFERENCES Events(ID),
+        UNIQUE(ClubID, EventID)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_club_events_club ON ClubEvents(ClubID);
+      CREATE INDEX IF NOT EXISTS idx_club_events_event ON ClubEvents(EventID);
     `;
 
     db.exec(schema);

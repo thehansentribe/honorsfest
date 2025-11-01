@@ -26,15 +26,27 @@ router.post('/', (req, res) => {
       return res.status(404).json({ error: 'Class not found' });
     }
 
-    // Check if event is closed
+    // Check if event exists and is active
     const Event = require('../models/event');
     const event = Event.findById(classData.EventID);
     if (!event) {
       return res.status(404).json({ error: 'Event not found' });
     }
 
-    if (event.Status === 'Closed') {
-      return res.status(403).json({ error: 'Registration is closed for this event.' });
+    // Check if event is active (inactive events are hidden)
+    if (!event.Active) {
+      return res.status(403).json({ error: 'This event is not currently active.' });
+    }
+
+    // Check if event is Live (only Live events allow registration)
+    if (event.Status !== 'Live') {
+      return res.status(403).json({ error: 'Registration is not open for this event. The event must be Live to register for classes.' });
+    }
+
+    // Check if user's club participates in this event
+    const Club = require('../models/club');
+    if (!Club.isInEvent(user.ClubID, classData.EventID)) {
+      return res.status(403).json({ error: 'Your club is not participating in this event. Please contact your club director.' });
     }
 
     // Check if user already registered for this specific class

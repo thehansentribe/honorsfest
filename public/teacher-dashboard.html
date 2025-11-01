@@ -70,12 +70,21 @@
 
     async function checkEventStatus() {
       try {
-        const response = await fetch('/api/events/current/status');
-        const data = await response.json();
+        // Get events where user's club participates
+        const eventsResponse = await fetchWithAuth('/api/events/my');
+        const events = await eventsResponse.json();
         
         const banner = document.getElementById('eventStatusBanner');
-        if (data.status === 'Closed') {
+        if (events.length === 0) {
           banner.style.display = 'block';
+          banner.innerHTML = '<strong>⚠ No Events:</strong> Your club is not participating in any active events.';
+          return;
+        }
+        
+        const currentEvent = events.find(e => e.Status === 'Live') || events[0];
+        if (currentEvent && currentEvent.Status !== 'Live') {
+          banner.style.display = 'block';
+          banner.innerHTML = '<strong>⚠ Registration Not Open:</strong> Registration is not currently open for this event.';
         } else {
           banner.style.display = 'none';
         }
@@ -86,8 +95,16 @@
 
     async function loadMyClasses() {
       try {
-        const eventsResponse = await fetchWithAuth('/api/events');
+        // Get events where user's club participates
+        const eventsResponse = await fetchWithAuth('/api/events/my');
         const events = await eventsResponse.json();
+        
+        if (events.length === 0) {
+          document.getElementById('myClasses').innerHTML = '<p>Your club is not participating in any active events.</p>';
+          return;
+        }
+
+        // Get first Live event or first event
         const activeEvent = events.find(e => e.Status === 'Live') || events[0];
 
         if (!activeEvent) {

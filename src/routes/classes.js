@@ -35,6 +35,34 @@ router.get('/honors/categories', (req, res) => {
 router.get('/:eventId', (req, res) => {
   try {
     const user = req.user;
+    const eventId = parseInt(req.params.eventId);
+    
+    // Check if event is active (non-admins can't see inactive events)
+    const Event = require('../models/event');
+    const event = Event.findById(eventId);
+    
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    
+    // Non-admins can only see active events
+    if (user.role !== 'Admin' && user.role !== 'EventAdmin') {
+      if (!event.Active) {
+        return res.status(403).json({ error: 'This event is not currently active.' });
+      }
+      
+      // Check if user's club participates in this event
+      const User = require('../models/user');
+      const userData = User.findById(user.id);
+      
+      if (userData && userData.ClubID) {
+        const Club = require('../models/club');
+        if (!Club.isInEvent(userData.ClubID, eventId)) {
+          return res.status(403).json({ error: 'Your club is not participating in this event.' });
+        }
+      }
+    }
+    
     const filters = {
       locationId: req.query.locationId,
       timeslotId: req.query.timeslotId,
@@ -49,7 +77,7 @@ router.get('/:eventId', (req, res) => {
       filters.active = true;
     }
     
-    const classes = Class.findByEvent(parseInt(req.params.eventId), filters);
+    const classes = Class.findByEvent(eventId, filters);
     res.json(classes);
   } catch (error) {
     res.status(500).json({ error: error.message });

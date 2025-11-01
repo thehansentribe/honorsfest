@@ -10,6 +10,7 @@ const router = express.Router();
 router.post('/', verifyToken, requireRole('ClubDirector'), (req, res) => {
   try {
     const { clubId, eventId, expiresInDays } = req.body;
+    const Club = require('../models/club');
     
     if (!clubId || !eventId) {
       return res.status(400).json({ error: 'clubId and eventId are required' });
@@ -19,6 +20,9 @@ router.post('/', verifyToken, requireRole('ClubDirector'), (req, res) => {
     if (req.user.clubId !== clubId) {
       return res.status(403).json({ error: 'You can only generate codes for your own club' });
     }
+    
+    // Ensure club is linked to event
+    Club.addToEvent(clubId, eventId);
     
     const code = RegistrationCode.generate(clubId, eventId, req.user.id, expiresInDays || 30);
     res.status(201).json(code);

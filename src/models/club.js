@@ -2,14 +2,14 @@ const { db } = require('../config/db');
 
 class Club {
   static create(clubData) {
-    const { EventID, Name, Church, DirectorID } = clubData;
+    const { Name, Church, DirectorID } = clubData;
     
     const stmt = db.prepare(`
-      INSERT INTO Clubs (EventID, Name, Church, DirectorID)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO Clubs (Name, Church, DirectorID)
+      VALUES (?, ?, ?)
     `);
 
-    const result = stmt.run(EventID, Name, Church || null, DirectorID || null);
+    const result = stmt.run(Name, Church || null, DirectorID || null);
 
     return this.findById(result.lastInsertRowid);
   }
@@ -27,10 +27,81 @@ class Club {
     return db.prepare(`
       SELECT c.*, u.FirstName as DirectorFirstName, u.LastName as DirectorLastName
       FROM Clubs c
+      INNER JOIN ClubEvents ce ON c.ID = ce.ClubID
       LEFT JOIN Users u ON c.DirectorID = u.ID
-      WHERE c.EventID = ?
+      WHERE ce.EventID = ?
       ORDER BY c.Name
     `).all(eventId);
+  }
+
+  static findByEvents(eventIds) {
+    if (!eventIds || eventIds.length === 0) {
+      return [];
+    }
+    
+    const placeholders = eventIds.map(() => '?').join(',');
+    return db.prepare(`
+      SELECT DISTINCT c.*, u.FirstName as DirectorFirstName, u.LastName as DirectorLastName
+      FROM Clubs c
+      INNER JOIN ClubEvents ce ON c.ID = ce.ClubID
+      LEFT JOIN Users u ON c.DirectorID = u.ID
+      WHERE ce.EventID IN (${placeholders})
+      ORDER BY c.Name
+    `).all(...eventIds);
+  }
+
+  static getEvents(clubId) {
+    return db.prepare(`
+      SELECT e.*, ce.CreatedAt as LinkedAt
+      FROM Events e
+      INNER JOIN ClubEvents ce ON e.ID = ce.EventID
+      WHERE ce.ClubID = ?
+      ORDER BY e.StartDate DESC
+    `).all(clubId);
+  }
+
+  static addToEvent(clubId, eventId) {
+    try {
+      const stmt = db.prepare(`
+        INSERT INTO ClubEvents (ClubID, EventID)
+        VALUES (?, ?)
+      `);
+      stmt.run(clubId, eventId);
+      return true;
+    } catch (error) {
+      if (error.message.includes('UNIQUE constraint')) {
+        // Already linked, return true
+        return true;
+      }
+      throw error;
+    }
+  }
+
+  static removeFromEvent(clubId, eventId) {
+    const stmt = db.prepare(`
+      DELETE FROM ClubEvents
+      WHERE ClubID = ? AND EventID = ?
+    `);
+    const result = stmt.run(clubId, eventId);
+    return result.changes > 0;
+  }
+
+  static isInEvent(clubId, eventId) {
+    const result = db.prepare(`
+      SELECT 1
+      FROM ClubEvents
+      WHERE ClubID = ? AND EventID = ?
+    `).get(clubId, eventId);
+    return !!result;
+  }
+
+  static getAll() {
+    return db.prepare(`
+      SELECT c.*, u.FirstName as DirectorFirstName, u.LastName as DirectorLastName
+      FROM Clubs c
+      LEFT JOIN Users u ON c.DirectorID = u.ID
+      ORDER BY c.Name
+    `).all();
   }
 
   static update(id, updates) {

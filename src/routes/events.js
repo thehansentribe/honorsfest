@@ -10,9 +10,10 @@ const router = express.Router();
 // GET /api/events/current/status - Get current event status (for banners) - Public route
 router.get('/current/status', (req, res) => {
   try {
-    const events = Event.getAll();
-    // Find the first Live event, or the most recent event if none are Live
-    const liveEvent = events.find(e => e.Status === 'Live');
+    // Only get active events
+    const events = Event.getAll({ active: true });
+    // Find the first Live event, or the most recent active event if none are Live
+    const liveEvent = events.find(e => e.Status === 'Live' && e.Active);
     const currentEvent = liveEvent || events.sort((a, b) => new Date(b.StartDate) - new Date(a.StartDate))[0];
     
     if (currentEvent) {
@@ -28,10 +29,31 @@ router.get('/current/status', (req, res) => {
 // Apply auth middleware to all routes after this
 router.use(verifyToken);
 
-// GET /api/events - List all events
+// GET /api/events - List all events (admins see all, others see only active)
 router.get('/', (req, res) => {
   try {
-    const events = Event.getAll();
+    // Admins and EventAdmins see all events, others only see active ones
+    const userRole = req.user?.role;
+    const showAll = userRole === 'Admin' || userRole === 'EventAdmin';
+    
+    const events = showAll ? Event.getAll() : Event.getAll({ active: true });
+    res.json(events);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/events/my - Get events where user's club participates
+router.get('/my', (req, res) => {
+  try {
+    const User = require('../models/user');
+    const user = User.findById(req.user.id);
+    
+    if (!user || !user.ClubID) {
+      return res.json([]); // User has no club, return empty array
+    }
+    
+    const events = Event.getEventsForClub(user.ClubID);
     res.json(events);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -115,10 +137,28 @@ router.get('/:eventId/clubs', (req, res) => {
   }
 });
 
-// POST /api/events/:eventId/clubs - Create club (Admin, EventAdmin)
+// POST /api/events/:eventId/clubs - Create club and link to event (Admin, EventAdmin)
 router.post('/:eventId/clubs', requireRole('Admin', 'EventAdmin'), (req, res) => {
   try {
-    const club = Club.create({ EventID: parseInt(req.params.eventId), ...req.body });
+    const eventId = parseInt(req.params.eventId);
+    const { Name, Church, DirectorID } = req.body;
+    const User = require('../models/user');
+    
+    if (!Name) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+    
+    // Create club
+    const club = Club.create({ Name, Church, DirectorID });
+    
+    // Link club to event
+    Club.addToEvent(club.ID, eventId);
+    
+    // If a director was assigned, automatically add them to the club
+    if (DirectorID && club.ID) {
+      User.update(parseInt(DirectorID), { ClubID: club.ID });
+    }
+    
     res.status(201).json(club);
   } catch (error) {
     res.status(500).json({ error: error.message });

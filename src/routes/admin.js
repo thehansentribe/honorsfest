@@ -28,10 +28,13 @@ router.post('/reseed', requireRole('Admin'), async (req, res) => {
       DELETE FROM RegistrationCodes;
     `);
     
+    // Delete ClubEvents junction table entries
+    db.exec(`DELETE FROM ClubEvents`);
+    
     // Delete ALL users (including admins) - fresh start
     db.exec(`DELETE FROM Users`);
     
-    // Delete clubs (references events and users)
+    // Delete clubs (references users via DirectorID)
     db.exec(`DELETE FROM Clubs`);
     
     // Delete timeslots and locations (references events)
@@ -51,18 +54,26 @@ router.post('/reseed', requireRole('Admin'), async (req, res) => {
 
     console.log('Database cleared, starting seed...');
 
-    // Run the seed script
-    seedDatabase();
+    // Run the seed script - wrap in try/catch to handle any seed errors
+    try {
+      seedDatabase();
+      console.log('Database reseeded successfully');
 
-    console.log('Database reseeded successfully');
-
-    res.json({ 
-      message: 'Database reset and reseeded successfully',
-      timestamp: new Date().toISOString()
-    });
+      res.json({ 
+        message: 'Database reset and reseeded successfully',
+        timestamp: new Date().toISOString()
+      });
+    } catch (seedError) {
+      console.error('Error during seeding:', seedError);
+      throw seedError; // Re-throw to be caught by outer catch
+    }
   } catch (error) {
     console.error('Error reseeding database:', error);
-    res.status(500).json({ error: error.message });
+    // Ensure we always return JSON, never HTML
+    res.status(500).json({ 
+      error: error.message || 'Unknown error occurred',
+      details: error.stack 
+    });
   }
 });
 
