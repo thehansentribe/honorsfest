@@ -258,7 +258,6 @@ async function switchTab(tabName, clickedElement = null) {
       break;
     case 'clubs':
       content.innerHTML = await getClubsTab();
-      updateEventDropdowns(); // Populate event dropdown
       await renderClubs();
       break;
     case 'classes':
@@ -338,11 +337,7 @@ function getClubsTab() {
     <div class="card">
       <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
         <h2 class="card-title" style="margin: 0;">Clubs</h2>
-        <button onclick="showCreateClubForm()" class="btn btn-primary" id="createClubBtn" disabled>Create Club</button>
       </div>
-      <select id="clubEventFilter" class="form-control mb-2" onchange="renderClubs()">
-        <option value="">Select Event</option>
-      </select>
       <div id="clubsList"></div>
     </div>
   `;
@@ -823,6 +818,7 @@ function renderEvents() {
               <button onclick="toggleEventStatus(${event.ID}, '${event.Status}')" class="btn btn-sm ${event.Status === 'Live' ? 'btn-success' : 'btn-secondary'}" style="margin-right: 5px;">
                 ${event.Status === 'Live' ? 'Registration Open' : 'Registration Closed'}
               </button>
+              <button onclick="manageEventClubs(${event.ID})" class="btn btn-sm btn-info" style="margin-right: 5px;">Manage Clubs</button>
               <button onclick="editEvent(${event.ID})" class="btn btn-sm btn-primary">Edit</button>
             </td>
           </tr>
@@ -1735,6 +1731,181 @@ async function removeStudentFromClass(registrationId, classId) {
     showNotification('Error removing student: ' + error.message, 'error');
   }
 }
+
+// Manage clubs for an event
+async function manageEventClubs(eventId) {
+  try {
+    // Remove existing modal if present
+    const existingModal = document.getElementById('manageClubsModal');
+    if (existingModal) {
+      existingModal.remove();
+    }
+    
+    // Fetch event details and assigned clubs
+    const [eventResponse, assignedClubsResponse, allClubsResponse] = await Promise.all([
+      fetchWithAuth(`/api/events/${eventId}`),
+      fetchWithAuth(`/api/clubs/event/${eventId}`),
+      fetchWithAuth('/api/clubs')
+    ]);
+    
+    const event = await eventResponse.json();
+    const assignedClubs = await assignedClubsResponse.json();
+    const allClubs = await allClubsResponse.json();
+    
+    // Get clubs not yet assigned to this event
+    const assignedClubIds = new Set(assignedClubs.map(c => c.ID));
+    const availableClubs = allClubs.filter(c => !assignedClubIds.has(c.ID));
+    
+    // Create the modal
+    const modal = document.createElement('div');
+    modal.id = 'manageClubsModal';
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    
+    modal.innerHTML = `
+      <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+        <div class="modal-header">
+          <h2>Manage Clubs: ${event.Name || 'Unknown Event'}</h2>
+          <button onclick="closeModal('manageClubsModal')" class="btn btn-outline">×</button>
+        </div>
+        <div style="padding: 20px;">
+          <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+              <div>
+                <strong style="color: var(--text-light); font-size: 0.875rem;">Event:</strong>
+                <div style="font-size: 1rem; margin-top: 4px;">${event.Name || 'Unknown'}</div>
+              </div>
+              <div>
+                <strong style="color: var(--text-light); font-size: 0.875rem;">Start Date:</strong>
+                <div style="font-size: 1rem; margin-top: 4px;">${event.StartDate || 'Not set'}</div>
+              </div>
+              <div>
+                <strong style="color: var(--text-light); font-size: 0.875rem;">End Date:</strong>
+                <div style="font-size: 1rem; margin-top: 4px;">${event.EndDate || 'Not set'}</div>
+              </div>
+            </div>
+          </div>
+          
+          <h3 style="margin-bottom: 15px;">Assigned Clubs (${assignedClubs.length})</h3>
+          ${assignedClubs.length > 0 ? `
+            <table class="table" style="margin-bottom: 30px;">
+              <thead>
+                <tr>
+                  <th>Club Name</th>
+                  <th>Church</th>
+                  <th>Director</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="assignedClubsList">
+                ${assignedClubs.map(club => `
+                  <tr>
+                    <td><strong>${club.Name}</strong></td>
+                    <td>${club.Church || '-'}</td>
+                    <td>${club.DirectorFirstName ? `${club.DirectorFirstName} ${club.DirectorLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
+                    <td>
+                      <button onclick="removeClubFromEvent(${club.ID}, ${eventId})" class="btn btn-sm btn-danger">Remove</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          ` : '<p style="margin-bottom: 30px; color: #666;">No clubs assigned to this event</p>'}
+          
+          <hr style="margin: 20px 0;">
+          <h3 style="margin-bottom: 15px;">Add Club</h3>
+          <div class="form-group">
+            <label for="addClubSelect">Select Club</label>
+            <select id="addClubSelect" class="form-control" style="margin-bottom: 10px;">
+              <option value="">Loading...</option>
+            </select>
+            <button onclick="handleAddClubToEvent(${eventId})" class="btn btn-primary">Add Club</button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Populate the club dropdown
+    const select = document.getElementById('addClubSelect');
+    select.innerHTML = '<option value="">Select a club...</option>';
+    if (availableClubs.length === 0) {
+      select.innerHTML = '<option value="">No available clubs</option>';
+      select.disabled = true;
+    } else {
+      select.innerHTML += availableClubs.map(c => 
+        `<option value="${c.ID}">${c.Name}${c.Church ? ` (${c.Church})` : ''}</option>`
+      ).join('');
+    }
+  } catch (error) {
+    console.error('Error loading clubs:', error);
+    showNotification('Error loading clubs: ' + error.message, 'error');
+  }
+}
+
+async function handleAddClubToEvent(eventId) {
+  const select = document.getElementById('addClubSelect');
+  const clubId = select.value;
+  
+  if (!clubId) {
+    showNotification('Please select a club', 'error');
+    return;
+  }
+  
+  try {
+    const response = await fetchWithAuth(`/api/clubs/${clubId}/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ EventID: eventId })
+    });
+    
+    const result = await response.json();
+    
+    if (response.ok) {
+      showNotification('Club added successfully', 'success');
+      // Reload the modal content
+      await manageEventClubs(eventId);
+      // Refresh clubs list if on clubs tab
+      if (currentTab === 'clubs') {
+        await renderClubs();
+      }
+    } else {
+      showNotification(result.error || 'Error adding club', 'error');
+    }
+  } catch (error) {
+    showNotification('Error adding club: ' + error.message, 'error');
+  }
+}
+
+async function removeClubFromEvent(clubId, eventId) {
+  if (!confirm('Are you sure you want to remove this club from the event?')) return;
+  
+  try {
+    const response = await fetchWithAuth(`/api/clubs/${clubId}/events/${eventId}`, {
+      method: 'DELETE'
+    });
+    
+    if (response.ok) {
+      showNotification('Club removed successfully', 'success');
+      await manageEventClubs(eventId);
+      // Refresh clubs list if on clubs tab
+      if (currentTab === 'clubs') {
+        await renderClubs();
+      }
+    } else {
+      const result = await response.json();
+      showNotification(result.error || 'Error removing club', 'error');
+    }
+  } catch (error) {
+    showNotification('Error removing club: ' + error.message, 'error');
+  }
+}
+
+// Make functions globally available
+window.manageEventClubs = manageEventClubs;
+window.handleAddClubToEvent = handleAddClubToEvent;
+window.removeClubFromEvent = removeClubFromEvent;
 
 function updateReportButton() {
   const select = document.getElementById('reportEventFilter');
@@ -3028,46 +3199,48 @@ window.renderTimeslots = renderTimeslots;
 
 // Club management functions
 async function renderClubs() {
-  const select = document.getElementById('clubEventFilter');
-  const eventId = select?.value;
-  const createBtn = document.getElementById('createClubBtn');
-  
-  if (!eventId) {
-    document.getElementById('clubsList').innerHTML = '<p class="text-center">Select an event to view clubs</p>';
-    if (createBtn) createBtn.disabled = true;
-    return;
-  }
-  
-  if (createBtn) createBtn.disabled = false;
-  
   try {
-    const response = await fetchWithAuth(`/api/clubs/event/${eventId}`);
+    // Load all clubs
+    const response = await fetchWithAuth('/api/clubs');
     allClubs = await response.json();
     
     if (allClubs.length === 0) {
-      document.getElementById('clubsList').innerHTML = '<p class="text-center">No clubs found for this event</p>';
+      document.getElementById('clubsList').innerHTML = '<p class="text-center">No clubs found</p>';
       return;
     }
+    
+    // For each club, load its events
+    const clubsWithEvents = await Promise.all(
+      allClubs.map(async (club) => {
+        const eventsResponse = await fetchWithAuth(`/api/clubs/${club.ID}/events`);
+        const events = await eventsResponse.json();
+        return {
+          ...club,
+          events: events
+        };
+      })
+    );
     
     document.getElementById('clubsList').innerHTML = `
       <table class="data-table">
         <thead>
           <tr>
-            <th style="width: 30%; padding: 12px 8px; text-align: left;">Name</th>
-            <th style="width: 25%; padding: 12px 8px; text-align: left;">Church</th>
-            <th style="width: 25%; padding: 12px 8px; text-align: left;">Director</th>
-            <th style="width: 20%; padding: 12px 8px; text-align: left;">Actions</th>
+            <th style="width: 25%; padding: 12px 8px; text-align: left;">Club Name</th>
+            <th style="width: 20%; padding: 12px 8px; text-align: left;">Church</th>
+            <th style="width: 20%; padding: 12px 8px; text-align: left;">Director</th>
+            <th style="width: 30%; padding: 12px 8px; text-align: left;">Events</th>
+            <th style="width: 5%; padding: 12px 8px; text-align: left;">Actions</th>
           </tr>
         </thead>
         <tbody>
-          ${allClubs.map(club => `
+          ${clubsWithEvents.map(club => `
           <tr style="border-bottom: 1px solid #e0e0e0;">
             <td style="padding: 12px 8px; text-align: left;"><strong>${club.Name}</strong></td>
             <td style="padding: 12px 8px; text-align: left;">${club.Church || '-'}</td>
             <td style="padding: 12px 8px; text-align: left;">${club.DirectorFirstName ? `${club.DirectorFirstName} ${club.DirectorLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
+            <td style="padding: 12px 8px; text-align: left;">${club.events.length > 0 ? club.events.map(e => e.Name).join(', ') : '<span style="color: #999;">No events</span>'}</td>
             <td style="padding: 12px 8px; text-align: left;">
-              <button onclick="editClub(${club.ID})" class="btn btn-sm btn-secondary" style="margin-right: 8px;">Edit</button>
-              <button onclick="showMoveClubModal(${club.ID})" class="btn btn-sm btn-info">Move to Event</button>
+              <button onclick="editClub(${club.ID})" class="btn btn-sm btn-secondary">Edit</button>
             </td>
           </tr>
         `).join('')}
