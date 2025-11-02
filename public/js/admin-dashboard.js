@@ -868,9 +868,16 @@ function renderUsers() {
   // Apply filters
   let filteredUsers = [...allUsers];
   
-  // Filter out deactivated users by default
+  // Filter out deactivated users by default, but show invited users even if inactive
   if (!showDeactivatedUsers) {
-    filteredUsers = filteredUsers.filter(user => user.Active !== 0 && user.Active !== false);
+    filteredUsers = filteredUsers.filter(user => {
+      // Show active users
+      if (user.Active === 1 || user.Active === true) return true;
+      // Also show invited users even if inactive (they need to be visible so we can track them)
+      if (user.Invited && !user.InviteAccepted) return true;
+      // Hide other inactive users
+      return false;
+    });
   }
   
   if (Object.keys(userFilters).length > 0) {
