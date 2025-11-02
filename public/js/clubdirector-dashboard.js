@@ -1631,6 +1631,7 @@ Thank you!`;
   window.closeModal = closeModal;
   window.shareRegistrationCode = shareRegistrationCode;
   window.deleteRegistrationCode = deleteRegistrationCode;
+  window.generateClubDirectorReport = generateClubDirectorReport;
   
   // Manage students functions
   window.viewClassStudents = viewClassStudents;
