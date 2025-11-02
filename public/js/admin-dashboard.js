@@ -2251,8 +2251,9 @@ function showCreateUserForm() {
           <small style="color: var(--text-light);">Age will be calculated automatically</small>
         </div>
         <div class="form-group">
-          <label for="email">Email</label>
-          <input type="email" id="email" name="email" class="form-control">
+          <label for="email">Email *</label>
+          <input type="email" id="email" name="email" class="form-control" required>
+          <small style="color: var(--text-light);">Required for Admin, Event Admin, and Club Director invitations</small>
         </div>
         <div class="form-group">
           <label for="phone">Phone</label>
@@ -2262,13 +2263,14 @@ function showCreateUserForm() {
           <label for="role">Role *</label>
           <select id="role" name="role" class="form-control" required onchange="toggleEventDropdown(this.value)">
             <option value="">Select Role</option>
-            <option value="Admin">Admin</option>
-            <option value="EventAdmin">Event Admin</option>
-            <option value="ClubDirector">Club Director</option>
-            <option value="Teacher">Teacher</option>
-            <option value="Student">Student</option>
-            <option value="Staff">Staff</option>
-          </select>
+          <option value="Admin">Admin</option>
+          <option value="EventAdmin">Event Admin</option>
+          <option value="ClubDirector">Club Director</option>
+          <option value="Teacher">Teacher</option>
+          <option value="Student">Student</option>
+          <option value="Staff">Staff</option>
+        </select>
+        <small style="color: var(--text-light); display: block; margin-top: 5px;">Note: Admin, Event Admin, and Club Directors will receive invitation codes. Other roles are created directly.</small>
         </div>
         <div class="form-group" id="eventContainer" style="display: none;">
           <label for="eventId">Event *</label>
@@ -2492,13 +2494,71 @@ async function handleCreateUser(e) {
   e.preventDefault();
   const form = e.target;
   
+  const role = form.role?.value || '';
+  const firstName = form.firstName?.value?.trim() || '';
+  const lastName = form.lastName?.value?.trim() || '';
+  const email = form.email?.value?.trim() || null;
+  
+  // For Admin, EventAdmin, and ClubDirector - generate invite code
+  if (['Admin', 'EventAdmin', 'ClubDirector'].includes(role)) {
+    if (!firstName || !lastName || !email || !role) {
+      showNotification('First Name, Last Name, Email, and Role are required', 'error');
+      return;
+    }
+    
+    // Validate EventAdmin must have EventID
+    if (role === 'EventAdmin' && !form.eventId?.value) {
+      showNotification('EventAdmin must be assigned to an event', 'error');
+      return;
+    }
+    
+    // Validate ClubDirector must have ClubID
+    if (role === 'ClubDirector' && !form.clubId?.value) {
+      showNotification('ClubDirector must be assigned to a club', 'error');
+      return;
+    }
+    
+    try {
+      const inviteData = {
+        firstName,
+        lastName,
+        email,
+        role,
+        clubId: form.clubId?.value || null,
+        eventId: form.eventId?.value || null,
+        expiresInDays: 30
+      };
+      
+      const response = await fetchWithAuth('/api/invites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(inviteData)
+      });
+      
+      const invite = await response.json();
+      
+      if (!response.ok) {
+        showNotification(invite.error || 'Error generating invite code', 'error');
+        return;
+      }
+      
+      // Show invite code and email template
+      showInviteModal(invite, inviteData);
+      closeModal('createUserModal');
+    } catch (error) {
+      showNotification('Error generating invite: ' + error.message, 'error');
+    }
+    return;
+  }
+  
+  // For other roles (Student, Teacher, Staff) - create user directly
   const userData = {
-    FirstName: form.firstName?.value?.trim() || '',
-    LastName: form.lastName?.value?.trim() || '',
+    FirstName: firstName,
+    LastName: lastName,
     DateOfBirth: form.dateOfBirth?.value || '',
-    Email: form.email?.value?.trim() || null,
+    Email: email,
     Phone: form.phone?.value?.trim() || null,
-    Role: form.role?.value || '',
+    Role: role,
     InvestitureLevel: form.investitureLevel?.value || 'None',
     EventID: form.eventId?.value || null,
     ClubID: form.clubId?.value || null,
@@ -2506,17 +2566,9 @@ async function handleCreateUser(e) {
     BackgroundCheck: form.backgroundCheck?.checked || false
   };
 
-  // Note: Background check is optional for users 18+, can be set later by Admin
-
   // Validate
   if (!userData.FirstName || !userData.LastName || !userData.DateOfBirth || !userData.Role) {
     showNotification('Please fill in all required fields', 'error');
-    return;
-  }
-  
-  // Validate EventAdmin must have EventID
-  if (userData.Role === 'EventAdmin' && !userData.EventID) {
-    showNotification('EventAdmin must be assigned to an event', 'error');
     return;
   }
 
@@ -2538,6 +2590,102 @@ async function handleCreateUser(e) {
   } catch (error) {
     showNotification('Error creating user: ' + error.message, 'error');
   }
+}
+
+function showInviteModal(invite, inviteData) {
+  const modal = document.createElement('div');
+  modal.id = 'inviteModal';
+  modal.className = 'modal';
+  modal.style.display = 'flex';
+  
+  // Get base URL for invite link
+  const baseUrl = window.location.origin;
+  const inviteUrl = `${baseUrl}/invite-register.html?code=${invite.Code}`;
+  
+  // Get event and club names if applicable
+  const eventName = inviteData.eventId ? (allEvents.find(e => e.ID === parseInt(inviteData.eventId))?.Name || 'Event') : '';
+  const clubName = inviteData.clubId ? (allClubs.find(c => c.ID === parseInt(inviteData.clubId))?.Name || 'Club') : '';
+  
+  // Calculate expiration date
+  const expiresAt = new Date(invite.ExpiresAt);
+  const expiresInDays = Math.ceil((expiresAt - new Date()) / (1000 * 60 * 60 * 24));
+  
+  // Generate email template
+  const emailSubject = `Invitation to Honors Festival - ${inviteData.role}`;
+  const emailBody = `Dear ${inviteData.firstName} ${inviteData.lastName},
+
+You have been invited to join the Honors Festival system as a ${inviteData.role}${eventName ? ` for ${eventName}` : ''}${clubName ? ` at ${clubName}` : ''}.
+
+To complete your registration, please follow these steps:
+
+1. Click on the following link or copy it into your browser:
+   ${inviteUrl}
+
+2. Enter your invitation code: ${invite.Code}
+
+3. Set up your password (must be at least 8 characters with uppercase, lowercase, number, and special character).
+
+This invitation code will expire in ${expiresInDays} day${expiresInDays !== 1 ? 's' : ''} (${expiresAt.toLocaleDateString()}).
+
+If you have any questions, please contact the system administrator.
+
+Best regards,
+Honors Festival Team`;
+  
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width: 700px;">
+      <div class="modal-header">
+        <h2>Invitation Code Generated</h2>
+        <button onclick="closeModal('inviteModal')" class="btn btn-outline">×</button>
+      </div>
+      <div style="padding: 20px;">
+        <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+          <p><strong>Name:</strong> ${inviteData.firstName} ${inviteData.lastName}</p>
+          <p><strong>Email:</strong> ${inviteData.email}</p>
+          <p><strong>Role:</strong> ${inviteData.role}</p>
+          ${inviteData.eventId ? `<p><strong>Event:</strong> ${eventName}</p>` : ''}
+          ${inviteData.clubId ? `<p><strong>Club:</strong> ${clubName}</p>` : ''}
+        </div>
+        
+        <div class="form-group">
+          <label><strong>Invitation Code:</strong></label>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="text" id="inviteCodeDisplay" value="${invite.Code}" readonly class="form-control" style="font-size: 18px; font-weight: bold; text-align: center; letter-spacing: 2px;">
+            <button onclick="copyInviteCode()" class="btn btn-secondary">Copy</button>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label><strong>Invitation Link:</strong></label>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="text" id="inviteUrlDisplay" value="${inviteUrl}" readonly class="form-control">
+            <button onclick="copyInviteUrl()" class="btn btn-secondary">Copy</button>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label><strong>Email Template:</strong></label>
+          <div style="margin-bottom: 10px;">
+            <button onclick="copyEmailTemplate()" class="btn btn-secondary">Copy Email Template</button>
+          </div>
+          <textarea id="emailTemplate" readonly class="form-control" rows="15" style="font-family: monospace; font-size: 12px;">Subject: ${emailSubject}
+
+${emailBody}</textarea>
+        </div>
+        
+        <div class="form-actions">
+          <button onclick="closeModal('inviteModal')" class="btn btn-primary">Done</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // Store invite code for copy functions
+  window.currentInviteCode = invite.Code;
+  window.currentInviteUrl = inviteUrl;
+  window.currentEmailTemplate = `Subject: ${emailSubject}\n\n${emailBody}`;
 }
 
 async function handleEditUser(e, userId) {
@@ -3624,6 +3772,24 @@ window.deleteTimeslot = deleteTimeslot;
 window.handleEditTimeslot = handleEditTimeslot;
 window.editUser = editUser;
 window.handleCreateUser = handleCreateUser;
+window.copyInviteCode = function() {
+  const code = document.getElementById('inviteCodeDisplay');
+  code.select();
+  document.execCommand('copy');
+  showNotification('Invitation code copied to clipboard', 'success');
+};
+window.copyInviteUrl = function() {
+  const url = document.getElementById('inviteUrlDisplay');
+  url.select();
+  document.execCommand('copy');
+  showNotification('Invitation URL copied to clipboard', 'success');
+};
+window.copyEmailTemplate = function() {
+  const template = document.getElementById('emailTemplate');
+  template.select();
+  document.execCommand('copy');
+  showNotification('Email template copied to clipboard', 'success');
+};
 window.handleEditUser = handleEditUser;
 window.closeModal = closeModal;
 window.handleCreateEvent = handleCreateEvent;

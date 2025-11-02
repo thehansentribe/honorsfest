@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Accept Invitation - Honors Festival</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="container" style="max-width: 600px; margin: 50px auto; padding: 20px;">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Accept Invitation</h2>
+      </div>
+      <div style="padding: 20px;">
+        <div id="codeEntrySection">
+          <p>Enter your invitation code to complete your registration.</p>
+          <div class="form-group">
+            <label for="inviteCode">Invitation Code:</label>
+            <input type="text" id="inviteCode" class="form-control" placeholder="Enter code (e.g., A1B2C3D4E5)" style="text-transform: uppercase;">
+            <button onclick="validateInviteCode()" class="btn btn-primary" style="margin-top: 10px; width: 100%;">Continue</button>
+          </div>
+        </div>
+
+        <div id="errorMessage" style="display: none; padding: 15px; background: #fee; border: 1px solid #fcc; border-radius: 4px; color: #c33; margin: 20px 0;"></div>
+
+        <div id="registrationForm" style="display: none;">
+          <div id="inviteInfo" style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <p><strong>Name:</strong> <span id="inviteName"></span></p>
+            <p><strong>Email:</strong> <span id="inviteEmail"></span></p>
+            <p><strong>Role:</strong> <span id="inviteRole"></span></p>
+            <p id="inviteClub" style="display: none;"><strong>Club:</strong> <span id="inviteClubName"></span></p>
+            <p id="inviteEvent" style="display: none;"><strong>Event:</strong> <span id="inviteEventName"></span></p>
+          </div>
+
+          <form id="regForm" onsubmit="handleInviteRegistration(event)">
+            <div class="form-group">
+              <label for="password">Password *</label>
+              <input type="password" id="password" class="form-control" required minlength="8" oninput="validatePasswordStrength()">
+              <small style="color: var(--text-light);">Minimum 8 characters</small>
+            </div>
+
+            <div id="passwordRequirements" style="margin-bottom: 15px; padding: 10px; background: #f8fafc; border-radius: 4px;">
+              <small style="display: block; margin-bottom: 5px;"><strong>Password Requirements:</strong></small>
+              <small id="req-length" style="display: block; color: #999;">✓ At least 8 characters</small>
+              <small id="req-upper" style="display: block; color: #999;">✓ One uppercase letter</small>
+              <small id="req-lower" style="display: block; color: #999;">✓ One lowercase letter</small>
+              <small id="req-number" style="display: block; color: #999;">✓ One number</small>
+              <small id="req-special" style="display: block; color: #999;">✓ One special character</small>
+              <small id="req-pattern" style="display: block; color: #fcc; margin-top: 5px;">⚠️ Avoid common words (like "password") or simple patterns (like "123")</small>
+            </div>
+
+            <div class="form-group">
+              <label for="confirmPassword">Confirm Password *</label>
+              <input type="password" id="confirmPassword" class="form-control" required minlength="8" oninput="validatePasswordMatch()">
+            </div>
+
+            <div id="passwordMatchError" style="display: none; color: #c33; margin-bottom: 15px;">
+              <small>Passwords do not match</small>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" style="width: 100%;">Complete Registration</button>
+            </div>
+          </form>
+        </div>
+
+        <div id="successMessage" style="display: none; padding: 20px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724; margin-top: 20px;">
+          <h3 style="margin-top: 0;">Registration Successful!</h3>
+          <p id="successText"></p>
+          <a href="/login.html" class="btn btn-primary" style="margin-top: 15px;">Go to Login</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/utils.js"></script>
+  <script>
+    let inviteData = null;
+
+    async function validateInviteCode() {
+      const codeInput = document.getElementById('inviteCode');
+      const code = codeInput.value.trim().toUpperCase();
+      const errorDiv = document.getElementById('errorMessage');
+      const codeSection = document.getElementById('codeEntrySection');
+      const regForm = document.getElementById('registrationForm');
+
+      if (!code) {
+        showError('Please enter an invitation code');
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/invites/${code}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          showError(data.error || 'Invalid invitation code');
+          return;
+        }
+
+        inviteData = data;
+        codeSection.style.display = 'none';
+        errorDiv.style.display = 'none';
+        regForm.style.display = 'block';
+
+        // Populate invite info
+        document.getElementById('inviteName').textContent = `${data.firstName} ${data.lastName}`;
+        document.getElementById('inviteEmailDisplay').textContent = data.email;
+        document.getElementById('inviteRole').textContent = data.role;
+
+        if (data.club) {
+          document.getElementById('inviteClub').style.display = 'block';
+          document.getElementById('inviteClubName').textContent = data.club.name;
+        } else {
+          document.getElementById('inviteClub').style.display = 'none';
+        }
+
+        if (data.event) {
+          document.getElementById('inviteEvent').style.display = 'block';
+          document.getElementById('inviteEventName').textContent = data.event.name;
+        } else {
+          document.getElementById('inviteEvent').style.display = 'none';
+        }
+      } catch (error) {
+        showError('Error validating invitation code: ' + error.message);
+      }
+    }
+
+    function validatePasswordStrength() {
+      const password = document.getElementById('password').value;
+      const lengthOk = password.length >= 8;
+      const upperOk = /[A-Z]/.test(password);
+      const lowerOk = /[a-z]/.test(password);
+      const numberOk = /[0-9]/.test(password);
+      const specialOk = /[^A-Za-z0-9]/.test(password);
+
+      document.getElementById('req-length').style.color = lengthOk ? '#28a745' : '#999';
+      document.getElementById('req-upper').style.color = upperOk ? '#28a745' : '#999';
+      document.getElementById('req-lower').style.color = lowerOk ? '#28a745' : '#999';
+      document.getElementById('req-number').style.color = numberOk ? '#28a745' : '#999';
+      document.getElementById('req-special').style.color = specialOk ? '#28a745' : '#999';
+
+      // Check for common patterns
+      const commonWords = ['password', 'admin', 'qwerty', '123456'];
+      const hasCommonWord = commonWords.some(word => password.toLowerCase().includes(word));
+      const hasPattern = /(password|admin|123|abc)/i.test(password);
+
+      if (hasCommonWord || hasPattern) {
+        document.getElementById('req-pattern').style.color = '#ffc107';
+      } else {
+        document.getElementById('req-pattern').style.color = '#28a745';
+      }
+    }
+
+    function validatePasswordMatch() {
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+      const matchError = document.getElementById('passwordMatchError');
+
+      if (confirmPassword && password !== confirmPassword) {
+        matchError.style.display = 'block';
+        return false;
+      } else {
+        matchError.style.display = 'none';
+        return true;
+      }
+    }
+
+    async function handleInviteRegistration(event) {
+      event.preventDefault();
+
+      const codeInput = document.getElementById('inviteCode');
+      const code = codeInput.value.trim().toUpperCase();
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+
+      if (!validatePasswordMatch()) {
+        showError('Passwords do not match');
+        return;
+      }
+
+      if (!code || !password) {
+        showError('Please fill in all required fields');
+        return;
+      }
+
+      // Validate password strength
+      validatePasswordStrength();
+      const lengthOk = password.length >= 8;
+      const upperOk = /[A-Z]/.test(password);
+      const lowerOk = /[a-z]/.test(password);
+      const numberOk = /[0-9]/.test(password);
+      const specialOk = /[^A-Za-z0-9]/.test(password);
+
+      if (!lengthOk || !upperOk || !lowerOk || !numberOk || !specialOk) {
+        showError('Password does not meet all requirements');
+        return;
+      }
+
+      // Check for common patterns
+      const commonWords = ['password', 'admin', 'qwerty', '123456'];
+      const hasCommonWord = commonWords.some(word => password.toLowerCase().includes(word));
+      const hasPattern = /(Password123|@Password123)/i.test(password);
+
+      if (hasCommonWord || hasPattern) {
+        if (!confirm('Your password appears to use common words or patterns. Are you sure you want to use this password?')) {
+          return;
+        }
+      }
+
+      try {
+        const response = await fetch('/api/invites/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, password })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          showError(data.error || 'Registration failed');
+          return;
+        }
+
+        // Show success message
+        document.getElementById('registrationForm').style.display = 'none';
+        document.getElementById('errorMessage').style.display = 'none';
+        document.getElementById('successMessage').style.display = 'block';
+        document.getElementById('successText').textContent = `Welcome ${inviteData.firstName}! Your account has been created. Your username is: ${data.username}. Please log in to access your dashboard.`;
+      } catch (error) {
+        showError('Error completing registration: ' + error.message);
+      }
+    }
+
+    function showError(message) {
+      const errorDiv = document.getElementById('errorMessage');
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+      errorDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // Allow Enter key to submit code
+    document.getElementById('inviteCode').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        validateInviteCode();
+      }
+    });
+  </script>
+</body>
+</html>
+

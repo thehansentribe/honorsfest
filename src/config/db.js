@@ -147,6 +147,25 @@ function initializeDatabase() {
         FOREIGN KEY (CreatedBy) REFERENCES Users(ID)
       );
 
+      CREATE TABLE IF NOT EXISTS InviteCodes (
+        ID INTEGER PRIMARY KEY AUTOINCREMENT,
+        Code TEXT UNIQUE NOT NULL,
+        FirstName TEXT NOT NULL,
+        LastName TEXT NOT NULL,
+        Email TEXT NOT NULL,
+        Role TEXT NOT NULL CHECK(Role IN ('Admin', 'EventAdmin', 'ClubDirector')),
+        ClubID INTEGER,
+        EventID INTEGER,
+        CreatedBy INTEGER NOT NULL,
+        CreatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+        ExpiresAt TEXT NOT NULL,
+        Used BOOLEAN NOT NULL DEFAULT 0,
+        UsedAt TEXT,
+        FOREIGN KEY (ClubID) REFERENCES Clubs(ID),
+        FOREIGN KEY (EventID) REFERENCES Events(ID),
+        FOREIGN KEY (CreatedBy) REFERENCES Users(ID)
+      );
+
       CREATE TABLE IF NOT EXISTS ClubEvents (
         ID INTEGER PRIMARY KEY AUTOINCREMENT,
         ClubID INTEGER NOT NULL,
