@@ -77,11 +77,12 @@ function renderRoster() {
     return;
   }
   
-  container.innerHTML = `
+  const tableHtml = `
     <table class="table">
       <thead>
         <tr>
           <th>Student Name</th>
+          <th>Club</th>
           <th>Investiture Level</th>
           <th>Attended</th>
           <th>Completed</th>
@@ -91,6 +92,7 @@ function renderRoster() {
         ${classRoster.map(student => `
           <tr>
             <td>${student.FirstName} ${student.LastName}</td>
+            <td>${student.ClubName || 'No Club'}</td>
             <td>${student.InvestitureLevel || 'N/A'}</td>
             <td>${student.Attended ? '✓' : '-'}</td>
             <td>${student.Completed ? '✓' : '-'}</td>
@@ -99,6 +101,18 @@ function renderRoster() {
       </tbody>
     </table>
   `;
+  
+  const mobileCards = classRoster.map(student => {
+    return createMobileCard({
+      'Student Name': `${student.FirstName} ${student.LastName}`,
+      'Club': student.ClubName || 'No Club',
+      'Investiture Level': student.InvestitureLevel || 'N/A',
+      'Attended': student.Attended ? '✓' : '-',
+      'Completed': student.Completed ? '✓' : '-'
+    }, `${student.FirstName} ${student.LastName}`);
+  }).join('');
+  
+  container.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
 }
 
 // Make functions globally available

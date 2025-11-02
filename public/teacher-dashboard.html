@@ -158,11 +158,13 @@
         const rosterContainer = document.getElementById('roster');
 
         rosterCard.style.display = 'block';
-        rosterContainer.innerHTML = `
+        
+        const tableHtml = `
           <table class="table">
             <thead>
               <tr>
                 <th>Student Name</th>
+                <th>Club</th>
                 <th>Investiture Level</th>
                 <th>Attended</th>
                 <th>Completed</th>
@@ -172,6 +174,7 @@
               ${roster.map(student => `
                 <tr>
                   <td>${student.FirstName} ${student.LastName}</td>
+                  <td>${student.ClubName || 'No Club'}</td>
                   <td>${student.InvestitureLevel || 'None'}</td>
                   <td>
                     <input type="checkbox" ${student.Attended ? 'checked' : ''} 
@@ -186,6 +189,34 @@
             </tbody>
           </table>
         `;
+        
+        const mobileCards = roster.map(student => {
+          const attendedChecked = student.Attended ? 'checked' : '';
+          const completedChecked = student.Completed ? 'checked' : '';
+          
+          const actionsHtml = `
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+              <label style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" ${attendedChecked} 
+                  onchange="updateAttendance(${classId}, ${student.UserID}, 'Attended', this.checked)">
+                <span>Attended</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" ${completedChecked}
+                  onchange="updateAttendance(${classId}, ${student.UserID}, 'Completed', this.checked)">
+                <span>Completed</span>
+              </label>
+            </div>
+          `;
+          
+          return createMobileCard({
+            'Student Name': `${student.FirstName} ${student.LastName}`,
+            'Club': student.ClubName || 'No Club',
+            'Investiture Level': student.InvestitureLevel || 'None'
+          }, `${student.FirstName} ${student.LastName}`, actionsHtml);
+        }).join('');
+        
+        rosterContainer.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
       } catch (error) {
         console.error('Error loading roster:', error);
       }
