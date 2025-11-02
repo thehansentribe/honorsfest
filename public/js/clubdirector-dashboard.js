@@ -113,15 +113,38 @@ function getCodesTab() {
 
 // Get Reports Tab HTML for Club Director
 function getReportsTab() {
+  if (clubDirectorEvents.length === 0) {
+    return `
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Reports</h2>
+        </div>
+        <p class="text-center" style="color: #d32f2f;">No events assigned to your club. Please contact an administrator to be assigned to an event.</p>
+      </div>
+    `;
+  }
+  
+  if (!clubDirectorSelectedEventId) {
+    return `
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Reports</h2>
+        </div>
+        <p class="text-center" style="color: #d32f2f;">Please select an event first using the dropdown above</p>
+      </div>
+    `;
+  }
+  
+  const selectedEvent = clubDirectorEvents.find(e => e.ID === parseInt(clubDirectorSelectedEventId));
+  const eventName = selectedEvent ? selectedEvent.Name : 'Selected Event';
+  
   return `
     <div class="card">
       <div class="card-header">
-        <h2 class="card-title">Reports for Your Event</h2>
+        <h2 class="card-title">Reports for ${eventName}</h2>
       </div>
-      <select id="reportEventFilter" class="form-control mb-2" style="pointer-events: none; background-color: #f0f0f0;" disabled>
-        <option value="${clubDirectorSelectedEventId}">${clubDirectorEvents.find(e => e.ID === parseInt(clubDirectorSelectedEventId))?.Name || 'Your Event'}</option>
-      </select>
-      <button id="generateReportBtn" onclick="generateReport()" class="btn btn-primary">Generate CSV Report</button>
+      <p class="mb-2"><strong>Event:</strong> ${eventName}</p>
+      <button id="generateReportBtn" onclick="generateClubDirectorReport()" class="btn btn-primary">Generate CSV Report</button>
     </div>
   `;
 }
@@ -350,7 +373,11 @@ async function renderClasses() {
   }
   
   if (!clubDirectorSelectedEventId) {
-    container.innerHTML = '<p class="text-center">No event assigned to your club</p>';
+    if (clubDirectorEvents.length === 0) {
+      container.innerHTML = '<p class="text-center" style="color: #d32f2f;">No events assigned to your club. Please contact an administrator.</p>';
+    } else {
+      container.innerHTML = '<p class="text-center" style="color: #d32f2f;">Please select an event first</p>';
+    }
     return;
   }
   
@@ -731,13 +758,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load events for this club
   await loadEvents();
   
-  // Select first event (prefer active events, then first available)
-  if (clubDirectorEvents.length > 0) {
+  // Handle no events case
+  const noEventsBanner = document.getElementById('noEventsBanner');
+  if (clubDirectorEvents.length === 0) {
+    if (noEventsBanner) noEventsBanner.style.display = 'block';
+    clubDirectorSelectedEventId = null;
+    clubDirectorEventId = null;
+  } else {
+    if (noEventsBanner) noEventsBanner.style.display = 'none';
+    // Select first event (prefer active events, then first available)
     const activeEvent = clubDirectorEvents.find(e => e.Active);
     clubDirectorEventId = activeEvent ? activeEvent.ID : clubDirectorEvents[0].ID;
     clubDirectorSelectedEventId = clubDirectorEventId;
-  } else {
-    showNotification('No events found for your club. Please contact an administrator.', 'error');
   }
   
   // Setup event selector UI (even if no events, to show message)
@@ -1012,37 +1044,55 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Registration code functions
   async function renderCodes() {
     const container = document.getElementById('codesList');
-    if (!container) return;
+    if (!container) {
+      console.error('Codes list container not found');
+      return;
+    }
     
     container.innerHTML = '<p class="text-center">Loading codes...</p>';
     
+    // Check if events are available
+    if (clubDirectorEvents.length === 0) {
+      container.innerHTML = '<p class="text-center" style="color: #d32f2f;">No events assigned to your club. Please contact an administrator to be assigned to an event.</p>';
+      return;
+    }
+    
     // Check if event is selected
     if (!clubDirectorSelectedEventId) {
-      container.innerHTML = '<p class="text-center" style="color: #d32f2f;">Please select an event first</p>';
+      container.innerHTML = '<p class="text-center" style="color: #d32f2f;">Please select an event first using the dropdown above</p>';
+      return;
+    }
+    
+    // Check if club ID is available
+    if (!clubDirectorClubId) {
+      container.innerHTML = '<p class="text-center" style="color: #d32f2f;">Club information not available. Please refresh the page.</p>';
+      console.error('clubDirectorClubId is null');
       return;
     }
     
     try {
-      if (!clubDirectorClubId) {
-        container.innerHTML = '<p class="text-center" style="color: #d32f2f;">Club information not available. Please refresh the page.</p>';
-        return;
-      }
-      
       const response = await fetchWithAuth(`/api/codes/club/${clubDirectorClubId}?eventId=${clubDirectorSelectedEventId}`);
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to load codes' }));
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || 'Failed to load codes' };
+        }
         throw new Error(errorData.error || `Server error: ${response.status}`);
       }
       
       const codes = await response.json();
       
       if (!Array.isArray(codes)) {
+        console.error('Invalid response format:', codes);
         throw new Error('Invalid response format from server');
       }
       
       if (codes.length === 0) {
-        container.innerHTML = '<p class="text-center">No registration codes yet. Generate your first code!</p>';
+        container.innerHTML = '<p class="text-center">No registration codes yet. Click "Generate New Code" to create one!</p>';
         return;
       }
       
@@ -1103,14 +1153,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   async function generateRegistrationCode() {
+    // Check if events are available
+    if (clubDirectorEvents.length === 0) {
+      showNotification('No events assigned to your club. Please contact an administrator.', 'error');
+      return;
+    }
+    
     // Check if event is selected
     if (!clubDirectorSelectedEventId) {
-      showNotification('Please select an event first', 'error');
+      showNotification('Please select an event first using the dropdown above', 'error');
       return;
     }
     
     if (!clubDirectorClubId) {
-      showNotification('Club information not available', 'error');
+      showNotification('Club information not available. Please refresh the page.', 'error');
+      console.error('clubDirectorClubId is null');
       return;
     }
     
@@ -1630,27 +1687,84 @@ Thank you!`;
     } else {
       // No events - hide selector and show message
       if (selectorContainer) selectorContainer.style.display = 'none';
-      eventNameEl.textContent = 'No Events Available';
+      eventNameEl.textContent = '';
     }
   }
   
   // Switch between events for multi-event clubs
   async function switchClubDirectorEvent(eventId) {
-    if (!eventId) return;
+    if (!eventId) {
+      showNotification('Please select a valid event', 'error');
+      return;
+    }
     
-    clubDirectorSelectedEventId = parseInt(eventId);
+    const eventIdInt = parseInt(eventId);
+    const selectedEvent = clubDirectorEvents.find(e => e.ID === eventIdInt);
+    
+    if (!selectedEvent) {
+      showNotification('Selected event not found', 'error');
+      return;
+    }
+    
+    clubDirectorSelectedEventId = eventIdInt;
     clubDirectorEventId = clubDirectorSelectedEventId;
-    
     
     // Update UI
     setupEventSelector();
     
-    // Reload data for the selected event
-    if (clubDirectorTab === 'classes') {
-      await renderClasses();
+    // Reload data for the selected event based on current tab
+    switch (clubDirectorTab) {
+      case 'classes':
+        await renderClasses();
+        break;
+      case 'codes':
+        await renderCodes();
+        break;
+      case 'reports':
+        // Reload reports tab with new event context
+        const content = document.getElementById('content');
+        if (content) {
+          content.innerHTML = getReportsTab();
+        }
+        break;
+      // 'users' tab doesn't need to reload on event switch
     }
     
-    showNotification('Event switched', 'success');
+    showNotification(`Switched to event: ${selectedEvent.Name}`, 'success');
+  }
+  
+  // Generate report for club director
+  async function generateClubDirectorReport() {
+    if (!clubDirectorSelectedEventId) {
+      showNotification('Please select an event first', 'error');
+      return;
+    }
+    
+    try {
+      const response = await fetchWithAuth(`/api/reports/event/${clubDirectorSelectedEventId}`);
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to generate report' }));
+        throw new Error(error.error || 'Failed to generate report');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      const selectedEvent = clubDirectorEvents.find(e => e.ID === clubDirectorSelectedEventId);
+      const eventName = selectedEvent ? selectedEvent.Name.replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'event';
+      a.download = `report_${eventName}_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      showNotification('Report generated successfully', 'success');
+    } catch (error) {
+      showNotification('Error generating report: ' + error.message, 'error');
+    }
   }
 });
 
