@@ -275,6 +275,35 @@ router.get('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => {
   }
 });
 
+// GET /api/invites/user/:email - Get invite code for a user (Admin, EventAdmin)
+router.get('/user/:email', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => {
+  try {
+    const email = req.params.email;
+    const user = User.findByEmail(email);
+    
+    if (!user || !user.Invited) {
+      return res.status(404).json({ error: 'User not found or not invited' });
+    }
+    
+    // Find the most recent unused invite code for this user
+    const invite = db.prepare(`
+      SELECT * FROM InviteCodes 
+      WHERE Email = ? AND Used = 0
+      ORDER BY CreatedAt DESC
+      LIMIT 1
+    `).get(email);
+    
+    if (!invite) {
+      return res.status(404).json({ error: 'No active invite code found for this user' });
+    }
+    
+    res.json(invite);
+  } catch (error) {
+    console.error('Error fetching user invite:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // DELETE /api/invites/:code - Delete an invite code (Admin, EventAdmin)
 router.delete('/:code', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => {
   try {
