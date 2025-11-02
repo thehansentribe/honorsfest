@@ -2305,25 +2305,51 @@ function showCreateUserForm() {
       });
   }
   
-  // Add listener for date of birth changes to show/hide background check
-  const dateOfBirthInput = document.getElementById('dateOfBirth');
-  const backgroundCheckContainer = document.getElementById('backgroundCheckContainer');
-  
-  dateOfBirthInput.addEventListener('change', function() {
-    const age = calculateAge(this.value);
-    if (age >= 18) {
-      backgroundCheckContainer.style.display = 'block';
-      // Note: Background check is NOT required, it's optional
-    } else {
-      backgroundCheckContainer.style.display = 'none';
-    }
-  });
-  
-  // Add listener for role changes to show/hide event dropdown
+  // Show/hide password field and date of birth based on role, update button text
   const roleSelect = document.getElementById('role');
-  roleSelect.addEventListener('change', function() {
-    toggleEventDropdown(this.value);
-  });
+  const passwordContainer = document.getElementById('passwordContainer');
+  const passwordInput = document.getElementById('password');
+  const submitBtn = document.getElementById('createUserSubmitBtn');
+  const dateOfBirthContainer = document.getElementById('dateOfBirthContainer');
+  const dateOfBirthInput = document.getElementById('dateOfBirth');
+  
+  if (roleSelect) {
+    roleSelect.addEventListener('change', function() {
+      const role = this.value;
+      
+      if (['Admin', 'EventAdmin', 'ClubDirector'].includes(role)) {
+        // Invite roles: hide password and date of birth, change button text
+        if (passwordContainer) passwordContainer.style.display = 'none';
+        if (passwordInput) passwordInput.required = false;
+        if (submitBtn) submitBtn.textContent = 'Invite User';
+        if (dateOfBirthContainer) dateOfBirthContainer.style.display = 'none';
+        if (dateOfBirthInput) dateOfBirthInput.required = false;
+      } else {
+        // Direct creation roles: show password and date of birth, keep button text
+        if (passwordContainer) passwordContainer.style.display = 'block';
+        if (passwordInput) passwordInput.required = true;
+        if (submitBtn) submitBtn.textContent = 'Create User';
+        if (dateOfBirthContainer) dateOfBirthContainer.style.display = 'block';
+        if (dateOfBirthInput) dateOfBirthInput.required = true;
+      }
+      
+      toggleEventDropdown(role);
+    });
+  }
+  
+  // Add listener for date of birth changes to show/hide background check
+  if (dateOfBirthInput) {
+    dateOfBirthInput.addEventListener('change', function() {
+      const age = calculateAge(this.value);
+      const backgroundCheckContainer = document.getElementById('backgroundCheckContainer');
+      if (age >= 18) {
+        if (backgroundCheckContainer) backgroundCheckContainer.style.display = 'block';
+        // Note: Background check is NOT required, it's optional
+      } else {
+        if (backgroundCheckContainer) backgroundCheckContainer.style.display = 'none';
+      }
+    });
+  }
 }
 
 async function editUser(userId) {
