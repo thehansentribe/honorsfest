@@ -59,6 +59,16 @@ class RegistrationCode {
     `).all(clubId);
   }
 
+  static findByClubAndEvent(clubId, eventId) {
+    return db.prepare(`
+      SELECT c.*, u.FirstName as CreatorFirstName, u.LastName as CreatorLastName
+      FROM RegistrationCodes c
+      JOIN Users u ON c.CreatedBy = u.ID
+      WHERE c.ClubID = ? AND c.EventID = ?
+      ORDER BY c.CreatedAt DESC
+    `).all(clubId, eventId);
+  }
+
   static delete(code) {
     return db.prepare('DELETE FROM RegistrationCodes WHERE Code = ?').run(code);
   }

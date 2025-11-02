@@ -977,9 +977,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     container.innerHTML = '<p class="text-center">Loading codes...</p>';
     
+    // Check if event is selected
+    if (!clubDirectorSelectedEventId) {
+      container.innerHTML = '<p class="text-center" style="color: #d32f2f;">Please select an event first</p>';
+      return;
+    }
+    
     try {
-      console.log('Fetching codes for club:', clubDirectorClubId);
-      const response = await fetchWithAuth(`/api/codes/club/${clubDirectorClubId}`);
+      console.log('Fetching codes for club:', clubDirectorClubId, 'event:', clubDirectorSelectedEventId);
+      const response = await fetchWithAuth(`/api/codes/club/${clubDirectorClubId}?eventId=${clubDirectorSelectedEventId}`);
       const codes = await response.json();
       
       console.log('Received codes:', codes);
@@ -1028,6 +1034,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   async function generateRegistrationCode() {
+    // Check if event is selected
+    if (!clubDirectorSelectedEventId) {
+      showNotification('Please select an event first', 'error');
+      return;
+    }
+    
+    if (!clubDirectorClubId) {
+      showNotification('Club information not available', 'error');
+      return;
+    }
+    
     const days = prompt('How many days should this code be valid? (Default: 30)', '30');
     if (days === null) return;
     
@@ -1049,8 +1066,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (response.ok) {
         showNotification(`Code generated: ${code.Code}`, 'success');
         await renderCodes();
-        // Show email template modal
-        showCodeEmailModal(code.Code);
+        // Show email template modal with expiration days
+        showCodeEmailModal(code.Code, expiresInDays);
       } else {
         showNotification(code.error || 'Error generating code', 'error');
       }
@@ -1059,7 +1076,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
   
-  function showCodeEmailModal(code) {
+  function showCodeEmailModal(code, expiresInDays = 30) {
     // Get current site URL
     const registrationUrl = window.location.origin + '/register.html';
     
@@ -1081,7 +1098,7 @@ TO REGISTER:
 3. Fill out the registration form
 4. Submit your registration
 
-This code will expire in 30 days. Please register as soon as possible.
+This code will expire in ${expiresInDays} day${expiresInDays !== 1 ? 's' : ''}. Please register as soon as possible.
 
 If you have any questions, please contact your club director.
 

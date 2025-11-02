@@ -166,13 +166,20 @@ router.post('/register', async (req, res) => {
 });
 
 // GET /api/codes/club/:clubId - Get all codes for a club (ClubDirector only)
+// Optional query parameter: ?eventId=123 to filter by event
 router.get('/club/:clubId', verifyToken, requireRole('ClubDirector'), (req, res) => {
   try {
     if (req.user.clubId !== parseInt(req.params.clubId)) {
       return res.status(403).json({ error: 'You can only view codes for your own club' });
     }
     
-    const codes = RegistrationCode.findByClub(req.params.clubId);
+    const eventId = req.query.eventId ? parseInt(req.query.eventId) : null;
+    
+    // If eventId is provided, filter by both club and event
+    const codes = eventId 
+      ? RegistrationCode.findByClubAndEvent(req.params.clubId, eventId)
+      : RegistrationCode.findByClub(req.params.clubId);
+    
     res.json(codes);
   } catch (error) {
     res.status(500).json({ error: error.message });
