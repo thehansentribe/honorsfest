@@ -207,6 +207,22 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+/* Card header buttons - smaller on mobile */
+@media (max-width: 768px) {
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .card-header .btn {
+    width: 100%;
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+    min-height: 40px; /* Slightly smaller than default for header buttons */
+  }
+}
+
 .card-title {
   font-size: 1.125rem;
   font-weight: 600;
@@ -598,6 +614,13 @@ body {
   .btn {
     min-height: 44px; /* Touch target size */
     padding: 0.625rem 1rem;
+  }
+
+  /* Card header buttons can be slightly smaller */
+  .card-header .btn {
+    min-height: 40px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
   }
 
   .tabs {
