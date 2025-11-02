@@ -10,6 +10,11 @@
   <div class="top-banner">
     <h1>Club Director Dashboard</h1>
     <div class="user-info">
+      <span id="eventSelectorContainer" style="display: none;">
+        <select id="eventSelector" onchange="switchClubDirectorEvent(this.value)" style="margin-right: 15px; padding: 5px 10px; border-radius: 4px; border: 1px solid #ccc;">
+          <!-- Options populated dynamically -->
+        </select>
+      </span>
       <span id="eventName" class="event-info"></span>
       <span id="userName">Welcome, <strong id="userDisplayName"></strong></span>
       <button onclick="logout()" class="btn btn-outline">Logout</button>

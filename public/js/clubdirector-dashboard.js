@@ -700,12 +700,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     clubDirectorEventId = activeEvent ? activeEvent.ID : clubDirectorEvents[0].ID;
     clubDirectorSelectedEventId = clubDirectorEventId;
     
-    // Display event name
-    const eventNameEl = document.getElementById('eventName');
-    if (eventNameEl) {
-      const selectedEvent = clubDirectorEvents.find(e => e.ID === clubDirectorEventId);
-      eventNameEl.textContent = selectedEvent ? selectedEvent.Name : 'No Event Selected';
-    }
+    // Setup event selector UI
+    setupEventSelector();
   }
 
   // Check event status and show banner if closed
@@ -719,6 +715,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.showCreateUserForm = showCreateUserFormClubDirector;
   window.editUser = editUserClubDirector;
   window.showCreateClassForm = showCreateClassFormClubDirector;
+  window.switchClubDirectorEvent = switchClubDirectorEvent;
   
   // Restore last active tab or default to users
   const savedTab = localStorage.getItem('directorCurrentTab') || 'users';
@@ -1513,6 +1510,58 @@ Thank you!`;
     } catch (error) {
       console.error('Error checking event status:', error);
     }
+  }
+  
+  // Setup event selector for multi-event support
+  function setupEventSelector() {
+    const selectorContainer = document.getElementById('eventSelectorContainer');
+    const selector = document.getElementById('eventSelector');
+    const eventNameEl = document.getElementById('eventName');
+    
+    if (!selector || !eventNameEl) return;
+    
+    // Show selector if there are multiple events
+    if (clubDirectorEvents.length > 1) {
+      if (selectorContainer) selectorContainer.style.display = 'inline-block';
+      
+      // Populate selector
+      selector.innerHTML = clubDirectorEvents.map(event => 
+        `<option value="${event.ID}" ${event.ID === clubDirectorSelectedEventId ? 'selected' : ''}>
+          ${event.Name} ${event.Active ? '' : '(Inactive)'}
+        </option>`
+      ).join('');
+      
+      // Display selected event name
+      const selectedEvent = clubDirectorEvents.find(e => e.ID === clubDirectorSelectedEventId);
+      if (selectedEvent) {
+        eventNameEl.textContent = '';
+      }
+    } else {
+      // Single event - hide selector and show event name
+      if (selectorContainer) selectorContainer.style.display = 'none';
+      const selectedEvent = clubDirectorEvents.find(e => e.ID === clubDirectorSelectedEventId);
+      eventNameEl.textContent = selectedEvent ? selectedEvent.Name : 'No Event Selected';
+    }
+  }
+  
+  // Switch between events for multi-event clubs
+  async function switchClubDirectorEvent(eventId) {
+    if (!eventId) return;
+    
+    clubDirectorSelectedEventId = parseInt(eventId);
+    clubDirectorEventId = clubDirectorSelectedEventId;
+    
+    console.log('Switched to event:', clubDirectorSelectedEventId);
+    
+    // Update UI
+    setupEventSelector();
+    
+    // Reload data for the selected event
+    if (clubDirectorTab === 'classes') {
+      await renderClasses();
+    }
+    
+    showNotification('Event switched', 'success');
   }
 });
 
