@@ -113,18 +113,22 @@
         if (emailEl) emailEl.textContent = data.email;
         if (roleEl) roleEl.textContent = data.role;
 
+        const clubEl = document.getElementById('inviteClub');
+        const clubNameEl = document.getElementById('inviteClubName');
         if (data.club) {
-          document.getElementById('inviteClub').style.display = 'block';
-          document.getElementById('inviteClubName').textContent = data.club.name;
+          if (clubEl) clubEl.style.display = 'block';
+          if (clubNameEl) clubNameEl.textContent = data.club.name;
         } else {
-          document.getElementById('inviteClub').style.display = 'none';
+          if (clubEl) clubEl.style.display = 'none';
         }
 
+        const eventEl = document.getElementById('inviteEvent');
+        const eventNameEl = document.getElementById('inviteEventName');
         if (data.event) {
-          document.getElementById('inviteEvent').style.display = 'block';
-          document.getElementById('inviteEventName').textContent = data.event.name;
+          if (eventEl) eventEl.style.display = 'block';
+          if (eventNameEl) eventNameEl.textContent = data.event.name;
         } else {
-          document.getElementById('inviteEvent').style.display = 'none';
+          if (eventEl) eventEl.style.display = 'none';
         }
       } catch (error) {
         showError('Error validating invitation code: ' + error.message);
