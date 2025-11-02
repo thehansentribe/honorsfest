@@ -2216,7 +2216,7 @@ function showCreateUserForm() {
           <label for="lastName">Last Name *</label>
           <input type="text" id="lastName" name="lastName" class="form-control" required>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="dateOfBirthContainer">
           <label for="dateOfBirth">Date of Birth *</label>
           <input type="date" id="dateOfBirth" name="dateOfBirth" class="form-control" required>
           <small style="color: var(--text-light);">Age will be calculated automatically</small>
@@ -2282,7 +2282,7 @@ function showCreateUserForm() {
           <small style="display: block; color: var(--text-light);">Can be verified later by Admin</small>
         </div>
         <div class="form-actions">
-          <button type="submit" class="btn btn-primary">Create User</button>
+          <button type="submit" class="btn btn-primary" id="createUserSubmitBtn">Create User</button>
           <button type="button" onclick="closeModal('createUserModal')" class="btn btn-outline">Cancel</button>
         </div>
       </form>

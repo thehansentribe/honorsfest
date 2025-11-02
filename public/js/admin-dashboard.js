@@ -2311,7 +2311,7 @@ function showCreateUserForm() {
           <small style="display: block; color: var(--text-light);">Can be verified later by Admin</small>
         </div>
         <div class="form-actions">
-          <button type="submit" class="btn btn-primary">Create User</button>
+          <button type="submit" class="btn btn-primary" id="createUserSubmitBtn">Create User</button>
           <button type="button" onclick="closeModal('createUserModal')" class="btn btn-outline">Cancel</button>
         </div>
       </form>
