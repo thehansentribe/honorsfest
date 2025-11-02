@@ -193,10 +193,21 @@ router.post('/register', async (req, res) => {
     
     const codeData = validation.code;
     
-    // Check if email is already in use
+    // Find existing user (should exist if invite was sent)
     const existingUser = User.findByEmail(codeData.Email);
-    if (existingUser) {
-      return res.status(400).json({ error: 'An account with this email already exists. Please log in if you have an existing account.' });
+    
+    // If user doesn't exist or wasn't invited, return error
+    if (!existingUser) {
+      return res.status(400).json({ error: 'User not found. Please contact the administrator.' });
+    }
+    
+    if (!existingUser.Invited) {
+      return res.status(400).json({ error: 'Invalid invite code. This user was not invited.' });
+    }
+    
+    // Check if already accepted
+    if (existingUser.InviteAccepted) {
+      return res.status(400).json({ error: 'This invitation has already been accepted. Please log in.' });
     }
     
     // Determine authentication method based on email
