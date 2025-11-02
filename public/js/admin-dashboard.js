@@ -2252,6 +2252,19 @@ function showCreateUserForm() {
       </div>
       <form id="createUserForm" onsubmit="handleCreateUser(event)">
         <div class="form-group">
+          <label for="role">Role *</label>
+          <select id="role" name="role" class="form-control" required>
+            <option value="">Select Role</option>
+            <option value="Admin">Admin</option>
+            <option value="EventAdmin">Event Admin</option>
+            <option value="ClubDirector">Club Director</option>
+            <option value="Teacher">Teacher</option>
+            <option value="Student">Student</option>
+            <option value="Staff">Staff</option>
+          </select>
+          <small style="display: block; color: var(--text-light);">Note: Admin, Event Admin, and Club Directors will receive invitation codes. Other roles are created directly.</small>
+        </div>
+        <div class="form-group">
           <label for="firstName">First Name *</label>
           <input type="text" id="firstName" name="firstName" class="form-control" required>
         </div>
@@ -2259,7 +2272,7 @@ function showCreateUserForm() {
           <label for="lastName">Last Name *</label>
           <input type="text" id="lastName" name="lastName" class="form-control" required>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="dateOfBirthContainer">
           <label for="dateOfBirth">Date of Birth *</label>
           <input type="date" id="dateOfBirth" name="dateOfBirth" class="form-control" required>
           <small style="color: var(--text-light);">Age will be calculated automatically</small>
@@ -2269,22 +2282,9 @@ function showCreateUserForm() {
           <input type="email" id="email" name="email" class="form-control" required>
           <small style="color: var(--text-light);">Required for Admin, Event Admin, and Club Director invitations</small>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="phoneContainer">
           <label for="phone">Phone</label>
           <input type="text" id="phone" name="phone" class="form-control">
-        </div>
-        <div class="form-group">
-          <label for="role">Role *</label>
-          <select id="role" name="role" class="form-control" required onchange="toggleEventDropdown(this.value)">
-            <option value="">Select Role</option>
-          <option value="Admin">Admin</option>
-          <option value="EventAdmin">Event Admin</option>
-          <option value="ClubDirector">Club Director</option>
-          <option value="Teacher">Teacher</option>
-          <option value="Student">Student</option>
-          <option value="Staff">Staff</option>
-        </select>
-        <small style="color: var(--text-light); display: block; margin-top: 5px;">Note: Admin, Event Admin, and Club Directors will receive invitation codes. Other roles are created directly.</small>
         </div>
         <div class="form-group" id="eventContainer" style="display: none;">
           <label for="eventId">Event *</label>
@@ -2312,7 +2312,7 @@ function showCreateUserForm() {
             <option value="MasterGuide">Master Guide</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="passwordContainer">
           <label for="password">Password *</label>
           <input type="password" id="password" name="password" class="form-control" required>
           <small style="color: var(--text-light);">Default: password123</small>
@@ -2348,40 +2348,55 @@ function showCreateUserForm() {
       });
   }
   
+  // Function to update form fields based on role
+  function updateFormFieldsForRole() {
+    const roleSelect = document.getElementById('role');
+    const passwordContainer = document.getElementById('passwordContainer');
+    const passwordInput = document.getElementById('password');
+    const submitBtn = document.getElementById('createUserSubmitBtn');
+    const dateOfBirthContainer = document.getElementById('dateOfBirthContainer');
+    const dateOfBirthInput = document.getElementById('dateOfBirth');
+    const phoneContainer = document.getElementById('phoneContainer');
+    
+    if (!roleSelect) return;
+    
+    const role = roleSelect.value;
+    
+    if (['Admin', 'EventAdmin', 'ClubDirector'].includes(role)) {
+      // Invite roles: hide password, date of birth, and phone, change button text
+      if (passwordContainer) passwordContainer.style.display = 'none';
+      if (passwordInput) {
+        passwordInput.required = false;
+        passwordInput.value = '';
+      }
+      if (submitBtn) submitBtn.textContent = 'Invite User';
+      if (dateOfBirthContainer) dateOfBirthContainer.style.display = 'none';
+      if (dateOfBirthInput) {
+        dateOfBirthInput.required = false;
+        dateOfBirthInput.value = '';
+      }
+      if (phoneContainer) phoneContainer.style.display = 'none';
+    } else {
+      // Direct creation roles: show password, date of birth, and phone, keep button text
+      if (passwordContainer) passwordContainer.style.display = 'block';
+      if (passwordInput) passwordInput.required = true;
+      if (submitBtn) submitBtn.textContent = 'Create User';
+      if (dateOfBirthContainer) dateOfBirthContainer.style.display = 'block';
+      if (dateOfBirthInput) dateOfBirthInput.required = true;
+      if (phoneContainer) phoneContainer.style.display = 'block';
+    }
+    
+    toggleEventDropdown(role);
+  }
+  
   // Show/hide password field and date of birth based on role, update button text
   const roleSelect = document.getElementById('role');
-  const passwordContainer = document.getElementById('passwordContainer');
-  const passwordInput = document.getElementById('password');
-  const submitBtn = document.getElementById('createUserSubmitBtn');
-  const dateOfBirthContainer = document.getElementById('dateOfBirthContainer');
-  const dateOfBirthInput = document.getElementById('dateOfBirth');
-  
   if (roleSelect) {
-    roleSelect.addEventListener('change', function() {
-      const role = this.value;
-      
-      const phoneContainer = document.getElementById('phoneContainer');
-      
-      if (['Admin', 'EventAdmin', 'ClubDirector'].includes(role)) {
-        // Invite roles: hide password, date of birth, and phone, change button text
-        if (passwordContainer) passwordContainer.style.display = 'none';
-        if (passwordInput) passwordInput.required = false;
-        if (submitBtn) submitBtn.textContent = 'Invite User';
-        if (dateOfBirthContainer) dateOfBirthContainer.style.display = 'none';
-        if (dateOfBirthInput) dateOfBirthInput.required = false;
-        if (phoneContainer) phoneContainer.style.display = 'none';
-      } else {
-        // Direct creation roles: show password, date of birth, and phone, keep button text
-        if (passwordContainer) passwordContainer.style.display = 'block';
-        if (passwordInput) passwordInput.required = true;
-        if (submitBtn) submitBtn.textContent = 'Create User';
-        if (dateOfBirthContainer) dateOfBirthContainer.style.display = 'block';
-        if (dateOfBirthInput) dateOfBirthInput.required = true;
-        if (phoneContainer) phoneContainer.style.display = 'block';
-      }
-      
-      toggleEventDropdown(role);
-    });
+    // Set initial state
+    updateFormFieldsForRole();
+    
+    // Add change listener
+    roleSelect.addEventListener('change', updateFormFieldsForRole);
   }
   
   // Add listener for date of birth changes to show/hide background check
