@@ -53,7 +53,8 @@ router.get('/my', (req, res) => {
       return res.json([]); // User has no club, return empty array
     }
     
-    const events = Event.getEventsForClub(user.ClubID);
+    // Get ALL events for club (not just active ones) so Club Directors can see all
+    const events = Event.getEventsForClub(user.ClubID, false);
     res.json(events);
   } catch (error) {
     res.status(500).json({ error: error.message });

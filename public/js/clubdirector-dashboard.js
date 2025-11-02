@@ -10,6 +10,7 @@ let clubDirectorUser = null;
 let clubDirectorUsers = [];
 let clubDirectorEvents = [];
 let clubDirectorClasses = [];
+let clubDirectorSelectedEventId = null; // Currently selected event for multi-event support
 
 // Filter state for user table
 let clubDirectorFilters = {};
@@ -118,7 +119,7 @@ function getReportsTab() {
         <h2 class="card-title">Reports for Your Event</h2>
       </div>
       <select id="reportEventFilter" class="form-control mb-2" style="pointer-events: none; background-color: #f0f0f0;" disabled>
-        <option value="${clubDirectorEventId}">${clubDirectorEvents.find(e => e.ID === parseInt(clubDirectorEventId))?.Name || 'Your Event'}</option>
+        <option value="${clubDirectorSelectedEventId}">${clubDirectorEvents.find(e => e.ID === parseInt(clubDirectorSelectedEventId))?.Name || 'Your Event'}</option>
       </select>
       <button id="generateReportBtn" onclick="generateReport()" class="btn btn-primary">Generate CSV Report</button>
     </div>
@@ -328,14 +329,14 @@ async function renderClasses() {
     return;
   }
   
-  if (!clubDirectorEventId) {
+  if (!clubDirectorSelectedEventId) {
     container.innerHTML = '<p class="text-center">No event assigned to your club</p>';
     return;
   }
   
   try {
-    console.log('Loading classes for event:', clubDirectorEventId);
-    const response = await fetchWithAuth(`/api/classes/${clubDirectorEventId}`);
+    console.log('Loading classes for event:', clubDirectorSelectedEventId);
+    const response = await fetchWithAuth(`/api/classes/${clubDirectorSelectedEventId}`);
     
     if (!response.ok) {
       throw new Error(`Failed to load classes: ${response.status}`);
@@ -400,22 +401,17 @@ async function renderClasses() {
   }
 }
 
-// Override loadEvents to only load their event
+// Override loadEvents to load events for this club
 async function loadEvents() {
   try {
-    const response = await fetchWithAuth('/api/events');
+    // Use /api/events/my to get events for this club
+    const response = await fetchWithAuth('/api/events/my');
     clubDirectorEvents = await response.json();
     
-    // Filter to only their event
-    if (clubDirectorEventId) {
-      clubDirectorEvents = clubDirectorEvents.filter(e => e.ID === parseInt(clubDirectorEventId));
-    }
-    
-    // No need to populate event filters for Club Directors
-    // They only see their own event
     console.log(`Loaded ${clubDirectorEvents.length} events for Club Director`);
   } catch (error) {
     console.error('Error loading events:', error);
+    clubDirectorEvents = [];
   }
 }
 
@@ -457,7 +453,7 @@ function showCreateUserFormClubDirector() {
       </div>
       <form id="createUserForm" onsubmit="handleCreateUser(event)">
         <input type="hidden" id="clubId" name="clubId" value="${clubDirectorClubId}">
-        <input type="hidden" id="eventId" name="eventId" value="${clubDirectorEventId}">
+        <input type="hidden" id="eventId" name="eventId" value="${clubDirectorSelectedEventId}">
         <div class="form-group">
           <label for="firstName">First Name *</label>
           <input type="text" id="firstName" name="firstName" class="form-control" required>
@@ -534,7 +530,7 @@ function editUserClubDirector(userId) {
       </div>
       <form id="editUserForm" data-user-id="${userId}" onsubmit="handleEditUser(event, ${userId})">
         <input type="hidden" id="editClubId" name="editClubId" value="${clubDirectorClubId}">
-        <input type="hidden" id="editEventId" name="editEventId" value="${clubDirectorEventId}">
+        <input type="hidden" id="editEventId" name="editEventId" value="${clubDirectorSelectedEventId}">
         <div class="form-group">
           <label>Username</label>
           <input type="text" value="${user.Username}" class="form-control" disabled>
@@ -598,7 +594,7 @@ function editUserClubDirector(userId) {
 
 // Override showCreateClassForm for Club Directors - filter teachers by club
 async function showCreateClassFormClubDirector() {
-  const eventId = clubDirectorEventId;
+  const eventId = clubDirectorSelectedEventId;
   
   if (!eventId) {
     showNotification('No event assigned to your club', 'error');
@@ -690,36 +686,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   clubDirectorUser = user;
   document.getElementById('userDisplayName').textContent = `${user.firstName} ${user.lastName}`;
 
-  // Get the director's club and event from JWT
+  // Get the director's club from JWT
   clubDirectorClubId = user.clubId;
-  clubDirectorEventId = user.eventId;
   
-  console.log('Club Director logged in - ClubID:', clubDirectorClubId, 'EventID:', clubDirectorEventId);
+  console.log('Club Director logged in - ClubID:', clubDirectorClubId);
 
-  // Get club info to confirm event
-  if (clubDirectorClubId) {
-    try {
-      const clubResponse = await fetchWithAuth(`/api/clubs/details/${clubDirectorClubId}`);
-      const club = await clubResponse.json();
-      if (club) {
-        clubDirectorEventId = club.EventID;
-        
-        // Load and display event name
-        if (clubDirectorEventId) {
-          try {
-            const eventResponse = await fetchWithAuth(`/api/events/${clubDirectorEventId}`);
-            const event = await eventResponse.json();
-            const eventNameEl = document.getElementById('eventName');
-            if (eventNameEl && event) {
-              eventNameEl.textContent = event.Name;
-            }
-          } catch (error) {
-            console.error('Error loading event name:', error);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error loading club:', error);
+  // Load events for this club
+  await loadEvents();
+  
+  // Select first event (prefer active events, then first available)
+  if (clubDirectorEvents.length > 0) {
+    const activeEvent = clubDirectorEvents.find(e => e.Active);
+    clubDirectorEventId = activeEvent ? activeEvent.ID : clubDirectorEvents[0].ID;
+    clubDirectorSelectedEventId = clubDirectorEventId;
+    
+    // Display event name
+    const eventNameEl = document.getElementById('eventName');
+    if (eventNameEl) {
+      const selectedEvent = clubDirectorEvents.find(e => e.ID === clubDirectorEventId);
+      eventNameEl.textContent = selectedEvent ? selectedEvent.Name : 'No Event Selected';
     }
   }
 
@@ -727,7 +712,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   await checkEventStatus();
   
   // Load data
-  await loadEvents();
   await loadUsers();
   
   // Override functions - expose to window so they can be called from HTML
@@ -745,7 +729,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const cls = clubDirectorClasses.find(c => c.ID === classId);
     if (!cls) return;
     
-    const eventId = clubDirectorEventId;
+    const eventId = clubDirectorSelectedEventId;
     
     // Load honors, teachers, locations for dropdowns
     const [honorsRes, locationsRes, teachersRes] = await Promise.all([
@@ -849,7 +833,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     const classData = {
-      EventID: clubDirectorEventId, // Use the director's event
+      EventID: clubDirectorSelectedEventId, // Use the director's event
       HonorID: form.classHonor?.value,
       TeacherID: form.classTeacher?.value,
       LocationID: null, // Club Directors don't set location - admins do this
@@ -1058,7 +1042,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clubId: clubDirectorClubId,
-          eventId: clubDirectorEventId,
+          eventId: clubDirectorSelectedEventId,
           expiresInDays
         })
       });
@@ -1083,7 +1067,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const registrationUrl = window.location.origin + '/register.html';
     
     // Get event info for the email
-    const currentEvent = clubDirectorEvents.find(e => e.ID === parseInt(clubDirectorEventId));
+    const currentEvent = clubDirectorEvents.find(e => e.ID === parseInt(clubDirectorSelectedEventId));
     const eventName = currentEvent ? currentEvent.Name : 'Event';
     
     const emailSubject = `Registration Code for ${eventName}`;

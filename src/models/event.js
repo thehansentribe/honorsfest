@@ -51,14 +51,21 @@ class Event {
   }
 
   // Get events where a club participates
-  static getEventsForClub(clubId) {
-    return db.prepare(`
+  static getEventsForClub(clubId, activeOnly = true) {
+    let query = `
       SELECT e.*
       FROM Events e
       INNER JOIN ClubEvents ce ON e.ID = ce.EventID
-      WHERE ce.ClubID = ? AND e.Active = 1
-      ORDER BY e.StartDate DESC
-    `).all(clubId);
+      WHERE ce.ClubID = ?
+    `;
+    
+    if (activeOnly) {
+      query += ' AND e.Active = 1';
+    }
+    
+    query += ' ORDER BY e.StartDate DESC';
+    
+    return db.prepare(query).all(clubId);
   }
 
   static update(id, updates) {
