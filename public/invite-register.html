@@ -105,9 +105,13 @@
         regForm.style.display = 'block';
 
         // Populate invite info
-        document.getElementById('inviteName').textContent = `${data.firstName} ${data.lastName}`;
-        document.getElementById('inviteEmailDisplay').textContent = data.email;
-        document.getElementById('inviteRole').textContent = data.role;
+        const nameEl = document.getElementById('inviteName');
+        const emailEl = document.getElementById('inviteEmail');
+        const roleEl = document.getElementById('inviteRole');
+        
+        if (nameEl) nameEl.textContent = `${data.firstName} ${data.lastName}`;
+        if (emailEl) emailEl.textContent = data.email;
+        if (roleEl) roleEl.textContent = data.role;
 
         if (data.club) {
           document.getElementById('inviteClub').style.display = 'block';
@@ -244,6 +248,20 @@
     document.getElementById('inviteCode').addEventListener('keypress', function(e) {
       if (e.key === 'Enter') {
         validateInviteCode();
+      }
+    });
+
+    // Auto-fill code from URL parameter on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      if (code) {
+        const codeInput = document.getElementById('inviteCode');
+        if (codeInput) {
+          codeInput.value = code.toUpperCase();
+          // Automatically validate if code is provided in URL
+          validateInviteCode();
+        }
       }
     });
   </script>
