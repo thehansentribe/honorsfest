@@ -5,6 +5,7 @@ const User = require('../models/user');
 const bcrypt = require('bcrypt');
 const StytchService = require('../services/stytch');
 const { determineAuthMethod } = require('../utils/authHelper');
+const { db } = require('../config/db');
 
 const router = express.Router();
 
@@ -44,6 +45,35 @@ router.post('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => 
         expiresInDays || 30
       );
       
+      // Create the user record immediately but mark as invited and not active
+      try {
+        User.create({
+          FirstName: firstName,
+          LastName: lastName,
+          Email: email,
+          PasswordHash: '', // Empty for invited users until they set password
+          Role: role,
+          ClubID: clubId || null,
+          EventID: assignedEventId,
+          Active: false, // Inactive until they accept invite
+          Invited: true,
+          InviteAccepted: false,
+          BackgroundCheck: false,
+          stytch_user_id: null,
+          auth_method: 'local' // Will be updated when they register
+        });
+      } catch (error) {
+        // If user already exists, update their invite status
+        const existingUser = User.findByEmail(email);
+        if (existingUser) {
+          db.prepare(`
+            UPDATE Users 
+            SET Invited = 1, InviteAccepted = 0, Active = 0
+            WHERE Email = ?
+          `).run(email);
+        }
+      }
+      
       return res.status(201).json(invite);
     }
     
@@ -53,6 +83,35 @@ router.post('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => 
       req.user.id,
       expiresInDays || 30
     );
+    
+    // Create the user record immediately but mark as invited and not active
+    try {
+      User.create({
+        FirstName: firstName,
+        LastName: lastName,
+        Email: email,
+        PasswordHash: '', // Empty for invited users until they set password
+        Role: role,
+        ClubID: clubId || null,
+        EventID: eventId || null,
+        Active: false, // Inactive until they accept invite
+        Invited: true,
+        InviteAccepted: false,
+        BackgroundCheck: false,
+        stytch_user_id: null,
+        auth_method: 'local' // Will be updated when they register
+      });
+    } catch (error) {
+      // If user already exists, update their invite status
+      const existingUser = User.findByEmail(email);
+      if (existingUser) {
+        db.prepare(`
+          UPDATE Users 
+          SET Invited = 1, InviteAccepted = 0, Active = 0
+          WHERE Email = ?
+        `).run(email);
+      }
+    }
     
     res.status(201).json(invite);
   } catch (error) {
@@ -161,28 +220,32 @@ router.post('/register', async (req, res) => {
       passwordHash = bcrypt.hashSync(password, 10);
     }
     
-    // Create the user in our database
-    const user = User.create({
-      FirstName: codeData.FirstName,
-      LastName: codeData.LastName,
-      Email: codeData.Email,
-      PasswordHash: passwordHash,
-      Role: codeData.Role,
-      ClubID: codeData.ClubID || null,
-      EventID: codeData.EventID || null,
-      Active: true,
-      BackgroundCheck: false,
-      stytch_user_id: stytchUserId,
-      auth_method: authMethod
-    });
+    // Update existing user with password and activate them
+    db.prepare(`
+      UPDATE Users 
+      SET PasswordHash = ?,
+          Active = 1,
+          InviteAccepted = 1,
+          stytch_user_id = ?,
+          auth_method = ?
+      WHERE Email = ?
+    `).run(
+      passwordHash,
+      stytchUserId || null,
+      authMethod,
+      codeData.Email
+    );
+    
+    // Get updated user
+    const updatedUser = User.findByEmail(codeData.Email);
     
     // Mark invite code as used
     InviteCode.markUsed(code.toUpperCase());
     
     res.status(201).json({
-      message: 'Account created successfully',
-      username: user.Username,
-      role: user.Role
+      message: 'Account activated successfully',
+      username: updatedUser.Username,
+      role: updatedUser.Role
     });
   } catch (error) {
     console.error('Invite registration error:', error);

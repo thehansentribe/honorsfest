@@ -33,6 +33,8 @@ function initializeDatabase() {
         ClubID INTEGER,
         EventID INTEGER,
         Active BOOLEAN NOT NULL DEFAULT 1,
+        Invited BOOLEAN NOT NULL DEFAULT 0,
+        InviteAccepted BOOLEAN DEFAULT 0,
         BackgroundCheck BOOLEAN DEFAULT 0,
         CheckInNumber INTEGER UNIQUE,
         CheckedIn BOOLEAN DEFAULT 0,
