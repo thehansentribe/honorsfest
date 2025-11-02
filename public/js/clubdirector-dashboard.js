@@ -20,7 +20,7 @@ let clubDirectorSortDirection = 'asc';
 // Define functions BEFORE they're called in DOMContentLoaded
 
 // Override switchTab
-function clubdirectorSwitchTab(tabName, clickedElement = null) {
+async function clubdirectorSwitchTab(tabName, clickedElement = null) {
   clubDirectorTab = tabName;
   try { localStorage.setItem('directorCurrentTab', tabName); } catch (e) {}
   
@@ -756,7 +756,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Restore last active tab or default to users
   const savedTab = localStorage.getItem('directorCurrentTab') || 'users';
-  window.switchTab(savedTab);
+  await window.switchTab(savedTab);
 
   // Override editClass to use clubDirectorClasses array
   window.editClass = async function editClassClubDirector(classId) {
@@ -1602,7 +1602,10 @@ Thank you!`;
     const selector = document.getElementById('eventSelector');
     const eventNameEl = document.getElementById('eventName');
     
-    if (!selector || !eventNameEl) return;
+    if (!selector || !eventNameEl) {
+      console.error('Event selector elements not found in DOM');
+      return;
+    }
     
     // Show selector if there are multiple events
     if (clubDirectorEvents.length > 1) {
@@ -1615,16 +1618,17 @@ Thank you!`;
         </option>`
       ).join('');
       
-      // Display selected event name
-      const selectedEvent = clubDirectorEvents.find(e => e.ID === clubDirectorSelectedEventId);
-      if (selectedEvent) {
-        eventNameEl.textContent = '';
-      }
-    } else {
+      // Hide event name when selector is shown
+      eventNameEl.textContent = '';
+    } else if (clubDirectorEvents.length === 1) {
       // Single event - hide selector and show event name
       if (selectorContainer) selectorContainer.style.display = 'none';
-      const selectedEvent = clubDirectorEvents.find(e => e.ID === clubDirectorSelectedEventId);
-      eventNameEl.textContent = selectedEvent ? selectedEvent.Name : 'No Event Selected';
+      const selectedEvent = clubDirectorEvents[0];
+      eventNameEl.textContent = selectedEvent.Name || 'No Event Selected';
+    } else {
+      // No events - hide selector and show message
+      if (selectorContainer) selectorContainer.style.display = 'none';
+      eventNameEl.textContent = 'No Events Available';
     }
   }
   
@@ -1649,3 +1653,4 @@ Thank you!`;
 });
 
 })(); // End IIFE - closes the wrapper around all Club Director code
+
