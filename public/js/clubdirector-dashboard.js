@@ -58,7 +58,7 @@ function clubdirectorSwitchTab(tabName, clickedElement = null) {
       break;
     case 'codes':
       content.innerHTML = getCodesTab();
-      renderCodes();
+      await renderCodes();
       break;
     case 'reports':
       content.innerHTML = getReportsTab();
@@ -1021,10 +1021,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     try {
+      if (!clubDirectorClubId) {
+        container.innerHTML = '<p class="text-center" style="color: #d32f2f;">Club information not available. Please refresh the page.</p>';
+        return;
+      }
+      
       const response = await fetchWithAuth(`/api/codes/club/${clubDirectorClubId}?eventId=${clubDirectorSelectedEventId}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to load codes' }));
+        throw new Error(errorData.error || `Server error: ${response.status}`);
+      }
+      
       const codes = await response.json();
       
-      if (!codes || codes.length === 0) {
+      if (!Array.isArray(codes)) {
+        throw new Error('Invalid response format from server');
+      }
+      
+      if (codes.length === 0) {
         container.innerHTML = '<p class="text-center">No registration codes yet. Generate your first code!</p>';
         return;
       }
@@ -1081,6 +1096,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
       console.error('Error loading codes:', error);
       container.innerHTML = `<p class="text-center" style="color: red;">Error loading codes: ${error.message}</p>`;
+      showNotification('Error loading codes: ' + error.message, 'error');
     }
   }
 
