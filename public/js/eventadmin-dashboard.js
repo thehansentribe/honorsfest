@@ -3159,36 +3159,32 @@ function renderTimeslotsList() {
   }
     
   container.innerHTML = `
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th style="width: 25%; text-align: left;">Date</th>
-            <th style="width: 20%; text-align: left;">Start Time</th>
-            <th style="width: 20%; text-align: left;">End Time</th>
-            <th style="width: 20%; text-align: left;">Duration</th>
-            <th style="width: 15%; text-align: left;">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${allTimeslots.map(slot => `
-          <tr>
-            <td style="text-align: left;">${slot.Date}</td>
-            <td style="text-align: left;">${convertTo12Hour(slot.StartTime)}</td>
-            <td style="text-align: left;">${convertTo12Hour(slot.EndTime)}</td>
-            <td style="text-align: left;">${calculateDuration(slot.StartTime, slot.EndTime)}</td>
-            <td style="text-align: left;">
-              <button onclick="editTimeslot(${slot.ID})" class="btn btn-sm btn-secondary">Edit</button>
-              <button onclick="deleteTimeslot(${slot.ID})" class="btn btn-sm btn-danger">Delete</button>
-            </td>
-          </tr>
-        `).join('')}
-        </tbody>
-      </table>
-    `;
-  } catch (error) {
-    console.error('Error loading timeslots:', error);
-    showNotification('Error loading timeslots', 'error');
-  }
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="width: 25%; text-align: left;">Date</th>
+          <th style="width: 20%; text-align: left;">Start Time</th>
+          <th style="width: 20%; text-align: left;">End Time</th>
+          <th style="width: 20%; text-align: left;">Duration</th>
+          <th style="width: 15%; text-align: left;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${allTimeslots.map(slot => `
+        <tr>
+          <td style="text-align: left;">${slot.Date}</td>
+          <td style="text-align: left;">${convertTo12Hour(slot.StartTime)}</td>
+          <td style="text-align: left;">${convertTo12Hour(slot.EndTime)}</td>
+          <td style="text-align: left;">${calculateDuration(slot.StartTime, slot.EndTime)}</td>
+          <td style="text-align: left;">
+            <button onclick="editTimeslot(${slot.ID})" class="btn btn-sm btn-secondary">Edit</button>
+            <button onclick="deleteTimeslot(${slot.ID})" class="btn btn-sm btn-danger">Delete</button>
+          </td>
+        </tr>
+      `).join('')}
+      </tbody>
+    </table>
+  `;
 }
 
 function calculateDuration(startTime, endTime) {
