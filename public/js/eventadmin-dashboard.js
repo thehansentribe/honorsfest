@@ -2319,40 +2319,55 @@ function showCreateUserForm() {
       });
   }
   
+  // Function to update form fields based on role
+  function updateFormFieldsForRole() {
+    const roleSelect = document.getElementById('role');
+    const passwordContainer = document.getElementById('passwordContainer');
+    const passwordInput = document.getElementById('password');
+    const submitBtn = document.getElementById('createUserSubmitBtn');
+    const dateOfBirthContainer = document.getElementById('dateOfBirthContainer');
+    const dateOfBirthInput = document.getElementById('dateOfBirth');
+    const phoneContainer = document.getElementById('phoneContainer');
+    
+    if (!roleSelect) return;
+    
+    const role = roleSelect.value;
+    
+    if (['Admin', 'EventAdmin', 'ClubDirector'].includes(role)) {
+      // Invite roles: hide password, date of birth, and phone, change button text
+      if (passwordContainer) passwordContainer.style.display = 'none';
+      if (passwordInput) {
+        passwordInput.required = false;
+        passwordInput.value = '';
+      }
+      if (submitBtn) submitBtn.textContent = 'Invite User';
+      if (dateOfBirthContainer) dateOfBirthContainer.style.display = 'none';
+      if (dateOfBirthInput) {
+        dateOfBirthInput.required = false;
+        dateOfBirthInput.value = '';
+      }
+      if (phoneContainer) phoneContainer.style.display = 'none';
+    } else {
+      // Direct creation roles: show password, date of birth, and phone, keep button text
+      if (passwordContainer) passwordContainer.style.display = 'block';
+      if (passwordInput) passwordInput.required = true;
+      if (submitBtn) submitBtn.textContent = 'Create User';
+      if (dateOfBirthContainer) dateOfBirthContainer.style.display = 'block';
+      if (dateOfBirthInput) dateOfBirthInput.required = true;
+      if (phoneContainer) phoneContainer.style.display = 'block';
+    }
+    
+    toggleEventDropdown(role);
+  }
+  
   // Show/hide password field and date of birth based on role, update button text
   const roleSelect = document.getElementById('role');
-  const passwordContainer = document.getElementById('passwordContainer');
-  const passwordInput = document.getElementById('password');
-  const submitBtn = document.getElementById('createUserSubmitBtn');
-  const dateOfBirthContainer = document.getElementById('dateOfBirthContainer');
-  const dateOfBirthInput = document.getElementById('dateOfBirth');
-  
   if (roleSelect) {
-    roleSelect.addEventListener('change', function() {
-      const role = this.value;
-      
-      const phoneContainer = document.getElementById('phoneContainer');
-      
-      if (['Admin', 'EventAdmin', 'ClubDirector'].includes(role)) {
-        // Invite roles: hide password, date of birth, and phone, change button text
-        if (passwordContainer) passwordContainer.style.display = 'none';
-        if (passwordInput) passwordInput.required = false;
-        if (submitBtn) submitBtn.textContent = 'Invite User';
-        if (dateOfBirthContainer) dateOfBirthContainer.style.display = 'none';
-        if (dateOfBirthInput) dateOfBirthInput.required = false;
-        if (phoneContainer) phoneContainer.style.display = 'none';
-      } else {
-        // Direct creation roles: show password, date of birth, and phone, keep button text
-        if (passwordContainer) passwordContainer.style.display = 'block';
-        if (passwordInput) passwordInput.required = true;
-        if (submitBtn) submitBtn.textContent = 'Create User';
-        if (dateOfBirthContainer) dateOfBirthContainer.style.display = 'block';
-        if (dateOfBirthInput) dateOfBirthInput.required = true;
-        if (phoneContainer) phoneContainer.style.display = 'block';
-      }
-      
-      toggleEventDropdown(role);
-    });
+    // Set initial state
+    updateFormFieldsForRole();
+    
+    // Add change listener
+    roleSelect.addEventListener('change', updateFormFieldsForRole);
   }
   
   // Add listener for date of birth changes to show/hide background check
