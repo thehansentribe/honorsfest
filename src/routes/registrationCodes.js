@@ -3,6 +3,8 @@ const { verifyToken, requireRole } = require('../middleware/auth');
 const RegistrationCode = require('../models/registrationCode');
 const User = require('../models/user');
 const bcrypt = require('bcrypt');
+const StytchService = require('../services/stytch');
+const { determineAuthMethod } = require('../utils/authHelper');
 
 const router = express.Router();
 
@@ -63,12 +65,37 @@ router.get('/:code', (req, res) => {
 });
 
 // POST /api/codes/register - Create user from registration code (public)
-router.post('/register', (req, res) => {
+router.post('/register', async (req, res) => {
   try {
-    const { code, firstName, lastName, dateOfBirth, email, phone, role, investitureLevel } = req.body;
+    const { code, firstName, lastName, dateOfBirth, email, phone, role, investitureLevel, password } = req.body;
     
-    if (!code || !firstName || !lastName || !email || !role) {
+    if (!code || !firstName || !lastName || !email || !role || !password) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Validate password
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+    }
+    
+    // Check password strength (basic validation)
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecialChar = /[^A-Za-z0-9]/.test(password);
+    const commonWords = ['password', 'admin', 'qwerty', '123456', 'password123'];
+    const isCommonPassword = commonWords.some(word => password.toLowerCase().includes(word.toLowerCase()));
+    
+    if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
+      return res.status(400).json({ 
+        error: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character' 
+      });
+    }
+    
+    if (isCommonPassword) {
+      return res.status(400).json({ 
+        error: 'Password is too weak. Please avoid common words or patterns.' 
+      });
     }
     
     // Validate the code
@@ -82,13 +109,32 @@ router.post('/register', (req, res) => {
     // Check if email is already in use
     const existingUser = User.findByEmail(email);
     if (existingUser) {
-      return res.status(400).json({ error: 'This email is already registered' });
+      return res.status(400).json({ error: 'An account with this email already exists. Please use a different email or log in if you have an existing account.' });
     }
     
-    // Hash the default password
-    const passwordHash = bcrypt.hashSync('password123', 10);
+    // Determine authentication method based on email
+    const authMethod = determineAuthMethod(email);
+    let stytchUserId = null;
+    let passwordHash = '';
     
-    // Create the user
+    if (authMethod === 'stytch') {
+      try {
+        // Create user in Stytch with password
+        const stytchResult = await StytchService.createUser(email, password);
+        stytchUserId = stytchResult.userId;
+        // PasswordHash stays empty for Stytch users
+      } catch (stytchError) {
+        console.error('Stytch user creation error:', stytchError);
+        return res.status(500).json({ 
+          error: stytchError.message || 'Failed to create authentication account. Please try again.' 
+        });
+      }
+    } else {
+      // Local authentication: hash the password
+      passwordHash = bcrypt.hashSync(password, 10);
+    }
+    
+    // Create the user in our database
     const user = User.create({
       FirstName: firstName,
       LastName: lastName,
@@ -101,11 +147,10 @@ router.post('/register', (req, res) => {
       ClubID: codeData.ClubID,
       EventID: codeData.EventID,
       Active: true,
-      BackgroundCheck: false
+      BackgroundCheck: false,
+      stytch_user_id: stytchUserId,
+      auth_method: authMethod
     });
-    
-    // Don't mark code as used - codes can be reused multiple times until expiration
-    // The code will remain valid until the expiration date
     
     res.status(201).json({
       message: 'Account created successfully',
@@ -115,6 +160,7 @@ router.post('/register', (req, res) => {
       eventId: user.EventID
     });
   } catch (error) {
+    console.error('Registration error:', error);
     res.status(500).json({ error: error.message });
   }
 });

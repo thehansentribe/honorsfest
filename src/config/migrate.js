@@ -76,6 +76,31 @@ function migrateDatabase() {
       console.log('CheckedIn column added successfully');
     }
     
+    // Check Users table for Stytch columns
+    const hasStytchUserId = usersTableInfo.some(col => col.name === 'stytch_user_id');
+    const hasAuthMethod = usersTableInfo.some(col => col.name === 'auth_method');
+    
+    if (!hasStytchUserId) {
+      console.log('Adding stytch_user_id column to Users table...');
+      db.exec('ALTER TABLE Users ADD COLUMN stytch_user_id TEXT');
+      console.log('✓ stytch_user_id column added');
+    }
+    
+    if (!hasAuthMethod) {
+      console.log('Adding auth_method column to Users table...');
+      db.exec(`ALTER TABLE Users ADD COLUMN auth_method TEXT NOT NULL DEFAULT 'local'`);
+      // Set all existing users to local auth method (normalize any 'password' to 'local')
+      db.exec(`UPDATE Users SET auth_method = 'local' WHERE auth_method IS NULL OR auth_method = 'password'`);
+      console.log('✓ auth_method column added');
+    } else {
+      // If column already exists but has 'password' as default, update existing values
+      const passwordUsers = db.prepare("SELECT COUNT(*) as count FROM Users WHERE auth_method = 'password'").get();
+      if (passwordUsers.count > 0) {
+        console.log(`Migrating ${passwordUsers.count} users from 'password' to 'local' auth_method`);
+        db.exec(`UPDATE Users SET auth_method = 'local' WHERE auth_method = 'password'`);
+      }
+    }
+    
   } catch (error) {
     console.error('Migration error:', error);
     // Don't throw, just log

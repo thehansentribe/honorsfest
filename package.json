@@ -13,11 +13,13 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
+    "@stytch/vanilla-js": "^5.40.0",
     "bcrypt": "^5.1.1",
     "better-sqlite3": "^12.4.1",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "stytch": "^12.42.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

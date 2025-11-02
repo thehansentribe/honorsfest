@@ -50,14 +50,17 @@ class User {
   }
 
   static create(userData) {
-    const { FirstName, LastName, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck } = userData;
+    const { FirstName, LastName, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck, stytch_user_id, auth_method } = userData;
     
     const Username = this.generateUsername(FirstName, LastName);
     const CheckInNumber = this.generateCheckInNumber();
     
+    // Ensure PasswordHash is never null (for Stytch users without local password)
+    const safePasswordHash = PasswordHash || '';
+    
     const stmt = db.prepare(`
-      INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck, CheckInNumber, CheckedIn)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck, CheckInNumber, CheckedIn, stytch_user_id, auth_method)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -67,7 +70,7 @@ class User {
       DateOfBirth || null,
       Email || null,
       Phone || null,
-      PasswordHash,
+      safePasswordHash,
       Role,
       InvestitureLevel || 'None',
       ClubID || null,
@@ -75,7 +78,9 @@ class User {
       Active !== undefined ? (Active ? 1 : 0) : 1,
       BackgroundCheck !== undefined ? (BackgroundCheck ? 1 : 0) : 0,
       CheckInNumber,
-      0  // CheckedIn defaults to false
+      0,  // CheckedIn defaults to false
+      stytch_user_id || null,
+      auth_method || 'local'
     );
 
     return this.findById(result.lastInsertRowid);
@@ -83,17 +88,20 @@ class User {
 
   static bulkCreate(users) {
     const insertStmt = db.prepare(`
-      INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck, CheckInNumber, CheckedIn)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck, CheckInNumber, CheckedIn, stytch_user_id, auth_method)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const usersCreated = [];
     const insertMany = db.transaction((userList) => {
       for (const userData of userList) {
-        const { FirstName, LastName, DateOfBirth, Email, Phone, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck, PasswordHash } = userData;
+        const { FirstName, LastName, DateOfBirth, Email, Phone, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck, PasswordHash, stytch_user_id, auth_method } = userData;
         
         const Username = this.generateUsername(FirstName, LastName);
         const CheckInNumber = this.generateCheckInNumber();
+        
+        // Ensure PasswordHash is never null
+        const safePasswordHash = PasswordHash || '';
         
         const result = insertStmt.run(
           FirstName,
@@ -102,7 +110,7 @@ class User {
           DateOfBirth || null,
           Email || null,
           Phone || null,
-          PasswordHash,
+          safePasswordHash,
           Role,
           InvestitureLevel || 'None',
           ClubID || null,
@@ -110,7 +118,9 @@ class User {
           Active !== undefined ? (Active ? 1 : 0) : 1,
           BackgroundCheck !== undefined ? (BackgroundCheck ? 1 : 0) : 0,
           CheckInNumber,
-          0  // CheckedIn defaults to false
+          0,  // CheckedIn defaults to false
+          stytch_user_id || null,
+          auth_method || 'local'
         );
 
         const user = this.findById(result.lastInsertRowid);
@@ -142,7 +152,22 @@ class User {
   }
 
   static findByEmail(email) {
-    return db.prepare('SELECT * FROM Users WHERE Email = ?').get(email);
+    // Make email lookup case-insensitive
+    const user = db.prepare('SELECT * FROM Users WHERE LOWER(Email) = LOWER(?)').get(email);
+    if (user) {
+      user.Age = user.DateOfBirth ? this.calculateAge(user.DateOfBirth) : null;
+      user.IsAdult = user.DateOfBirth ? this.isAdult(user.DateOfBirth) : false;
+    }
+    return user;
+  }
+
+  static findByStytchUserId(stytchUserId) {
+    const user = db.prepare('SELECT * FROM Users WHERE stytch_user_id = ?').get(stytchUserId);
+    if (user) {
+      user.Age = user.DateOfBirth ? this.calculateAge(user.DateOfBirth) : null;
+      user.IsAdult = user.DateOfBirth ? this.isAdult(user.DateOfBirth) : false;
+    }
+    return user;
   }
 
   static findByIdWithClub(id) {
@@ -193,7 +218,7 @@ class User {
   }
 
   static update(id, updates) {
-    const allowedUpdates = ['FirstName', 'LastName', 'DateOfBirth', 'Email', 'Phone', 'Role', 'InvestitureLevel', 'ClubID', 'EventID', 'Active', 'BackgroundCheck', 'PasswordHash', 'CheckedIn'];
+    const allowedUpdates = ['FirstName', 'LastName', 'DateOfBirth', 'Email', 'Phone', 'Role', 'InvestitureLevel', 'ClubID', 'EventID', 'Active', 'BackgroundCheck', 'PasswordHash', 'CheckedIn', 'stytch_user_id', 'auth_method'];
     const setClause = [];
     const values = [];
 

@@ -28,8 +28,8 @@ function seedDatabase() {
     
     // Prepare user insert statement
     const insertUser = db.prepare(`
-      INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, PasswordHash, Role, Active, BackgroundCheck, ClubID, EventID, InvestitureLevel, CheckInNumber, CheckedIn, Email)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, PasswordHash, Role, Active, BackgroundCheck, ClubID, EventID, InvestitureLevel, CheckInNumber, CheckedIn, Email, auth_method)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     // Seed honors (always seed fresh)
@@ -106,7 +106,8 @@ function seedDatabase() {
         'MasterGuide', 
         getNextCheckInNumber(), 
         0,
-        admin.Email
+        admin.Email,
+        'local'  // All seeded users use local auth
       );
       console.log(`Created admin: ${admin.Username}`);
     });
@@ -180,7 +181,8 @@ function seedDatabase() {
         'MasterGuide',
         getNextCheckInNumber(),
         0,
-        `eventadmin${eventIndex + 1}@example.com`
+        `eventadmin${eventIndex + 1}@example.com`,
+        'local'
       );
       const eventAdminId = eventAdminRes.lastInsertRowid;
       console.log(`Created Event Admin (ID: ${eventAdminId}) for event ${event.ID}`);
@@ -261,7 +263,8 @@ function seedDatabase() {
           'MasterGuide',
           getNextCheckInNumber(),
           0,
-          `director${eventIndex + 1}.${clubIndex + 1}@example.com`
+          `director${eventIndex + 1}.${clubIndex + 1}@example.com`,
+          'local'
         );
         const directorId = directorRes.lastInsertRowid;
         db.prepare('UPDATE Clubs SET DirectorID = ? WHERE ID = ?').run(directorId, clubId);
@@ -285,7 +288,8 @@ function seedDatabase() {
             'MasterGuide',
             getNextCheckInNumber(),
             0,
-            `teacher${eventIndex + 1}.${clubIndex + 1}.${t + 1}@example.com`
+            `teacher${eventIndex + 1}.${clubIndex + 1}.${t + 1}@example.com`,
+            'local'
           );
           const teacherId = teacherRes.lastInsertRowid;
           teacherIds.push(teacherId);
@@ -310,7 +314,8 @@ function seedDatabase() {
             'Guide',
             getNextCheckInNumber(),
             0,
-            `staff${eventIndex + 1}.${clubIndex + 1}.${s + 1}@example.com`
+            `staff${eventIndex + 1}.${clubIndex + 1}.${s + 1}@example.com`,
+            'local'
           );
           const staffId = staffRes.lastInsertRowid;
           staffIds.push(staffId);
@@ -337,7 +342,8 @@ function seedDatabase() {
             investitureLevels[st],
             getNextCheckInNumber(),
             0,
-            `student${eventIndex + 1}.${clubIndex + 1}.${st + 1}@example.com`
+            `student${eventIndex + 1}.${clubIndex + 1}.${st + 1}@example.com`,
+            'local'
           );
           const studentId = studentRes.lastInsertRowid;
           studentIds.push(studentId);

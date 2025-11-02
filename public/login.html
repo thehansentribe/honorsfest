@@ -15,6 +15,17 @@
 
     <div id="errorMessage" class="error-message" style="display: none;"></div>
 
+    <!-- Tab buttons for login methods -->
+    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+      <button id="passwordTab" onclick="switchLoginTab('password')" class="btn" style="flex: 1; background: var(--primary-color); color: white; border: none;">
+        Username & Password
+      </button>
+      <button id="magicTab" onclick="switchLoginTab('magic')" class="btn" style="flex: 1; background: #e0e0e0; color: #666; border: none;">
+        Email Magic Link
+      </button>
+    </div>
+
+    <!-- Username/Password Login Form -->
     <form id="loginForm" class="login-form">
       <div class="form-group">
         <label for="username">Username</label>
@@ -31,11 +42,58 @@
           Login
         </button>
       </div>
+      
+      <div style="text-align: center; margin-top: 15px;">
+        <a href="/forgot-password.html" style="color: var(--primary-color); text-decoration: none;">Forgot Password?</a>
+      </div>
+    </form>
+
+    <!-- Email Magic Link Login Form -->
+    <form id="emailLoginForm" class="login-form" style="display: none;">
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" class="form-control" required placeholder="your.email@example.com">
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+          Send Magic Link
+        </button>
+      </div>
+      
+      <div style="text-align: center; margin-top: 15px; font-size: 0.9em; color: #666;">
+        We'll send you a secure link to log in. No password needed!
+      </div>
     </form>
   </div>
 
   <script src="/js/utils.js"></script>
   <script>
+    // Tab switching logic
+    function switchLoginTab(tab) {
+      const passwordForm = document.getElementById('loginForm');
+      const magicForm = document.getElementById('emailLoginForm');
+      const passwordTab = document.getElementById('passwordTab');
+      const magicTab = document.getElementById('magicTab');
+      
+      if (tab === 'password') {
+        passwordForm.style.display = 'block';
+        magicForm.style.display = 'none';
+        passwordTab.style.background = 'var(--primary-color)';
+        passwordTab.style.color = 'white';
+        magicTab.style.background = '#e0e0e0';
+        magicTab.style.color = '#666';
+      } else {
+        passwordForm.style.display = 'none';
+        magicForm.style.display = 'block';
+        magicTab.style.background = 'var(--primary-color)';
+        magicTab.style.color = 'white';
+        passwordTab.style.background = '#e0e0e0';
+        passwordTab.style.color = '#666';
+      }
+    }
+
+    // Username/password login
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
@@ -69,12 +127,60 @@
             'Staff': 'student-dashboard.html'
           }[data.user.role] || 'login.html';
         } else {
-          errorEl.textContent = data.error || 'Login failed';
+          // If user needs Stytch authentication, suggest using email login
+          if (data.error && data.error.includes('Stytch')) {
+            errorEl.textContent = 'This account uses email authentication. Please use the "Email Magic Link" tab to log in.';
+          } else {
+            errorEl.textContent = data.error || 'Login failed';
+          }
           errorEl.style.display = 'block';
         }
       } catch (error) {
         errorEl.textContent = 'An error occurred. Please try again.';
         errorEl.style.display = 'block';
+      }
+    });
+
+    // Email magic link login
+    document.getElementById('emailLoginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById('email').value;
+      const errorEl = document.getElementById('errorMessage');
+
+      errorEl.style.display = 'none';
+
+      try {
+        const response = await fetch('/api/auth/magic/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          // Show success message
+          errorEl.style.display = 'block';
+          errorEl.style.background = '#dfd';
+          errorEl.style.color = '#060';
+          errorEl.style.borderColor = '#6c6';
+          errorEl.innerHTML = '✓ Magic link sent! Please check your email and click the link to log in.';
+        } else {
+          errorEl.style.display = 'block';
+          errorEl.style.background = '#fee';
+          errorEl.style.color = '#c33';
+          errorEl.style.borderColor = '#fcc';
+          errorEl.textContent = data.error || 'Unable to send magic link. Please try again.';
+        }
+      } catch (error) {
+        errorEl.style.display = 'block';
+        errorEl.style.background = '#fee';
+        errorEl.style.color = '#c33';
+        errorEl.style.borderColor = '#fcc';
+        errorEl.textContent = 'An error occurred. Please try again.';
       }
     });
   </script>

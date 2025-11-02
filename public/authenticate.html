@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authenticating - Honors Festival</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-header">
+      <h1>Honors Festival</h1>
+      <p>Event Registration System</p>
+    </div>
+    
+    <div id="authenticating" style="text-align: center; padding: 40px;">
+      <p style="font-size: 1.2em;">Authenticating...</p>
+      <p style="color: #666; margin-top: 10px;">Please wait while we verify your magic link.</p>
+    </div>
+    
+    <div id="errorMessage" class="error-message" style="display: none;"></div>
+  </div>
+
+  <script>
+    async function authenticate() {
+      // Extract token from URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('token');
+      
+      if (!token) {
+        document.getElementById('authenticating').style.display = 'none';
+        document.getElementById('errorMessage').style.display = 'block';
+        document.getElementById('errorMessage').textContent = 'Invalid authentication link. Token is missing.';
+        return;
+      }
+      
+      try {
+        const response = await fetch('/api/auth/stytch/callback', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          // Store token and user data
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          
+          // Redirect to appropriate dashboard
+          const role = data.user.role;
+          const dashboardMap = {
+            'Admin': 'admin-dashboard.html',
+            'EventAdmin': 'eventadmin-dashboard.html',
+            'ClubDirector': 'clubdirector-dashboard.html',
+            'Teacher': 'teacher-dashboard.html',
+            'Student': 'student-dashboard.html',
+            'Staff': 'student-dashboard.html'
+          };
+          
+          window.location.href = '/' + (dashboardMap[role] || 'login.html');
+        } else {
+          document.getElementById('authenticating').style.display = 'none';
+          document.getElementById('errorMessage').style.display = 'block';
+          document.getElementById('errorMessage').textContent = data.error || 'Authentication failed. Please try logging in with your password.';
+        }
+      } catch (error) {
+        document.getElementById('authenticating').style.display = 'none';
+        document.getElementById('errorMessage').style.display = 'block';
+        document.getElementById('errorMessage').textContent = 'An error occurred during authentication. Please try logging in with your password.';
+      }
+    }
+    
+    // Run authentication on page load
+    authenticate();
+  </script>
+</body>
+</html>
+

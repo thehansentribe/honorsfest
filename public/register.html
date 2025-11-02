@@ -81,16 +81,39 @@
               </select>
             </div>
 
+            <div class="form-group">
+              <label for="password">Password *</label>
+              <input type="password" id="password" class="form-control" required minlength="8" oninput="validatePasswordStrength()">
+              <small style="color: var(--text-light); font-size: 0.875em;">
+                <div id="passwordRequirements" style="margin-top: 5px;">
+                  <div id="reqLength" style="color: #999;">✓ At least 8 characters</div>
+                  <div id="reqUpper" style="color: #999;">✓ One uppercase letter</div>
+                  <div id="reqLower" style="color: #999;">✓ One lowercase letter</div>
+                  <div id="reqNumber" style="color: #999;">✓ One number</div>
+                  <div id="reqSpecial" style="color: #999;">✓ One special character</div>
+                </div>
+                <div id="passwordWarning" style="display: none; color: #ff9900; margin-top: 5px;">
+                  ⚠️ Avoid common words (like "password") or simple patterns (like "123")
+                </div>
+              </small>
+            </div>
+
+            <div class="form-group">
+              <label for="confirmPassword">Confirm Password *</label>
+              <input type="password" id="confirmPassword" class="form-control" required minlength="8" oninput="validatePasswordMatch()">
+              <small id="passwordMatch" style="color: #999; display: none;">✓ Passwords match</small>
+              <small id="passwordNoMatch" style="color: #c33; display: none;">✗ Passwords don't match</small>
+            </div>
+
             <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 20px;">Submit Registration</button>
           </form>
         </div>
 
         <div id="successMessage" style="display: none;">
           <div style="background: #dfd; padding: 20px; border-radius: 8px; text-align: center;">
-            <h3 style="color: #060; margin-bottom: 10px;">Registration Successful!</h3>
+            <h3 style="color: #060; margin-bottom: 10px;">✓ Registration Successful!</h3>
             <p>Your username is: <strong id="createdUsername"></strong></p>
             <p>Your check-in number is: <strong id="checkInNumber" style="font-size: 1.2em; color: #0066cc;">#</strong></p>
-            <p>Default password: <strong>password123</strong></p>
             <p style="background: #fff3cd; padding: 10px; border-radius: 5px; margin: 10px 0;">
               <strong>Important:</strong> Please write down your check-in number. You will need it when you check in at the event.
             </p>
@@ -135,6 +158,48 @@
       }
     }
 
+    function validatePasswordStrength() {
+      const password = document.getElementById('password').value;
+      
+      const reqLength = document.getElementById('reqLength');
+      const reqUpper = document.getElementById('reqUpper');
+      const reqLower = document.getElementById('reqLower');
+      const reqNumber = document.getElementById('reqNumber');
+      const reqSpecial = document.getElementById('reqSpecial');
+      const warning = document.getElementById('passwordWarning');
+      
+      reqLength.style.color = password.length >= 8 ? '#060' : '#999';
+      reqUpper.style.color = /[A-Z]/.test(password) ? '#060' : '#999';
+      reqLower.style.color = /[a-z]/.test(password) ? '#060' : '#999';
+      reqNumber.style.color = /[0-9]/.test(password) ? '#060' : '#999';
+      reqSpecial.style.color = /[^A-Za-z0-9]/.test(password) ? '#060' : '#999';
+      
+      const commonWords = ['password', 'admin', 'qwerty', '123456', 'password123'];
+      const hasCommon = commonWords.some(word => password.toLowerCase().includes(word.toLowerCase()));
+      warning.style.display = hasCommon ? 'block' : 'none';
+    }
+    
+    function validatePasswordMatch() {
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+      const match = document.getElementById('passwordMatch');
+      const noMatch = document.getElementById('passwordNoMatch');
+      
+      if (!confirmPassword) {
+        match.style.display = 'none';
+        noMatch.style.display = 'none';
+        return;
+      }
+      
+      if (password === confirmPassword) {
+        match.style.display = 'block';
+        noMatch.style.display = 'none';
+      } else {
+        match.style.display = 'none';
+        noMatch.style.display = 'block';
+      }
+    }
+
     async function handleRegistration(event) {
       event.preventDefault();
       
@@ -145,6 +210,30 @@
       const phone = document.getElementById('phone').value;
       const role = document.getElementById('role').value;
       const investitureLevel = document.getElementById('investitureLevel').value;
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+      
+      // Validate passwords match
+      if (password !== confirmPassword) {
+        showError('Passwords do not match');
+        return;
+      }
+      
+      // Validate password strength
+      if (password.length < 8) {
+        showError('Password must be at least 8 characters long');
+        return;
+      }
+      
+      const hasUpperCase = /[A-Z]/.test(password);
+      const hasLowerCase = /[a-z]/.test(password);
+      const hasNumber = /[0-9]/.test(password);
+      const hasSpecialChar = /[^A-Za-z0-9]/.test(password);
+      
+      if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
+        showError('Password must contain uppercase, lowercase, number, and special character');
+        return;
+      }
 
       try {
         const response = await fetch('/api/codes/register', {
@@ -158,7 +247,8 @@
             email,
             phone,
             role,
-            investitureLevel
+            investitureLevel,
+            password
           })
         });
 
