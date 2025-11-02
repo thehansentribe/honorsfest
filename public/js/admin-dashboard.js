@@ -295,7 +295,12 @@ function getUsersTab() {
     <div class="card">
       <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
         <h2 class="card-title" style="margin: 0;">Users</h2>
-        <button onclick="showCreateUserForm()" class="btn btn-primary">Add User</button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button onclick="toggleDeactivatedUsers()" class="btn btn-outline" id="toggleDeactivatedBtn">
+            ${showDeactivatedUsers ? 'Hide Deactivated' : 'Show Deactivated'}
+          </button>
+          <button onclick="showCreateUserForm()" class="btn btn-primary">Add User</button>
+        </div>
       </div>
       <div id="usersList"></div>
     </div>
@@ -861,6 +866,11 @@ function renderUsers() {
   
   // Apply filters
   let filteredUsers = [...allUsers];
+  
+  // Filter out deactivated users by default
+  if (!showDeactivatedUsers) {
+    filteredUsers = filteredUsers.filter(user => user.Active !== 0 && user.Active !== false);
+  }
   
   if (Object.keys(userFilters).length > 0) {
     filteredUsers = filteredUsers.filter(user => {
