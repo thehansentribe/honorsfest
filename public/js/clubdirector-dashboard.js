@@ -406,8 +406,7 @@ async function renderClasses() {
             <th style="width: 15%; padding: 12px 8px; text-align: left;">Teacher</th>
             <th style="width: 15%; padding: 12px 8px; text-align: left;">Location</th>
             <th style="width: 18%; padding: 12px 8px; text-align: left;">Date/Time</th>
-            <th style="width: 12%; padding: 12px 8px; text-align: left;">Capacity</th>
-            <th style="width: 10%; padding: 12px 8px; text-align: left;">Enrolled</th>
+            <th style="width: 15%; padding: 12px 8px; text-align: left;">Capacity</th>
             <th style="width: 10%; padding: 12px 8px; text-align: left;">Status</th>
             <th style="width: 10%; padding: 12px 8px; text-align: left;">Actions</th>
           </tr>
@@ -425,8 +424,7 @@ async function renderClasses() {
               ${cls.TimeslotDate || 'N/A'}<br>
               <small style="color: var(--text-light);">${cls.TimeslotStartTime ? convertTo12Hour(cls.TimeslotStartTime) : ''} - ${cls.TimeslotEndTime ? convertTo12Hour(cls.TimeslotEndTime) : ''}</small>
             </td>
-            <td style="padding: 12px 8px; text-align: left;">${cls.EnrolledCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}</td>
-            <td style="padding: 12px 8px; text-align: left;">${cls.EnrolledCount || 0}</td>
+            <td style="padding: 12px 8px; text-align: left;">${cls.EnrolledCount || 0}/${cls.WaitlistCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}</td>
             <td style="padding: 12px 8px; text-align: left;"><span class="badge bg-success">Active</span></td>
             <td style="padding: 12px 8px; text-align: left;">
               <button onclick="viewClassStudents(${cls.ID})" class="btn btn-sm btn-info">Manage Students</button>
@@ -455,8 +453,7 @@ async function renderClasses() {
         'Teacher': cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : 'Unassigned',
         'Location': cls.LocationName || 'N/A',
         'Date/Time': dateTime,
-        'Capacity': `${cls.EnrolledCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}`,
-        'Enrolled': cls.EnrolledCount || 0,
+        'Capacity': `${cls.EnrolledCount || 0}/${cls.WaitlistCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}`,
         'Status': 'Active'
       }, cls.HonorName || 'N/A', actionsHtml);
     }).join('');
