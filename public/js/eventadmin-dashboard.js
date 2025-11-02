@@ -2701,7 +2701,7 @@ async function handleCreateLocation(e) {
   }
   
   try {
-    const response = await fetchWithAuth(`/api/events/${eventId}/locations`, {
+    const response = await fetchWithAuth(`/api/events/${assignedEventId}/locations`, {
       method: 'POST',
       body: JSON.stringify(locationData)
     });
