@@ -13,6 +13,7 @@ let currentUser = null;
 let userFilters = {};
 let userSortColumn = null;
 let userSortDirection = 'asc';
+let showDeactivatedUsers = false;
 
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', async () => {
@@ -3620,6 +3621,7 @@ window.handleCreateEvent = handleCreateEvent;
 window.toggleUserColumnFilter = toggleUserColumnFilter;
 window.updateUserFilter = updateUserFilter;
 window.renderUsers = renderUsers;
+window.toggleDeactivatedUsers = toggleDeactivatedUsers;
 window.searchByCheckInNumber = searchByCheckInNumber;
 window.searchByFirstName = searchByFirstName;
 window.selectUserFromDropdown = selectUserFromDropdown;
