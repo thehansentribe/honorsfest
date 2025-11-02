@@ -101,6 +101,22 @@ function migrateDatabase() {
       }
     }
     
+    // Check Users table for Invite columns
+    const hasInvited = usersTableInfo.some(col => col.name === 'Invited');
+    const hasInviteAccepted = usersTableInfo.some(col => col.name === 'InviteAccepted');
+    
+    if (!hasInvited) {
+      console.log('Adding Invited column to Users table...');
+      db.exec('ALTER TABLE Users ADD COLUMN Invited BOOLEAN NOT NULL DEFAULT 0');
+      console.log('✓ Invited column added');
+    }
+    
+    if (!hasInviteAccepted) {
+      console.log('Adding InviteAccepted column to Users table...');
+      db.exec('ALTER TABLE Users ADD COLUMN InviteAccepted BOOLEAN DEFAULT 0');
+      console.log('✓ InviteAccepted column added');
+    }
+    
   } catch (error) {
     console.error('Migration error:', error);
     // Don't throw, just log

@@ -3776,6 +3776,43 @@ window.deleteTimeslot = deleteTimeslot;
 window.handleEditTimeslot = handleEditTimeslot;
 window.editUser = editUser;
 window.handleCreateUser = handleCreateUser;
+window.showInviteModal = showInviteModal;
+window.resendInvite = async function(email) {
+  try {
+    const response = await fetchWithAuth(`/api/invites/user/${encodeURIComponent(email)}`);
+    const invite = await response.json();
+    
+    if (!response.ok) {
+      showNotification(invite.error || 'Error fetching invite', 'error');
+      return;
+    }
+    
+    // Get user details for email template
+    const user = allUsers.find(u => u.Email === email);
+    if (!user) {
+      showNotification('User not found', 'error');
+      return;
+    }
+    
+    // Get event and club names
+    const eventName = assignedEvent ? assignedEvent.Name : '';
+    const clubName = user.ClubID ? (allClubs.find(c => c.ID === user.ClubID)?.Name || 'Club') : '';
+    
+    // Show invite modal with existing code
+    const inviteData = {
+      firstName: user.FirstName,
+      lastName: user.LastName,
+      email: user.Email,
+      role: user.Role,
+      clubId: user.ClubID || null,
+      eventId: assignedEventId
+    };
+    
+    showInviteModal(invite, inviteData);
+  } catch (error) {
+    showNotification('Error resending invite: ' + error.message, 'error');
+  }
+};
 window.handleEditUser = handleEditUser;
 window.closeModal = closeModal;
 window.handleCreateEvent = handleCreateEvent;
