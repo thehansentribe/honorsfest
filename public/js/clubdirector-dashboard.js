@@ -215,7 +215,7 @@ function renderUsers() {
     });
   }
   
-  container.innerHTML = `
+  const tableHtml = `
     <table class="table">
       <thead>
         <tr>
@@ -271,6 +271,26 @@ function renderUsers() {
       </tbody>
     </table>
   `;
+  
+  const mobileCards = filteredUsers.length === 0
+    ? '<div class="card-row"><div class="card-row-value text-center">No users match the current filters</div></div>'
+    : filteredUsers.map(user => {
+        const actionsHtml = `
+          <button onclick="editUser(${user.ID})" class="btn btn-sm btn-secondary">Edit</button>
+        `;
+        
+        return createMobileCard({
+          'Name': `${user.FirstName} ${user.LastName}`,
+          'Username': user.Username,
+          'Role': user.Role,
+          'Club': user.ClubName || 'None',
+          'Age (DOB)': user.Age !== null ? user.Age : 'N/A',
+          'Active': user.Active ? 'Yes' : 'No',
+          'BG Check': user.BackgroundCheck ? '✓' : '-'
+        }, `${user.FirstName} ${user.LastName}`, actionsHtml);
+      }).join('');
+  
+  container.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
 }
 
 function toggleClubDirectorColumnFilter(column) {
@@ -351,7 +371,7 @@ async function renderClasses() {
       return;
     }
     
-    container.innerHTML = `
+    const tableHtml = `
       <table class="data-table">
         <thead>
           <tr>
@@ -391,6 +411,30 @@ async function renderClasses() {
         </tbody>
       </table>
     `;
+    
+    const mobileCards = activeClasses.map(cls => {
+      const canEdit = cls.CreatedBy === clubDirectorUser?.id;
+      const dateTime = cls.TimeslotDate 
+        ? `${cls.TimeslotDate}<br><small style="color: var(--text-light);">${cls.TimeslotStartTime ? convertTo12Hour(cls.TimeslotStartTime) : ''} - ${cls.TimeslotEndTime ? convertTo12Hour(cls.TimeslotEndTime) : ''}</small>`
+        : 'N/A';
+      
+      const actionsHtml = `
+        <button onclick="viewClassStudents(${cls.ID})" class="btn btn-sm btn-info">Manage Students</button>
+        ${canEdit ? `<button onclick="editClass(${cls.ID})" class="btn btn-sm btn-secondary">Edit</button>` : ''}
+      `;
+      
+      return createMobileCard({
+        'Honor': cls.HonorName || 'N/A',
+        'Teacher': cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : 'Unassigned',
+        'Location': cls.LocationName || 'N/A',
+        'Date/Time': dateTime,
+        'Capacity': `${cls.EnrolledCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}`,
+        'Enrolled': cls.EnrolledCount || 0,
+        'Status': 'Active'
+      }, cls.HonorName || 'N/A', actionsHtml);
+    }).join('');
+    
+    container.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
   } catch (error) {
     console.error('Error loading classes:', error);
     container.innerHTML = `<p class="text-center" style="color: red;">Error loading classes: ${error.message}</p>`;
@@ -985,7 +1029,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
       
-      container.innerHTML = `
+      const tableHtml = `
         <table class="data-table" style="width: 100%;">
           <thead>
             <tr>
@@ -1017,6 +1061,23 @@ document.addEventListener('DOMContentLoaded', async () => {
           </tbody>
         </table>
       `;
+      
+      const mobileCards = codes.map(code => {
+        const isActive = new Date(code.ExpiresAt) > new Date();
+        const actionsHtml = `
+          <button onclick="shareRegistrationCode('${code.Code}')" class="btn btn-sm btn-info">Share</button>
+          <button onclick="deleteRegistrationCode('${code.Code}')" class="btn btn-sm btn-danger">Delete</button>
+        `;
+        
+        return createMobileCard({
+          'Code': code.Code,
+          'Created': new Date(code.CreatedAt).toLocaleDateString(),
+          'Expires': new Date(code.ExpiresAt).toLocaleDateString(),
+          'Status': isActive ? 'Active' : 'Expired'
+        }, `Code: ${code.Code}`, actionsHtml);
+      }).join('');
+      
+      container.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
     } catch (error) {
       console.error('Error loading codes:', error);
       container.innerHTML = `<p class="text-center" style="color: red;">Error loading codes: ${error.message}</p>`;

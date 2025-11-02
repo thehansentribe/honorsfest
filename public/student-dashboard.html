@@ -327,22 +327,9 @@
         return;
       }
 
-      container.innerHTML = `
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Honor Name</th>
-              <th>Teacher</th>
-              <th>Location</th>
-              <th>Session Time</th>
-              <th>Remaining Spots</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${(() => {
-              let renderedCount = 0;
-              const rows = filtered.map(c => {
+      const tableData = (() => {
+        let renderedCount = 0;
+        return filtered.map(c => {
                 const location = `${c.LocationName || 'TBA'}`;
                 const teacher = c.TeacherFirstName ? `${c.TeacherFirstName} ${c.TeacherLastName}` : 'TBA';
                 
@@ -384,7 +371,7 @@
 
               // Don't show this class at all if they're already registered for it
               if (isRegistered) {
-                return '';
+                return null;
               }
 
               renderedCount++;
@@ -410,24 +397,68 @@
               const displayTeacher = teacher === 'TBA' ? '<span style="color: #999;">TBA</span>' : teacher;
               const displayLocation = location === 'TBA' ? '<span style="color: #999;">TBA</span>' : location;
               
-              return `
-                <tr data-class-id="${c.ID}" data-honor-id="${c.HonorID || ''}" data-teacher-id="${c.TeacherID || ''}" data-location-id="${c.LocationID || ''}" data-timeslot-id="${c.TimeslotID || ''}">
-                  <td>${c.HonorName || 'Unknown'}</td>
-                  <td>${displayTeacher}</td>
-                  <td>${displayLocation}</td>
-                  <td>${sessionTime}</td>
-                  <td>${c.RemainingSpots}</td>
-                  <td>
-                    ${actionButtons}
-                  </td>
-                </tr>
-              `;
-            }).filter(html => html.trim() !== '');
-            return rows.join('');
-            })()}
+              return {
+                classId: c.ID,
+                honorId: c.HonorID || '',
+                teacherId: c.TeacherID || '',
+                locationId: c.LocationID || '',
+                timeslotId: c.TimeslotID || '',
+                honorName: c.HonorName || 'Unknown',
+                teacher: displayTeacher,
+                location: displayLocation,
+                sessionTime: sessionTime,
+                remainingSpots: c.RemainingSpots,
+                actionButtons: actionButtons,
+                canRegister: canRegister,
+                canWaitlist: canWaitlist,
+                isFull: isFull
+              };
+            }).filter(data => data !== null);
+      })();
+      
+      const tableHtml = `
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Honor Name</th>
+              <th>Teacher</th>
+              <th>Location</th>
+              <th>Session Time</th>
+              <th>Remaining Spots</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableData.map(c => `
+              <tr data-class-id="${c.classId}" data-honor-id="${c.honorId}" data-teacher-id="${c.teacherId}" data-location-id="${c.locationId}" data-timeslot-id="${c.timeslotId}">
+                <td>${c.honorName}</td>
+                <td>${c.teacher}</td>
+                <td>${c.location}</td>
+                <td>${c.sessionTime}</td>
+                <td>${c.remainingSpots}</td>
+                <td>
+                  ${c.actionButtons}
+                </td>
+              </tr>
+            `).join('')}
           </tbody>
         </table>
       `;
+      
+      const mobileCards = tableData.map(c => {
+        // Convert HTML session time to plain text
+        const sessionTimePlain = c.sessionTime.replace(/<br\s*\/?>/gi, ' ').replace(/<small>/gi, '').replace(/<\/small>/gi, '').replace(/<[^>]*>/g, '').trim();
+        
+        return createMobileCard({
+          'Honor Name': c.honorName,
+          'Teacher': c.teacher.replace(/<[^>]*>/g, ''), // Strip HTML tags
+          'Location': c.location.replace(/<[^>]*>/g, ''), // Strip HTML tags
+          'Session Time': sessionTimePlain,
+          'Remaining Spots': c.remainingSpots
+        }, c.honorName, `<div class="card-row-actions">${c.actionButtons}</div>`);
+      }).join('');
+      
+      container.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
     }
 
     function renderSchedule() {

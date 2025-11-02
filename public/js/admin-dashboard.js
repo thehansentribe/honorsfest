@@ -791,7 +791,7 @@ function renderEvents() {
     return;
   }
   
-  container.innerHTML = `
+  const tableHtml = `
     <table class="table">
       <thead>
         <tr>
@@ -826,6 +826,28 @@ function renderEvents() {
       </tbody>
     </table>
   `;
+  
+  const mobileCards = allEvents.map(event => {
+    const actionsHtml = `
+      <button onclick="toggleEventActive(${event.ID}, ${event.Active ? 'true' : 'false'})" class="btn btn-sm ${event.Active ? 'btn-success' : 'btn-secondary'}">
+        ${event.Active ? 'Event Open' : 'Event Closed'}
+      </button>
+      <button onclick="toggleEventStatus(${event.ID}, '${event.Status}')" class="btn btn-sm ${event.Status === 'Live' ? 'btn-success' : 'btn-secondary'}">
+        ${event.Status === 'Live' ? 'Registration Open' : 'Registration Closed'}
+      </button>
+      <button onclick="manageEventClubs(${event.ID})" class="btn btn-sm btn-info">Manage Clubs</button>
+      <button onclick="editEvent(${event.ID})" class="btn btn-sm btn-primary">Edit</button>
+    `;
+    
+    return createMobileCard({
+      'Name': event.Name,
+      'Start Date': event.StartDate,
+      'End Date': event.EndDate,
+      'Classes': event.ClassCount || 0
+    }, event.Name, actionsHtml);
+  }).join('');
+  
+  container.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
 }
 
 function renderUsers() {
@@ -916,7 +938,7 @@ function renderUsers() {
     });
   }
   
-  container.innerHTML = `
+  const tableHtml = `
     <table class="table">
       <thead>
         <tr>
@@ -975,6 +997,29 @@ function renderUsers() {
       </tbody>
     </table>
   `;
+  
+  const mobileCards = filteredUsers.length === 0 
+    ? '<div class="card-row"><div class="card-row-value text-center">No users match the current filters</div></div>'
+    : filteredUsers.map(user => {
+        const actionsHtml = `
+          <button onclick="editUser(${user.ID})" class="btn btn-sm btn-secondary">Edit</button>
+          <button onclick="toggleUserStatus(${user.ID}, ${user.Active})" class="btn btn-sm ${user.Active ? 'btn-warning' : 'btn-success'}">
+            ${user.Active ? 'Deactivate' : 'Activate'}
+          </button>
+        `;
+        
+        return createMobileCard({
+          'Name': `${user.FirstName} ${user.LastName}`,
+          'Username': user.Username,
+          'Role': getRoleLabel(user.Role, user.EventID),
+          'Event': user.EventName || 'N/A',
+          'Club': user.ClubName || 'None',
+          'Age (DOB)': user.Age !== null ? user.Age : 'N/A',
+          'BG Check': user.BackgroundCheck ? '✓' : '-'
+        }, `${user.FirstName} ${user.LastName}`, actionsHtml);
+      }).join('');
+  
+  container.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
 }
 
 function toggleUserColumnFilter(column) {
@@ -1038,7 +1083,7 @@ function renderLocationsList() {
     return;
   }
   
-  container.innerHTML = `
+  const tableHtml = `
     <table class="table">
       <thead>
         <tr>
@@ -1063,6 +1108,21 @@ function renderLocationsList() {
       </tbody>
     </table>
   `;
+  
+  const mobileCards = allLocations.map(loc => {
+    const actionsHtml = `
+      <button onclick="editLocation(${loc.ID})" class="btn btn-sm btn-secondary">Edit</button>
+      <button onclick="deleteLocation(${loc.ID})" class="btn btn-sm btn-danger">Delete</button>
+    `;
+    
+    return createMobileCard({
+      'Name': loc.Name,
+      'Max Capacity': loc.MaxCapacity,
+      'Description': loc.Description || '-'
+    }, loc.Name, actionsHtml);
+  }).join('');
+  
+  container.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
 }
 
 // Actions
@@ -3126,7 +3186,7 @@ async function renderClasses() {
     const activeClasses = allClasses.filter(c => c.Active);
     const inactiveClasses = allClasses.filter(c => !c.Active);
     
-    document.getElementById('classesList').innerHTML = `
+    const tableHtml = `
       <table class="data-table">
         <thead>
           <tr>
@@ -3185,6 +3245,35 @@ async function renderClasses() {
         </tbody>
       </table>
     `;
+    
+    const allClassesForMobile = [...activeClasses, ...inactiveClasses];
+    const mobileCards = allClassesForMobile.map(cls => {
+      const dateTime = cls.TimeslotDate 
+        ? `${cls.TimeslotDate}<br><small style="color: var(--text-light);">${cls.TimeslotStartTime ? convertTo12Hour(cls.TimeslotStartTime) : ''} - ${cls.TimeslotEndTime ? convertTo12Hour(cls.TimeslotEndTime) : ''}</small>`
+        : 'N/A';
+      
+      const actionsHtml = cls.Active
+        ? `
+          <button onclick="viewClassStudents(${cls.ID})" class="btn btn-sm btn-info">Manage Students</button>
+          <button onclick="editClass(${cls.ID})" class="btn btn-sm btn-secondary">Edit</button>
+          <button onclick="deactivateClass(${cls.ID})" class="btn btn-sm btn-danger">Deactivate</button>
+        `
+        : `
+          <button onclick="activateClass(${cls.ID})" class="btn btn-sm btn-success">Activate</button>
+        `;
+      
+      return createMobileCard({
+        'Honor': cls.HonorName || 'N/A',
+        'Teacher': cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : 'Unassigned',
+        'Location': cls.LocationName || 'N/A',
+        'Date/Time': dateTime,
+        'Capacity': `${cls.EnrolledCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}`,
+        'Enrolled': cls.EnrolledCount || 0,
+        'Status': cls.Active ? 'Active' : 'Inactive'
+      }, cls.HonorName || 'N/A', actionsHtml);
+    }).join('');
+    
+    document.getElementById('classesList').innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
   } catch (error) {
     console.error('Error loading classes:', error);
     showNotification('Error loading classes', 'error');
@@ -3218,7 +3307,7 @@ async function renderClubs() {
       })
     );
     
-    document.getElementById('clubsList').innerHTML = `
+    const tableHtml = `
       <table class="data-table">
         <thead>
           <tr>
@@ -3244,6 +3333,21 @@ async function renderClubs() {
         </tbody>
       </table>
     `;
+    
+    const mobileCards = clubsWithEvents.map(club => {
+      const actionsHtml = `
+        <button onclick="editClub(${club.ID})" class="btn btn-sm btn-secondary">Edit</button>
+      `;
+      
+      return createMobileCard({
+        'Club Name': club.Name,
+        'Church': club.Church || '-',
+        'Director': club.DirectorFirstName ? `${club.DirectorFirstName} ${club.DirectorLastName}` : 'Unassigned',
+        'Events': club.events.length > 0 ? club.events.map(e => e.Name).join(', ') : 'No events'
+      }, club.Name, actionsHtml);
+    }).join('');
+    
+    document.getElementById('clubsList').innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
   } catch (error) {
     console.error('Error loading clubs:', error);
     showNotification('Error loading clubs', 'error');
