@@ -967,9 +967,12 @@ function renderUsers() {
         </tr>
       </thead>
       <tbody>
-        ${filteredUsers.length === 0 ? '<tr><td colspan="8" class="text-center">No users match the current filters</td></tr>' : filteredUsers.map(user => `
-          <tr>
-            <td>${user.FirstName} ${user.LastName}</td>
+        ${filteredUsers.length === 0 ? '<tr><td colspan="8" class="text-center">No users match the current filters</td></tr>' : filteredUsers.map(user => {
+          const isInvitedNotAccepted = user.Invited && !user.InviteAccepted;
+          const rowStyle = isInvitedNotAccepted ? 'style="color: #1565c0; font-weight: 500;"' : '';
+          return `
+          <tr ${rowStyle}>
+            <td>${user.FirstName} ${user.LastName}${isInvitedNotAccepted ? ' <span style="font-size: 0.85em; opacity: 0.8;">(Invited)</span>' : ''}</td>
             <td>${user.Username}</td>
             <td>${getRoleLabel(user.Role, user.EventID)}</td>
             <td>${user.EventName ? user.EventName : '<span style="color: #999;">N/A</span>'}</td>
@@ -978,12 +981,16 @@ function renderUsers() {
             <td>${user.BackgroundCheck ? '✓' : '-'}</td>
             <td>
               <button onclick="editUser(${user.ID})" class="btn btn-sm btn-secondary">Edit</button>
+              ${isInvitedNotAccepted ? `
+                <button onclick="resendInvite('${user.Email}')" class="btn btn-sm btn-info">Resend Invite</button>
+              ` : ''}
               <button onclick="toggleUserStatus(${user.ID}, ${user.Active})" class="btn btn-sm ${user.Active ? 'btn-warning' : 'btn-success'}">
                 ${user.Active ? 'Deactivate' : 'Activate'}
               </button>
             </td>
           </tr>
-        `).join('')}
+        `;
+        }).join('')}
       </tbody>
     </table>
   `;
@@ -991,22 +998,29 @@ function renderUsers() {
   const mobileCards = filteredUsers.length === 0 
     ? '<div class="card-row"><div class="card-row-value text-center">No users match the current filters</div></div>'
     : filteredUsers.map(user => {
+        const isInvitedNotAccepted = user.Invited && !user.InviteAccepted;
+        const nameStyle = isInvitedNotAccepted ? 'style="color: #1565c0; font-weight: 500;"' : '';
         const actionsHtml = `
           <button onclick="editUser(${user.ID})" class="btn btn-sm btn-secondary">Edit</button>
+          ${isInvitedNotAccepted ? `
+            <button onclick="resendInvite('${user.Email}')" class="btn btn-sm btn-info">Resend Invite</button>
+          ` : ''}
           <button onclick="toggleUserStatus(${user.ID}, ${user.Active})" class="btn btn-sm ${user.Active ? 'btn-warning' : 'btn-success'}">
             ${user.Active ? 'Deactivate' : 'Activate'}
           </button>
         `;
         
-        return createMobileCard({
-          'Name': `${user.FirstName} ${user.LastName}`,
+        const cardData = {
+          'Name': `${user.FirstName} ${user.LastName}${isInvitedNotAccepted ? ' (Invited)' : ''}`,
           'Username': user.Username,
           'Role': getRoleLabel(user.Role, user.EventID),
           'Event': user.EventName || 'N/A',
           'Club': user.ClubName || 'None',
           'Age (DOB)': user.Age !== null ? user.Age : 'N/A',
           'BG Check': user.BackgroundCheck ? '✓' : '-'
-        }, `${user.FirstName} ${user.LastName}`, actionsHtml);
+        };
+        
+        return createMobileCard(cardData, `${user.FirstName} ${user.LastName}`, actionsHtml);
       }).join('');
   
   container.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
@@ -2317,20 +2331,24 @@ function showCreateUserForm() {
     roleSelect.addEventListener('change', function() {
       const role = this.value;
       
+      const phoneContainer = document.getElementById('phoneContainer');
+      
       if (['Admin', 'EventAdmin', 'ClubDirector'].includes(role)) {
-        // Invite roles: hide password and date of birth, change button text
+        // Invite roles: hide password, date of birth, and phone, change button text
         if (passwordContainer) passwordContainer.style.display = 'none';
         if (passwordInput) passwordInput.required = false;
         if (submitBtn) submitBtn.textContent = 'Invite User';
         if (dateOfBirthContainer) dateOfBirthContainer.style.display = 'none';
         if (dateOfBirthInput) dateOfBirthInput.required = false;
+        if (phoneContainer) phoneContainer.style.display = 'none';
       } else {
-        // Direct creation roles: show password and date of birth, keep button text
+        // Direct creation roles: show password, date of birth, and phone, keep button text
         if (passwordContainer) passwordContainer.style.display = 'block';
         if (passwordInput) passwordInput.required = true;
         if (submitBtn) submitBtn.textContent = 'Create User';
         if (dateOfBirthContainer) dateOfBirthContainer.style.display = 'block';
         if (dateOfBirthInput) dateOfBirthInput.required = true;
+        if (phoneContainer) phoneContainer.style.display = 'block';
       }
       
       toggleEventDropdown(role);

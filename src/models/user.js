@@ -50,7 +50,7 @@ class User {
   }
 
   static create(userData) {
-    const { FirstName, LastName, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck, stytch_user_id, auth_method } = userData;
+    const { FirstName, LastName, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, Invited, InviteAccepted, BackgroundCheck, stytch_user_id, auth_method } = userData;
     
     const Username = this.generateUsername(FirstName, LastName);
     const CheckInNumber = this.generateCheckInNumber();
@@ -59,8 +59,8 @@ class User {
     const safePasswordHash = PasswordHash || '';
     
     const stmt = db.prepare(`
-      INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck, CheckInNumber, CheckedIn, stytch_user_id, auth_method)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, Invited, InviteAccepted, BackgroundCheck, CheckInNumber, CheckedIn, stytch_user_id, auth_method)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -76,6 +76,8 @@ class User {
       ClubID || null,
       EventID || null,
       Active !== undefined ? (Active ? 1 : 0) : 1,
+      Invited !== undefined ? (Invited ? 1 : 0) : 0,
+      InviteAccepted !== undefined ? (InviteAccepted ? 1 : 0) : 0,
       BackgroundCheck !== undefined ? (BackgroundCheck ? 1 : 0) : 0,
       CheckInNumber,
       0,  // CheckedIn defaults to false
@@ -180,7 +182,7 @@ class User {
   }
 
   static getAll(filters = {}) {
-    let query = 'SELECT u.*, c.Name as ClubName, e.Name as EventName, e.ID as EventID FROM Users u LEFT JOIN Clubs c ON u.ClubID = c.ID LEFT JOIN Events e ON u.EventID = e.ID WHERE 1=1';
+    let query = 'SELECT u.*, c.Name as ClubName, e.Name as EventName, e.ID as EventID, u.Invited, u.InviteAccepted FROM Users u LEFT JOIN Clubs c ON u.ClubID = c.ID LEFT JOIN Events e ON u.EventID = e.ID WHERE 1=1';
     const params = [];
 
     if (filters.role) {
