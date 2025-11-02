@@ -1373,6 +1373,15 @@ async function toggleEventStatus(eventId, currentStatus) {
   }
 }
 
+function toggleDeactivatedUsers() {
+  showDeactivatedUsers = !showDeactivatedUsers;
+  const btn = document.getElementById('toggleDeactivatedBtn');
+  if (btn) {
+    btn.textContent = showDeactivatedUsers ? 'Hide Deactivated' : 'Show Deactivated';
+  }
+  renderUsers();
+}
+
 async function toggleUserStatus(userId, currentActive) {
   if (!confirm(`Are you sure you want to ${currentActive ? 'deactivate' : 'activate'} this user?`)) return;
   
