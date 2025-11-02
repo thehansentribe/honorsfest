@@ -18,6 +18,10 @@ const adminRoutes = require('./routes/admin');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy - important for Render and other hosting platforms
+// This allows Express to correctly detect HTTPS from X-Forwarded-Proto header
+app.set('trust proxy', true);
+
 // Middleware
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));

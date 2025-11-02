@@ -138,11 +138,14 @@ router.post('/magic/send', async (req, res) => {
     // Send magic link
     // Note: The redirect URL must match exactly what's in Stytch dashboard
     // For magic links, we use /authenticate.html for both login and signup
-    const baseUrl = req.protocol + '://' + req.get('host');
+    // Ensure HTTPS in production (Render and other platforms use X-Forwarded-Proto)
+    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : req.protocol;
+    const baseUrl = `${protocol}://${req.get('host')}`;
     const redirectUrl = `${baseUrl}/authenticate.html`;
     
     console.log('Magic link redirect URL (used for both login and signup):', redirectUrl);
     console.log('Base URL:', baseUrl);
+    console.log('Detected protocol:', protocol, '(secure:', req.secure, ', x-forwarded-proto:', req.headers['x-forwarded-proto'], ')');
     
     try {
       await StytchService.sendMagicLink(email, redirectUrl);
@@ -227,10 +230,13 @@ router.post('/password-reset/request', async (req, res) => {
     // Send password reset email via Stytch
     // Note: The redirect URL must be registered in Stytch dashboard exactly as shown
     // It must NOT include query parameters - Stytch will append the token automatically
-    const baseUrl = req.protocol + '://' + req.get('host');
+    // Ensure HTTPS in production (Render and other platforms use X-Forwarded-Proto)
+    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : req.protocol;
+    const baseUrl = `${protocol}://${req.get('host')}`;
     const resetPasswordRedirectUrl = `${baseUrl}/reset-password.html`;
     
     console.log('Password reset redirect URL being sent to Stytch:', resetPasswordRedirectUrl);
+    console.log('Detected protocol:', protocol, '(secure:', req.secure, ', x-forwarded-proto:', req.headers['x-forwarded-proto'], ')');
     
     try {
       await StytchService.sendPasswordResetEmail(email, resetPasswordRedirectUrl);
