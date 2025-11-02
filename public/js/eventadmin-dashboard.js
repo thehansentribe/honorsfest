@@ -2223,6 +2223,19 @@ function showCreateUserForm() {
       </div>
       <form id="createUserForm" onsubmit="handleCreateUser(event)">
         <div class="form-group">
+          <label for="role">Role *</label>
+          <select id="role" name="role" class="form-control" required>
+            <option value="">Select Role</option>
+            <option value="Admin">Admin</option>
+            <option value="EventAdmin">Event Admin</option>
+            <option value="ClubDirector">Club Director</option>
+            <option value="Teacher">Teacher</option>
+            <option value="Student">Student</option>
+            <option value="Staff">Staff</option>
+          </select>
+          <small style="display: block; color: var(--text-light);">Note: Admin, Event Admin, and Club Directors will receive invitation codes. Other roles are created directly.</small>
+        </div>
+        <div class="form-group">
           <label for="firstName">First Name *</label>
           <input type="text" id="firstName" name="firstName" class="form-control" required>
         </div>
@@ -2240,22 +2253,9 @@ function showCreateUserForm() {
           <input type="email" id="email" name="email" class="form-control" required>
           <small style="color: var(--text-light);">Required for Admin, Event Admin, and Club Director invitations</small>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="phoneContainer">
           <label for="phone">Phone</label>
           <input type="text" id="phone" name="phone" class="form-control">
-        </div>
-        <div class="form-group">
-          <label for="role">Role *</label>
-          <select id="role" name="role" class="form-control" required onchange="toggleEventDropdown(this.value)">
-            <option value="">Select Role</option>
-            <option value="Admin">Admin</option>
-            <option value="EventAdmin">Event Admin</option>
-            <option value="ClubDirector">Club Director</option>
-            <option value="Teacher">Teacher</option>
-            <option value="Student">Student</option>
-            <option value="Staff">Staff</option>
-          </select>
-          <small style="color: var(--text-light); display: block; margin-top: 5px;">Note: Admin, Event Admin, and Club Directors will receive invitation codes. Other roles are created directly.</small>
         </div>
         <div class="form-group" id="eventContainer" style="display: none;">
           <label for="eventId">Event *</label>
