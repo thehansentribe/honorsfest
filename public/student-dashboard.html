@@ -223,25 +223,6 @@
         // Load classes
         const classesResponse = await fetchWithAuth(`/api/classes/${currentEventId}`);
         allClasses = await classesResponse.json();
-        
-        // Debug: Log all classes loaded
-        console.log('=== CLASS LOADING DEBUG ===');
-        console.log('Current Event ID:', currentEventId);
-        console.log('Loaded classes from API:', allClasses.length);
-        console.log('All classes details:', allClasses.map(c => ({
-          ID: c.ID,
-          EventID: c.EventID,
-          HonorName: c.HonorName,
-          HonorID: c.HonorID,
-          TeacherID: c.TeacherID,
-          TeacherName: (c.TeacherFirstName || '') + ' ' + (c.TeacherLastName || ''),
-          LocationID: c.LocationID,
-          LocationName: c.LocationName,
-          TimeslotID: c.TimeslotID,
-          TimeslotDate: c.TimeslotDate,
-          TimeslotStartTime: c.TimeslotStartTime,
-          Active: c.Active
-        })));
 
         // Load my registrations
         const regResponse = await fetchWithAuth(`/api/registrations/user/${currentUserId}?eventId=${currentEventId}`);
@@ -326,11 +307,6 @@
         return true;
       });
 
-      // Debug logging - expand arrays to see full details
-      console.log('Total classes loaded:', allClasses.length);
-      console.log('Filtered classes count:', filtered.length);
-      console.log('All classes (expanded):', JSON.parse(JSON.stringify(allClasses)));
-      console.log('Filtered classes (expanded):', JSON.parse(JSON.stringify(filtered)));
       
       // Count classes by honor name and timeslot to check for duplicates
       const classesByHonorTimeslot = {};
@@ -345,7 +321,6 @@
           Location: c.LocationName || 'TBA'
         });
       });
-      console.log('Classes grouped by Honor + Timeslot:', classesByHonorTimeslot);
 
       if (filtered.length === 0) {
         container.innerHTML = '<p class="text-center">No classes available</p>';
@@ -409,12 +384,10 @@
 
               // Don't show this class at all if they're already registered for it
               if (isRegistered) {
-                console.log('Skipping class ID', c.ID, 'because student is already registered');
                 return '';
               }
 
               renderedCount++;
-              console.log(`Rendering class ID ${c.ID}: ${c.HonorName} - Teacher: ${teacher} - Location: ${location} - Timeslot: ${c.TimeslotID}`);
 
               // Determine action buttons - only show if event is Live
               let actionButtons = '';
@@ -450,7 +423,6 @@
                 </tr>
               `;
             }).filter(html => html.trim() !== '');
-            console.log(`Total rows rendered: ${renderedCount} out of ${filtered.length} filtered classes`);
             return rows.join('');
             })()}
           </tbody>

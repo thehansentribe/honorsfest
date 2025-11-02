@@ -2088,7 +2088,6 @@ async function handleCreateEvent(e) {
     Status: form.eventStatus?.value || 'Closed'
   };
 
-  console.log('Event data from form:', eventData);
 
   // Validate required fields
   const missingFields = [];
@@ -2098,7 +2097,6 @@ async function handleCreateEvent(e) {
   if (!eventData.CoordinatorName) missingFields.push('Coordinator Name');
   
   if (missingFields.length > 0) {
-    console.log('Missing fields:', missingFields);
     showNotification(`Please fill in: ${missingFields.join(', ')}`, 'error');
     return;
   }
@@ -2513,7 +2511,6 @@ async function handleEditUser(e, userId) {
     return;
   }
 
-  console.log('Sending user update data:', userData);
   try {
     const response = await fetchWithAuth(`/api/users/${userId}`, {
       method: 'PUT',

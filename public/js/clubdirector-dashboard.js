@@ -335,7 +335,6 @@ async function renderClasses() {
   }
   
   try {
-    console.log('Loading classes for event:', clubDirectorSelectedEventId);
     const response = await fetchWithAuth(`/api/classes/${clubDirectorSelectedEventId}`);
     
     if (!response.ok) {
@@ -343,8 +342,6 @@ async function renderClasses() {
     }
     
     clubDirectorClasses = await response.json();
-    
-    console.log(`Loaded ${clubDirectorClasses.length} classes`);
     
     // Filter out inactive classes for Club Directors
     const activeClasses = clubDirectorClasses.filter(c => c.Active);
@@ -408,7 +405,6 @@ async function loadEvents() {
     const response = await fetchWithAuth('/api/events/my');
     clubDirectorEvents = await response.json();
     
-    console.log(`Loaded ${clubDirectorEvents.length} events for Club Director`);
   } catch (error) {
     console.error('Error loading events:', error);
     clubDirectorEvents = [];
@@ -427,7 +423,6 @@ async function loadUsers() {
     const response = await fetchWithAuth(`/api/users?${queryParams.toString()}`);
     clubDirectorUsers = await response.json();
     
-    console.log(`Loaded ${clubDirectorUsers.length} users from club ${clubDirectorClubId}`);
     
     // Now trigger renderUsers if tab is active
     if (clubDirectorTab === 'users') {
@@ -614,7 +609,6 @@ async function showCreateClassFormClubDirector() {
   const teachersResponse = await fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Teacher`);
   const teachers = await teachersResponse.json();
   
-  console.log(`Loaded ${teachers.length} teachers from club ${clubDirectorClubId}`);
   
   const modal = document.createElement('div');
   modal.id = 'createClassModal';
@@ -689,7 +683,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Get the director's club from JWT
   clubDirectorClubId = user.clubId;
   
-  console.log('Club Director logged in - ClubID:', clubDirectorClubId);
 
   // Load events for this club
   await loadEvents();
@@ -984,11 +977,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     try {
-      console.log('Fetching codes for club:', clubDirectorClubId, 'event:', clubDirectorSelectedEventId);
       const response = await fetchWithAuth(`/api/codes/club/${clubDirectorClubId}?eventId=${clubDirectorSelectedEventId}`);
       const codes = await response.json();
-      
-      console.log('Received codes:', codes);
       
       if (!codes || codes.length === 0) {
         container.innerHTML = '<p class="text-center">No registration codes yet. Generate your first code!</p>';
@@ -1568,7 +1558,6 @@ Thank you!`;
     clubDirectorSelectedEventId = parseInt(eventId);
     clubDirectorEventId = clubDirectorSelectedEventId;
     
-    console.log('Switched to event:', clubDirectorSelectedEventId);
     
     // Update UI
     setupEventSelector();

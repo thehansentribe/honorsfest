@@ -77,7 +77,6 @@ router.get('/:id', (req, res) => {
 // POST /api/events - Create event (Admin only)
 router.post('/', requireRole('Admin'), (req, res) => {
   try {
-    console.log('Received event data:', req.body);
     
     // Validate required fields
     if (!req.body.Name || !req.body.StartDate || !req.body.EndDate || !req.body.CoordinatorName) {

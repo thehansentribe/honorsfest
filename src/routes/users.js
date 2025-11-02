@@ -147,7 +147,6 @@ router.post('/bulk', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, r
 router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) => {
   try {
     const updates = req.body;
-    console.log('Updating user with data:', updates);
     
     // Remove fields that shouldn't be updated via API
     delete updates.Username;

@@ -37,7 +37,7 @@ try {
     secret: process.env.STYTCH_SECRET,
     env: envValue,
   });
-  console.log(`✓ Stytch client initialized (${stytchEnv.toUpperCase()} environment)`);
+  // Stytch client initialized
 } catch (error) {
   console.error('Failed to initialize Stytch client:', error.message);
   console.error('Make sure STYTCH_PROJECT_ID and STYTCH_SECRET are set in .env');
@@ -59,14 +59,13 @@ class StytchService {
       };
 
       const response = await client.passwords.create(params);
-      console.log('Stytch user created:', response.user_id);
       
       return {
         userId: response.user_id,
         email: response.email,
       };
     } catch (error) {
-      console.error('Stytch createUser error:', error);
+      console.error('Stytch createUser error:', error.message || error);
       
       // Provide more specific error messages
       if (error.status_code === 404) {
@@ -96,7 +95,7 @@ class StytchService {
         breachDetection: response.breach_detection,
       };
     } catch (error) {
-      console.error('Stytch checkPasswordStrength error:', error);
+      console.error('Stytch checkPasswordStrength error:', error.message || error);
       // Return a default "weak" result if the check fails
       return {
         validPassword: false,
@@ -126,7 +125,7 @@ class StytchService {
         email: response.email,
       };
     } catch (error) {
-      console.error('Stytch authenticatePassword error:', error);
+      console.error('Stytch authenticatePassword error:', error.message || error);
       throw new Error(`Failed to authenticate password: ${error.message}`);
     }
   }
@@ -144,30 +143,14 @@ class StytchService {
         reset_password_redirect_url: resetPasswordRedirectUrl,
       };
 
-      console.log('Sending password reset to Stytch with params:', { email: params.email, redirectUrl: resetPasswordRedirectUrl });
       const response = await client.passwords.email.resetStart(params);
-      console.log('Stytch password reset response:', { emailId: response.email_id, statusCode: response.status_code });
       
       return {
         emailId: response.email_id,
         statusCode: response.status_code,
       };
     } catch (error) {
-      console.error('Stytch sendPasswordResetEmail error:', error);
-      console.error('Stytch sendPasswordResetEmail error type:', typeof error);
-      console.error('Stytch sendPasswordResetEmail error constructor:', error?.constructor?.name);
-      console.error('Stytch sendPasswordResetEmail error details:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-      
-      // Log Stytch-specific error properties
-      if (error.status_code) {
-        console.error('Stytch status_code:', error.status_code);
-      }
-      if (error.error_type) {
-        console.error('Stytch error_type:', error.error_type);
-      }
-      if (error.error_message) {
-        console.error('Stytch error_message:', error.error_message);
-      }
+      console.error('Stytch sendPasswordResetEmail error:', error.message || error);
       
       // Provide more specific error messages
       if (error.status_code === 404) {
@@ -198,7 +181,7 @@ class StytchService {
       const response = await client.passwords.email.reset(params);
       return response;
     } catch (error) {
-      console.error('Stytch resetPassword error:', error);
+      console.error('Stytch resetPassword error:', error.message || error);
       throw new Error(`Failed to reset password: ${error.message}`);
     }
   }
@@ -222,44 +205,14 @@ class StytchService {
         signup_expiration_minutes: expirationMinutes,
       };
 
-      console.log('=== Sending magic link to Stytch ===');
-      console.log('Email:', params.email);
-      console.log('Redirect URL (used for both login and signup):', redirectUrl);
-      console.log('Full params:', JSON.stringify(params, null, 2));
-      
       const response = await client.magicLinks.email.loginOrCreate(params);
-      console.log('Stytch magic link response:', { emailId: response.email_id, statusCode: response.status_code });
       
       return {
         emailId: response.email_id,
         statusCode: response.status_code,
       };
     } catch (error) {
-      console.error('=== Stytch sendMagicLink Error ===');
-      console.error('Error type:', typeof error);
-      console.error('Error constructor:', error?.constructor?.name);
-      console.error('Full error:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-      
-      // Log Stytch-specific error properties
-      if (error.status_code) {
-        console.error('Status code:', error.status_code);
-      }
-      if (error.error_type) {
-        console.error('Error type:', error.error_type);
-      }
-      if (error.error_message) {
-        console.error('Error message:', error.error_message);
-      }
-      
-      console.error('=== URL Sent to Stytch ===');
-      console.error('Redirect URL:', redirectUrl);
-      console.error('');
-      console.error('=== Expected in Dashboard ===');
-      console.error('This URL must be registered in Stytch dashboard:');
-      console.error('  ', redirectUrl);
-      console.error('');
-      console.error('Note: The URL should be registered for BOTH Login and Signup in the dashboard.');
-      console.error('');
+      console.error('Stytch sendMagicLink error:', error.message || error);
       
       // Provide more specific error messages
       if (error.status_code === 404) {
@@ -296,7 +249,7 @@ class StytchService {
         email: response.email,
       };
     } catch (error) {
-      console.error('Stytch authenticateMagicLink error:', error);
+      console.error('Stytch authenticateMagicLink error:', error.message || error);
       throw new Error(`Failed to authenticate magic link: ${error.message}`);
     }
   }

@@ -108,7 +108,7 @@ router.post('/magic/send', async (req, res) => {
     try {
       user = User.findByEmail(email);
     } catch (dbError) {
-      console.error('Error finding user by email:', dbError);
+      console.error('Database error finding user:', dbError.message || dbError);
       return res.status(500).json({ error: 'Database error. Please try again.' });
     }
     if (!user) {
@@ -143,10 +143,6 @@ router.post('/magic/send', async (req, res) => {
     const baseUrl = `${protocol}://${req.get('host')}`;
     const redirectUrl = `${baseUrl}/authenticate.html`;
     
-    console.log('Magic link redirect URL (used for both login and signup):', redirectUrl);
-    console.log('Base URL:', baseUrl);
-    console.log('Detected protocol:', protocol, '(secure:', req.secure, ', x-forwarded-proto:', req.headers['x-forwarded-proto'], ')');
-    
     try {
       await StytchService.sendMagicLink(email, redirectUrl);
       
@@ -154,9 +150,7 @@ router.post('/magic/send', async (req, res) => {
         message: 'If an account exists with this email, a magic link has been sent.' 
       });
     } catch (stytchError) {
-      console.error('Stytch magic link error:', stytchError);
-      console.error('Magic link error type:', typeof stytchError);
-      console.error('Magic link error details:', JSON.stringify(stytchError, Object.getOwnPropertyNames(stytchError), 2));
+      console.error('Stytch magic link error:', stytchError.message || stytchError);
       
       // Extract error message from various possible formats
       const errorMsg = stytchError?.message || stytchError?.error_message || stytchError?.toString() || 'Unknown error';
@@ -175,8 +169,7 @@ router.post('/magic/send', async (req, res) => {
       return res.status(500).json({ error: errorMessage });
     }
   } catch (error) {
-    console.error('Magic link send error:', error);
-    console.error('Magic link send error stack:', error.stack);
+    console.error('Magic link send error:', error.message || error);
     res.status(500).json({ 
       error: 'An error occurred. Please try again.',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -198,7 +191,7 @@ router.post('/password-reset/request', async (req, res) => {
     try {
       user = User.findByEmail(email);
     } catch (dbError) {
-      console.error('Error finding user by email:', dbError);
+      console.error('Database error finding user:', dbError.message || dbError);
       return res.status(500).json({ error: 'Database error. Please try again.' });
     }
     if (!user) {
@@ -235,9 +228,6 @@ router.post('/password-reset/request', async (req, res) => {
     const baseUrl = `${protocol}://${req.get('host')}`;
     const resetPasswordRedirectUrl = `${baseUrl}/reset-password.html`;
     
-    console.log('Password reset redirect URL being sent to Stytch:', resetPasswordRedirectUrl);
-    console.log('Detected protocol:', protocol, '(secure:', req.secure, ', x-forwarded-proto:', req.headers['x-forwarded-proto'], ')');
-    
     try {
       await StytchService.sendPasswordResetEmail(email, resetPasswordRedirectUrl);
       
@@ -245,9 +235,7 @@ router.post('/password-reset/request', async (req, res) => {
         message: 'If an account exists with this email, a password reset link has been sent. Please check your email.' 
       });
     } catch (stytchError) {
-      console.error('Stytch password reset error:', stytchError);
-      console.error('Password reset error type:', typeof stytchError);
-      console.error('Password reset error details:', JSON.stringify(stytchError, Object.getOwnPropertyNames(stytchError), 2));
+      console.error('Stytch password reset error:', stytchError.message || stytchError);
       
       // Extract error message from various possible formats
       const errorMsg = stytchError?.message || stytchError?.error_message || stytchError?.toString() || 'Unknown error';
@@ -269,8 +257,7 @@ router.post('/password-reset/request', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Password reset request error:', error);
-    console.error('Password reset request error stack:', error.stack);
+    console.error('Password reset request error:', error.message || error);
     // Return user-friendly error message
     return res.status(500).json({ 
       error: 'An error occurred while processing your request. Please try again.',
@@ -299,7 +286,7 @@ router.post('/password-reset/confirm', async (req, res) => {
       message: 'Your password has been reset successfully. You can now log in with your new password.' 
     });
   } catch (error) {
-    console.error('Password reset confirm error:', error);
+    console.error('Password reset confirm error:', error.message || error);
     res.status(400).json({ 
       error: 'Failed to reset password. The reset link may have expired or is invalid. Please request a new password reset link.' 
     });

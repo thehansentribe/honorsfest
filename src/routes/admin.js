@@ -14,7 +14,6 @@ router.post('/reseed', requireRole('Admin'), async (req, res) => {
       return res.status(400).json({ error: 'Confirmation required. Send { confirm: true }' });
     }
 
-    console.log('Admin initiated database reset and reseed...');
 
     // Disable foreign key constraints temporarily
     db.pragma('foreign_keys = OFF');
@@ -52,7 +51,6 @@ router.post('/reseed', requireRole('Admin'), async (req, res) => {
     // Re-enable foreign key constraints
     db.pragma('foreign_keys = ON');
 
-    console.log('Database cleared, ensuring schema is up to date...');
     
     // Re-initialize database schema (creates tables with latest schema if needed)
     initializeDatabase();
@@ -65,7 +63,6 @@ router.post('/reseed', requireRole('Admin'), async (req, res) => {
       const { migrateClubEvents } = require('../config/migrate-club-events');
       migrateClubEvents();
       
-      console.log('Schema migrations completed, starting seed...');
     } catch (migrateError) {
       console.warn('Migration warning (may be safe to ignore):', migrateError.message);
       // Continue with seeding - migrations may have already run
@@ -74,7 +71,6 @@ router.post('/reseed', requireRole('Admin'), async (req, res) => {
     // Run the seed script - wrap in try/catch to handle any seed errors
     try {
       seedDatabase();
-      console.log('Database reseeded successfully');
 
       res.json({ 
         message: 'Database reset and reseeded successfully',

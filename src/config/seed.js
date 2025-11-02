@@ -14,7 +14,6 @@ function seedDatabase() {
     // Initialize database schema (creates tables if they don't exist)
     initializeDatabase();
 
-    console.log('Starting database seeding...');
     const passwordHash = bcrypt.hashSync('password123', 10);
 
     // Helper function to generate check-in number
@@ -33,7 +32,6 @@ function seedDatabase() {
     `);
 
     // Seed honors (always seed fresh)
-    console.log('Seeding honors...');
     const rtfPath = path.join(__dirname, '../../Honorslist.rtf');
     if (fs.existsSync(rtfPath)) {
       // Clear existing honors for fresh seed
@@ -66,9 +64,7 @@ function seedDatabase() {
           }
         }
       }
-      console.log(`Inserted ${inserted} honors`);
     } else {
-      console.warn('Honorslist.rtf not found, skipping honors seeding');
       // Create a few sample honors if file doesn't exist
       const insertHonor = db.prepare('INSERT INTO Honors (Name, Category) VALUES (?, ?)');
       const sampleHonors = [
@@ -78,11 +74,9 @@ function seedDatabase() {
         { name: 'Block Printing', category: 'Arts & Crafts' }
       ];
       sampleHonors.forEach(h => insertHonor.run(h.name, h.category));
-      console.log('Created sample honors (Honorslist.rtf not found)');
     }
 
     // Create 3 admin users (always create fresh)
-    console.log('Creating admin users...');
     const admins = [
       { FirstName: 'Jason', LastName: 'Hansen', Username: 'jason.hansen', Email: 'jason.hansen@example.com' },
       { FirstName: 'Jamie', LastName: 'Jesse', Username: 'jamie.jesse', Email: 'jamie.jesse@example.com' },
@@ -109,11 +103,9 @@ function seedDatabase() {
         admin.Email,
         'local'  // All seeded users use local auth
       );
-      console.log(`Created admin: ${admin.Username}`);
     });
 
     // Create 2 events with proper status and active fields
-    console.log('Creating events...');
     const insertEvent = db.prepare(`
       INSERT INTO Events (Name, StartDate, EndDate, CoordinatorName, Description, Status, Active)
       VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -139,7 +131,6 @@ function seedDatabase() {
       1  // Active
     );
     const event1Id = event1Result.lastInsertRowid;
-    console.log(`Created event 1 (ID: ${event1Id}): Spring Honors Festival 2025`);
     
     // Event 2: Fall Honors Festival (Active, Closed)
     const event2Start = new Date(nextWeek);
@@ -157,13 +148,11 @@ function seedDatabase() {
       1  // Active
     );
     const event2Id = event2Result.lastInsertRowid;
-    console.log(`Created event 2 (ID: ${event2Id}): Fall Honors Festival 2025`);
     
     const events = [{ ID: event1Id }, { ID: event2Id }];
 
     // For each event, create event admin, locations, timeslots, clubs, and users
     events.forEach((event, eventIndex) => {
-      console.log(`\n=== Processing Event ${event.ID} ===`);
       
       // Create 1 Event Admin for this event
       const eventAdminBirthDate = new Date(new Date().getFullYear() - 40, 0, 1).toISOString().split('T')[0];
@@ -185,10 +174,8 @@ function seedDatabase() {
         'local'
       );
       const eventAdminId = eventAdminRes.lastInsertRowid;
-      console.log(`Created Event Admin (ID: ${eventAdminId}) for event ${event.ID}`);
 
       // Create 4 locations for this event
-      console.log(`Creating 4 locations for event ${event.ID}...`);
       const insertLoc = db.prepare('INSERT INTO Locations (EventID, Name, Description, MaxCapacity) VALUES (?, ?, ?, ?)');
       const locations = [
         { Name: 'Gymnasium', Desc: 'Main gymnasium', Cap: 40 },
@@ -200,11 +187,9 @@ function seedDatabase() {
       locations.forEach((loc, idx) => {
         const result = insertLoc.run(event.ID, loc.Name, loc.Desc, loc.Cap);
         locationIds.push(result.lastInsertRowid);
-        console.log(`  Created location: ${loc.Name} (ID: ${result.lastInsertRowid})`);
       });
 
       // Create 4 morning timeslots for this event
-      console.log(`Creating 4 morning timeslots for event ${event.ID}...`);
       const insertTs = db.prepare('INSERT INTO Timeslots (EventID, Date, StartTime, EndTime) VALUES (?, ?, ?, ?)');
       const eventData = db.prepare('SELECT StartDate, EndDate FROM Events WHERE ID = ?').get(event.ID);
       const timeslotIds = [];
@@ -219,7 +204,6 @@ function seedDatabase() {
       morningSlots.forEach(slot => {
         const result = insertTs.run(event.ID, eventData.StartDate, slot.time, slot.end);
         timeslotIds.push(result.lastInsertRowid);
-        console.log(`  Created timeslot: ${eventData.StartDate} ${slot.time}-${slot.end} (ID: ${result.lastInsertRowid})`);
       });
       
       // Day 2 timeslots (if different day)
@@ -227,12 +211,10 @@ function seedDatabase() {
         morningSlots.forEach(slot => {
           const result = insertTs.run(event.ID, eventData.EndDate, slot.time, slot.end);
           timeslotIds.push(result.lastInsertRowid);
-          console.log(`  Created timeslot: ${eventData.EndDate} ${slot.time}-${slot.end} (ID: ${result.lastInsertRowid})`);
         });
       }
 
       // Create 4 clubs with directors, teachers, staff, and students
-      console.log(`Creating 4 clubs for event ${event.ID}...`);
       const insertClub = db.prepare('INSERT INTO Clubs (Name, Church) VALUES (?, ?)');
       const insertClubEvent = db.prepare('INSERT INTO ClubEvents (ClubID, EventID) VALUES (?, ?)');
       const churches = ['First Baptist Church', 'Grace Community Church', 'Hope Presbyterian Church', 'St. Mary\'s Catholic Church'];
@@ -245,7 +227,6 @@ function seedDatabase() {
         
         // Link club to event via ClubEvents junction table
         insertClubEvent.run(clubId, event.ID);
-        console.log(`\n  Club ${clubIndex + 1} (ID: ${clubId}):`);
         
         // Create club director
         const directorBirthDate = new Date(new Date().getFullYear() - 35, 0, 1).toISOString().split('T')[0];
@@ -268,7 +249,6 @@ function seedDatabase() {
         );
         const directorId = directorRes.lastInsertRowid;
         db.prepare('UPDATE Clubs SET DirectorID = ? WHERE ID = ?').run(directorId, clubId);
-        console.log(`    Director: director${eventIndex + 1}.${clubIndex + 1} (ID: ${directorId})`);
         
         // Create 2 teachers
         const teacherBirthDate = new Date(new Date().getFullYear() - 30, 0, 1).toISOString().split('T')[0];
@@ -293,7 +273,6 @@ function seedDatabase() {
           );
           const teacherId = teacherRes.lastInsertRowid;
           teacherIds.push(teacherId);
-          console.log(`    Teacher ${t + 1}: teacher${eventIndex + 1}.${clubIndex + 1}.${t + 1} (ID: ${teacherId})`);
         }
         
         // Create 2 staff
@@ -319,7 +298,6 @@ function seedDatabase() {
           );
           const staffId = staffRes.lastInsertRowid;
           staffIds.push(staffId);
-          console.log(`    Staff ${s + 1}: staff${eventIndex + 1}.${clubIndex + 1}.${s + 1} (ID: ${staffId})`);
         }
         
         // Create 4 students
@@ -347,11 +325,9 @@ function seedDatabase() {
           );
           const studentId = studentRes.lastInsertRowid;
           studentIds.push(studentId);
-          console.log(`    Student ${st + 1}: student${eventIndex + 1}.${clubIndex + 1}.${st + 1} (ID: ${studentId})`);
         }
         
         // Create 1 class for this club (each club creates 1 class)
-        console.log(`    Creating 1 class for club ${clubId}...`);
         const honors = db.prepare('SELECT ID, Name FROM Honors ORDER BY ID LIMIT 50').all();
         if (honors.length > 0) {
           const honorIndex = (eventIndex * 4 + clubIndex) % honors.length;
@@ -375,26 +351,10 @@ function seedDatabase() {
             20,
             directorId // Created by the club director
           );
-          console.log(`      Created class: ${selectedHonor.Name} (ID: ${classResult.lastInsertRowid})`);
         }
       }
     });
 
-    console.log('\n=== Database seeding completed successfully ===');
-    console.log('\nSummary:');
-    console.log('- 3 Admin users: jason.hansen, jamie.jesse, valerie.rexin (password: password123)');
-    console.log('- 2 Events: Spring (Live) and Fall (Closed)');
-    console.log('- 2 Event Admins (1 per event)');
-    console.log('- 8 Clubs (4 per event) linked via ClubEvents junction table');
-    console.log('- 8 Club Directors (1 per club)');
-    console.log('- 16 Teachers (2 per club)');
-    console.log('- 16 Staff (2 per club)');
-    console.log('- 32 Students (4 per club)');
-    console.log('- 8 Locations (4 per event)');
-    console.log('- 8 Timeslots (4 per event)');
-    console.log('- 8 Classes (1 per club, 4 per event)');
-    console.log('- ClubEvents relationships: 8 (1 per club per event)');
-    console.log('\nAll users have password: password123');
     
   } catch (error) {
     console.error('Error seeding database:', error);
