@@ -1,4 +1,4 @@
-// Admin Dashboard - Full Implementation
+// Event Admin Dashboard - Full Implementation
 
 let currentTab = 'events';
 let allEvents = [];
@@ -8,6 +8,8 @@ let allTimeslots = [];
 let allClubs = [];
 let allClasses = [];
 let currentUser = null;
+let assignedEventId = null;
+let assignedEvent = null;
 
 // Filter state for user table
 let userFilters = {};
@@ -24,23 +26,58 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const user = getCurrentUser();
   
-  // Skip admin dashboard initialization for Club Directors
-  // They have their own dashboard logic
-  if (user.role === 'ClubDirector') {
-    return;
+  // Only EventAdmin should use this dashboard
+  if (user.role !== 'EventAdmin') {
+    // Redirect to appropriate dashboard
+    if (user.role === 'Admin') {
+      window.location.href = '/admin-dashboard.html';
+      return;
+    } else if (user.role === 'ClubDirector') {
+      window.location.href = '/clubdirector-dashboard.html';
+      return;
+    } else {
+      window.location.href = '/student-dashboard.html';
+      return;
+    }
   }
   
   currentUser = user;
-  document.getElementById('userDisplayName').textContent = `${user.firstName} ${user.lastName}`;
+  assignedEventId = user.eventId;
+  
+  // Display user name
+  const userDisplayNameEl = document.getElementById('userDisplayName');
+  if (userDisplayNameEl) {
+    userDisplayNameEl.textContent = `${user.firstName} ${user.lastName}`;
+  }
 
   // Make switchTab available globally
   window.switchTab = switchTab;
   window.toggleEventDropdown = toggleEventDropdown;
   window.toggleEditEventDropdown = toggleEditEventDropdown;
   
-  await loadEvents();
+  // Load assigned event first
+  if (assignedEventId) {
+    await loadAssignedEvent();
+  } else {
+    showNotification('No event assigned. Please contact an administrator.', 'error');
+  }
+  
+  // Load data filtered by assigned event
   await loadUsers();
-  const savedTab = localStorage.getItem('adminCurrentTab') || 'events';
+  await loadLocations(assignedEventId);
+  await loadTimeslots(assignedEventId);
+  await loadClubs(assignedEventId);
+  await loadClasses(assignedEventId);
+  
+  // Update event name in banner
+  if (assignedEvent) {
+    const eventNameEl = document.getElementById('eventName');
+    if (eventNameEl) {
+      eventNameEl.textContent = `Event: ${assignedEvent.Name}`;
+    }
+  }
+  
+  const savedTab = localStorage.getItem('eventadminCurrentTab') || 'events';
   switchTab(savedTab);
 });
 
@@ -653,29 +690,39 @@ async function reseedDatabase() {
 }
 
 // Load data
-async function loadEvents() {
+async function loadAssignedEvent() {
   try {
-    const response = await fetchWithAuth('/api/events');
-    allEvents = await response.json();
+    if (!assignedEventId) {
+      showNotification('No event assigned. Please contact an administrator.', 'error');
+      return;
+    }
     
-    // Normalize Active field from SQLite (1/0) to boolean for consistent rendering
-    allEvents = allEvents.map(event => {
-      // SQLite returns Active as 1 or 0 (integer), convert to boolean for template rendering
-      const isActive = event.Active === 1 || event.Active === true || event.Active === '1';
-      return {
-        ...event,
-        Active: isActive  // Store as boolean (true/false) for easier template rendering
-      };
-    });
+    const response = await fetchWithAuth(`/api/events/${assignedEventId}`);
+    const event = await response.json();
     
-    
-    // Populate event filters every time
-    updateEventDropdowns();
-    
-    renderEvents();
+    if (response.ok && event) {
+      assignedEvent = event;
+      allEvents = [event]; // Only one event for EventAdmin
+      
+      // Update event name in banner
+      const eventNameEl = document.getElementById('eventName');
+      if (eventNameEl) {
+        eventNameEl.textContent = `Event: ${event.Name}`;
+      }
+    } else {
+      showNotification('Error loading assigned event', 'error');
+    }
   } catch (error) {
-    console.error('Error loading events:', error);
-    showNotification('Error loading events', 'error');
+    console.error('Error loading assigned event:', error);
+    showNotification('Error loading assigned event', 'error');
+  }
+}
+
+async function loadEvents() {
+  // EventAdmin only has one event - already loaded in loadAssignedEvent
+  if (assignedEvent) {
+    allEvents = [assignedEvent];
+    renderEvents();
   }
 }
 
@@ -721,8 +768,16 @@ function updateEventDropdowns() {
 
 async function loadUsers() {
   try {
-    const response = await fetchWithAuth('/api/users');
+    // EventAdmin can only see users for their assigned event
+    const url = assignedEventId ? `/api/users?eventId=${assignedEventId}` : '/api/users';
+    const response = await fetchWithAuth(url);
     allUsers = await response.json();
+    
+    // Filter to only users for the assigned event
+    if (assignedEventId) {
+      allUsers = allUsers.filter(user => user.EventID === assignedEventId);
+    }
+    
     renderUsers();
   } catch (error) {
     console.error('Error loading users:', error);
@@ -731,13 +786,18 @@ async function loadUsers() {
 }
 
 async function loadLocations(eventId) {
-  if (!eventId) {
-    document.getElementById('locationsList').innerHTML = '<p class="text-center">Select an event to view locations</p>';
+  const targetEventId = eventId || assignedEventId;
+  
+  if (!targetEventId) {
+    const container = document.getElementById('locationsList');
+    if (container) {
+      container.innerHTML = '<p class="text-center">No event assigned</p>';
+    }
     return;
   }
   
   try {
-    const response = await fetchWithAuth(`/api/events/${eventId}/locations`);
+    const response = await fetchWithAuth(`/api/events/${targetEventId}/locations`);
     allLocations = await response.json();
     renderLocationsList();
   } catch (error) {
@@ -747,19 +807,94 @@ async function loadLocations(eventId) {
 }
 
 async function loadClasses(eventId) {
-  if (!eventId) {
-    document.getElementById('classesList').innerHTML = '<p class="text-center">Select an event to view classes</p>';
+  const targetEventId = eventId || assignedEventId;
+  
+  if (!targetEventId) {
+    const container = document.getElementById('classesList');
+    if (container) {
+      container.innerHTML = '<p class="text-center">No event assigned</p>';
+    }
     return;
   }
   
   try {
-    const response = await fetchWithAuth(`/api/classes/${eventId}`);
+    const response = await fetchWithAuth(`/api/classes/${targetEventId}`);
     allClasses = await response.json();
-    // renderClassesList is no longer used - new data-table version handles rendering
+    renderClasses();
   } catch (error) {
     console.error('Error loading classes:', error);
     showNotification('Error loading classes', 'error');
   }
+}
+
+async function loadClubs(eventId) {
+  const targetEventId = eventId || assignedEventId;
+  
+  if (!targetEventId) {
+    const container = document.getElementById('clubsList');
+    if (container) {
+      container.innerHTML = '<p class="text-center">No event assigned</p>';
+    }
+    return;
+  }
+  
+  try {
+    const response = await fetchWithAuth(`/api/clubs/event/${targetEventId}`);
+    allClubs = await response.json();
+    renderClubs();
+  } catch (error) {
+    console.error('Error loading clubs:', error);
+    showNotification('Error loading clubs', 'error');
+  }
+}
+
+async function renderClubs() {
+  const container = document.getElementById('clubsList');
+  if (!container) return;
+  
+  if (allClubs.length === 0) {
+    container.innerHTML = '<p class="text-center">No clubs found for this event</p>';
+    return;
+  }
+  
+  const tableHtml = `
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Club Name</th>
+          <th>Church</th>
+          <th>Director</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${allClubs.map(club => `
+          <tr>
+            <td><strong>${club.Name}</strong></td>
+            <td>${club.Church || '-'}</td>
+            <td>${club.DirectorFirstName ? `${club.DirectorFirstName} ${club.DirectorLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
+            <td>
+              <button onclick="editClub(${club.ID})" class="btn btn-sm btn-secondary">Edit</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+  
+  const mobileCards = allClubs.map(club => {
+    const actionsHtml = `
+      <button onclick="editClub(${club.ID})" class="btn btn-sm btn-secondary">Edit</button>
+    `;
+    
+    return createMobileCard({
+      'Club Name': club.Name,
+      'Church': club.Church || '-',
+      'Director': club.DirectorFirstName ? `${club.DirectorFirstName} ${club.DirectorLastName}` : 'Unassigned'
+    }, club.Name, actionsHtml);
+  }).join('');
+  
+  container.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
 }
 
 // Render functions
@@ -2989,17 +3124,41 @@ window.reseedDatabase = reseedDatabase;
 window.updateReportButton = updateReportButton;
 window.renderLocations = renderLocations;
 // Timeslot management functions
-async function renderTimeslots() {
-  try {
-    await loadTimeslots();
-    allTimeslots = await response.json();
-    
-    if (allTimeslots.length === 0) {
-      document.getElementById('timeslotsList').innerHTML = '<p class="text-center">No timeslots found for this event</p>';
-      return;
+async function loadTimeslots(eventId) {
+  const targetEventId = eventId || assignedEventId;
+  
+  if (!targetEventId) {
+    const container = document.getElementById('timeslotsList');
+    if (container) {
+      container.innerHTML = '<p class="text-center">No event assigned</p>';
     }
+    return;
+  }
+  
+  try {
+    const response = await fetchWithAuth(`/api/events/${targetEventId}/timeslots`);
+    allTimeslots = await response.json();
+    renderTimeslotsList();
+  } catch (error) {
+    console.error('Error loading timeslots:', error);
+    showNotification('Error loading timeslots', 'error');
+  }
+}
+
+async function renderTimeslots() {
+  await loadTimeslots();
+}
+
+function renderTimeslotsList() {
+  const container = document.getElementById('timeslotsList');
+  if (!container) return;
+  
+  if (allTimeslots.length === 0) {
+    container.innerHTML = '<p class="text-center">No timeslots found for this event</p>';
+    return;
+  }
     
-    document.getElementById('timeslotsList').innerHTML = `
+  container.innerHTML = `
       <table class="data-table">
         <thead>
           <tr>
