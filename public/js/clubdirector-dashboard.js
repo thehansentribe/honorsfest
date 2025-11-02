@@ -736,10 +736,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const activeEvent = clubDirectorEvents.find(e => e.Active);
     clubDirectorEventId = activeEvent ? activeEvent.ID : clubDirectorEvents[0].ID;
     clubDirectorSelectedEventId = clubDirectorEventId;
-    
-    // Setup event selector UI
-    setupEventSelector();
+  } else {
+    showNotification('No events found for your club. Please contact an administrator.', 'error');
   }
+  
+  // Setup event selector UI (even if no events, to show message)
+  setupEventSelector();
 
   // Check event status and show banner if closed
   await checkEventStatus();
