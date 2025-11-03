@@ -3680,10 +3680,5 @@ window.toggleUserColumnFilter = toggleUserColumnFilter;
 window.updateUserFilter = updateUserFilter;
 window.renderUsers = renderUsers;
 window.toggleDeactivatedUsers = toggleDeactivatedUsers;
-window.searchByCheckInNumber = searchByCheckInNumber;
-window.searchByFirstName = searchByFirstName;
-window.selectUserFromDropdown = selectUserFromDropdown;
-window.displayCheckInUser = displayCheckInUser;
-window.handleCheckInUser = handleCheckInUser;
-window.clearCheckInForm = clearCheckInForm;
+// Old check-in functions removed - now using checkin.js module
 
