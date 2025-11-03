@@ -24,10 +24,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const user = getCurrentUser();
   
-  // Skip admin dashboard initialization for Club Directors
-  // They have their own dashboard logic
-  if (user.role === 'ClubDirector') {
-    return;
+  // Only Admin should access this dashboard
+  if (user.role !== 'Admin') {
+    // Redirect to appropriate dashboard
+    if (user.role === 'EventAdmin') {
+      window.location.href = '/eventadmin-dashboard.html';
+      return;
+    } else if (user.role === 'ClubDirector') {
+      window.location.href = '/clubdirector-dashboard.html';
+      return;
+    } else if (user.role === 'Teacher') {
+      window.location.href = '/teacher-dashboard.html';
+      return;
+    } else {
+      window.location.href = '/student-dashboard.html';
+      return;
+    }
   }
   
   currentUser = user;

@@ -12,6 +12,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const user = getCurrentUser();
+  
+  // Only Student or Staff should access this dashboard
+  if (user.role !== 'Student' && user.role !== 'Staff') {
+    // Redirect to appropriate dashboard
+    if (user.role === 'Admin') {
+      window.location.href = '/admin-dashboard.html';
+      return;
+    } else if (user.role === 'EventAdmin') {
+      window.location.href = '/eventadmin-dashboard.html';
+      return;
+    } else if (user.role === 'ClubDirector') {
+      window.location.href = '/clubdirector-dashboard.html';
+      return;
+    } else if (user.role === 'Teacher') {
+      window.location.href = '/teacher-dashboard.html';
+      return;
+    } else {
+      // Unknown role, logout
+      logout();
+      return;
+    }
+  }
+  
   currentUser = user;
   document.getElementById('userDisplayName').textContent = `${user.firstName} ${user.lastName}`;
   
