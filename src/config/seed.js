@@ -27,8 +27,8 @@ function seedDatabase() {
     
     // Prepare user insert statement
     const insertUser = db.prepare(`
-      INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, PasswordHash, Role, Active, BackgroundCheck, ClubID, EventID, InvestitureLevel, CheckInNumber, CheckedIn, Email, auth_method)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, Invited, InviteAccepted, BackgroundCheck, CheckInNumber, CheckedIn, stytch_user_id, auth_method)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     // Seed honors (always seed fresh)
@@ -90,18 +90,22 @@ function seedDatabase() {
         admin.FirstName, 
         admin.LastName, 
         admin.Username, 
-        adminBirthDate, 
-        passwordHash, 
-        'Admin', 
-        1, 
-        1, 
-        null, 
-        null, 
-        'MasterGuide', 
-        getNextCheckInNumber(), 
-        0,
+        adminBirthDate,
         admin.Email,
-        'local'  // All seeded users use local auth
+        null,  // Phone
+        passwordHash, 
+        'Admin',
+        'MasterGuide',
+        null,  // ClubID
+        null,  // EventID
+        1,     // Active
+        0,     // Invited
+        0,     // InviteAccepted
+        1,     // BackgroundCheck
+        getNextCheckInNumber(),
+        0,     // CheckedIn
+        null,  // stytch_user_id
+        'local'  // auth_method
       );
     });
 
@@ -161,17 +165,21 @@ function seedDatabase() {
         'Coordinator',
         `eventadmin${eventIndex + 1}`,
         eventAdminBirthDate,
+        `eventadmin${eventIndex + 1}@example.com`,
+        null,  // Phone
         passwordHash,
         'EventAdmin',
-        1,
-        1,
-        null,
-        event.ID,
         'MasterGuide',
+        null,  // ClubID
+        event.ID,
+        1,     // Active
+        0,     // Invited
+        0,     // InviteAccepted
+        1,     // BackgroundCheck
         getNextCheckInNumber(),
-        0,
-        `eventadmin${eventIndex + 1}@example.com`,
-        'local'
+        0,     // CheckedIn
+        null,  // stytch_user_id
+        'local'  // auth_method
       );
       const eventAdminId = eventAdminRes.lastInsertRowid;
 
@@ -217,12 +225,30 @@ function seedDatabase() {
       // Create 4 clubs with directors, teachers, staff, and students
       const insertClub = db.prepare('INSERT INTO Clubs (Name, Church) VALUES (?, ?)');
       const insertClubEvent = db.prepare('INSERT INTO ClubEvents (ClubID, EventID) VALUES (?, ?)');
-      const churches = ['First Baptist Church', 'Grace Community Church', 'Hope Presbyterian Church', 'St. Mary\'s Catholic Church'];
+      
+      // Unique club names and churches across all events
+      // Event 1 clubs
+      const event1Clubs = [
+        { name: 'Spring Adventurers Alpha', church: 'First Baptist Church' },
+        { name: 'Spring Adventurers Beta', church: 'Grace Community Church' },
+        { name: 'Spring Adventurers Gamma', church: 'Hope Presbyterian Church' },
+        { name: 'Spring Adventurers Delta', church: 'St. Mary\'s Catholic Church' }
+      ];
+      // Event 2 clubs
+      const event2Clubs = [
+        { name: 'Fall Adventurers Alpha', church: 'Trinity Methodist Church' },
+        { name: 'Fall Adventurers Beta', church: 'Lighthouse Assembly Church' },
+        { name: 'Fall Adventurers Gamma', church: 'New Life Community Church' },
+        { name: 'Fall Adventurers Delta', church: 'Calvary Baptist Church' }
+      ];
+      
+      // Select clubs based on event index
+      const clubsForEvent = eventIndex === 0 ? event1Clubs : event2Clubs;
       const honorNames = ['Airplane Modeling', 'African Lore', 'Basketry', 'Block Printing'];
       
       for (let clubIndex = 0; clubIndex < 4; clubIndex++) {
         // Create club (without EventID - using junction table)
-        const clubResult = insertClub.run(`Club ${clubIndex + 1}`, churches[clubIndex]);
+        const clubResult = insertClub.run(clubsForEvent[clubIndex].name, clubsForEvent[clubIndex].church);
         const clubId = clubResult.lastInsertRowid;
         
         // Link club to event via ClubEvents junction table
@@ -235,17 +261,21 @@ function seedDatabase() {
           'Leader',
           `director${eventIndex + 1}.${clubIndex + 1}`,
           directorBirthDate,
+          `director${eventIndex + 1}.${clubIndex + 1}@example.com`,
+          null,  // Phone
           passwordHash,
           'ClubDirector',
-          1,
-          1,
+          'MasterGuide',
           clubId,
           event.ID,
-          'MasterGuide',
+          1,     // Active
+          0,     // Invited
+          0,     // InviteAccepted
+          1,     // BackgroundCheck
           getNextCheckInNumber(),
-          0,
-          `director${eventIndex + 1}.${clubIndex + 1}@example.com`,
-          'local'
+          0,     // CheckedIn
+          null,  // stytch_user_id
+          'local'  // auth_method
         );
         const directorId = directorRes.lastInsertRowid;
         db.prepare('UPDATE Clubs SET DirectorID = ? WHERE ID = ?').run(directorId, clubId);
@@ -259,17 +289,21 @@ function seedDatabase() {
             'Smith',
             `teacher${eventIndex + 1}.${clubIndex + 1}.${t + 1}`,
             teacherBirthDate,
+            `teacher${eventIndex + 1}.${clubIndex + 1}.${t + 1}@example.com`,
+            null,  // Phone
             passwordHash,
             'Teacher',
-            1,
-            1,
+            'MasterGuide',
             clubId,
             event.ID,
-            'MasterGuide',
+            1,     // Active
+            0,     // Invited
+            0,     // InviteAccepted
+            1,     // BackgroundCheck
             getNextCheckInNumber(),
-            0,
-            `teacher${eventIndex + 1}.${clubIndex + 1}.${t + 1}@example.com`,
-            'local'
+            0,     // CheckedIn
+            null,  // stytch_user_id
+            'local'  // auth_method
           );
           const teacherId = teacherRes.lastInsertRowid;
           teacherIds.push(teacherId);
@@ -284,17 +318,21 @@ function seedDatabase() {
             'Johnson',
             `staff${eventIndex + 1}.${clubIndex + 1}.${s + 1}`,
             staffBirthDate,
+            `staff${eventIndex + 1}.${clubIndex + 1}.${s + 1}@example.com`,
+            null,  // Phone
             passwordHash,
             'Staff',
-            1,
-            1,
+            'Guide',
             clubId,
             event.ID,
-            'Guide',
+            1,     // Active
+            0,     // Invited
+            0,     // InviteAccepted
+            1,     // BackgroundCheck
             getNextCheckInNumber(),
-            0,
-            `staff${eventIndex + 1}.${clubIndex + 1}.${s + 1}@example.com`,
-            'local'
+            0,     // CheckedIn
+            null,  // stytch_user_id
+            'local'  // auth_method
           );
           const staffId = staffRes.lastInsertRowid;
           staffIds.push(staffId);
@@ -311,17 +349,21 @@ function seedDatabase() {
             studentLastNames[st],
             `student${eventIndex + 1}.${clubIndex + 1}.${st + 1}`,
             studentBirthDate,
+            `student${eventIndex + 1}.${clubIndex + 1}.${st + 1}@example.com`,
+            null,  // Phone
             passwordHash,
             'Student',
-            1,
-            0,
+            investitureLevels[st],
             clubId,
             event.ID,
-            investitureLevels[st],
+            1,     // Active
+            0,     // Invited
+            0,     // InviteAccepted
+            0,     // BackgroundCheck
             getNextCheckInNumber(),
-            0,
-            `student${eventIndex + 1}.${clubIndex + 1}.${st + 1}@example.com`,
-            'local'
+            0,     // CheckedIn
+            null,  // stytch_user_id
+            'local'  // auth_method
           );
           const studentId = studentRes.lastInsertRowid;
           studentIds.push(studentId);
