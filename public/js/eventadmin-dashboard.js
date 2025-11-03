@@ -295,7 +295,10 @@ async function switchTab(tabName, clickedElement = null) {
       content.innerHTML = await getReportsTab();
       break;
     case 'checkin':
-      content.innerHTML = getCheckInTab();
+      content.innerHTML = getCheckInTab({ eventId: assignedEventId, userRole: currentUser.role, userClubId: null });
+      if (assignedEventId) {
+        await checkInLoadParticipants();
+      }
       break;
   }
 }
@@ -390,39 +393,8 @@ function getReportsTab() {
   `;
 }
 
-function getCheckInTab() {
-  return `
-    <div class="card">
-      <div class="card-header">
-        <h2 class="card-title">Check-In</h2>
-      </div>
-      <div style="padding: 20px;">
-        <div class="form-group">
-          <label><strong>Search by Check-In Number</strong></label>
-          <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-            <input type="number" id="checkInNumberInput" class="form-control" placeholder="Enter check-in number" style="flex: 1;">
-            <button onclick="searchByCheckInNumber()" class="btn btn-primary">Search</button>
-          </div>
-        </div>
-        
-        <div style="margin: 30px 0; text-align: center; color: #666;">OR</div>
-        
-        <div class="form-group">
-          <label><strong>Search by First Name</strong></label>
-          <input type="text" id="firstNameSearch" class="form-control" placeholder="Start typing first name..." 
-                 oninput="searchByFirstName(this.value)" style="margin-bottom: 10px;">
-          <select id="userDropdown" class="form-control" size="10" style="display: none; max-height: 300px; margin-bottom: 10px;">
-          </select>
-          <button onclick="selectUserFromDropdown()" class="btn btn-primary" id="selectUserBtn" style="display: none;">Select User</button>
-        </div>
-        
-        <div id="checkInUserDetails" style="display: none;">
-          <!-- User edit form will be rendered here -->
-        </div>
-      </div>
-    </div>
-  `;
-}
+// Check-in tab now uses the reusable module in checkin.js
+// Old getCheckInTab function removed
 
 let checkInSearchTimeout = null;
 let checkInSearchResults = [];

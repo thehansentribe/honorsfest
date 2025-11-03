@@ -15,6 +15,7 @@ const clubRoutes = require('./routes/clubs');
 const codeRoutes = require('./routes/registrationCodes');
 const inviteRoutes = require('./routes/invites');
 const adminRoutes = require('./routes/admin');
+const checkinRoutes = require('./routes/checkin');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -41,6 +42,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/codes', codeRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/checkin', checkinRoutes);
 
 // Serve frontend
 app.get('*', (req, res) => {

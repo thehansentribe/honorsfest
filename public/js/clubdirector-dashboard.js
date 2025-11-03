@@ -63,6 +63,16 @@ async function clubdirectorSwitchTab(tabName, clickedElement = null) {
     case 'reports':
       content.innerHTML = getReportsTab();
       break;
+    case 'checkin':
+      content.innerHTML = getCheckInTab({ 
+        eventId: clubDirectorSelectedEventId, 
+        userRole: 'ClubDirector', 
+        userClubId: clubDirectorClubId 
+      });
+      if (clubDirectorSelectedEventId) {
+        await checkInLoadParticipants();
+      }
+      break;
   }
 }
 

@@ -44,8 +44,8 @@ router.get('/search', requireRole('Admin'), (req, res) => {
   }
 });
 
-// GET /api/users/checkin/:number - Get user by check-in number (Admin only)
-router.get('/checkin/:number', requireRole('Admin'), (req, res) => {
+// GET /api/users/checkin/:number - Get user by check-in number (Admin, EventAdmin, ClubDirector)
+router.get('/checkin/:number', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) => {
   try {
     const checkInNumber = parseInt(req.params.number);
     if (isNaN(checkInNumber)) {
