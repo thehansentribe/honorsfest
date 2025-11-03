@@ -152,4 +152,73 @@ function wrapResponsiveTable(tableHtml, mobileCardHtml = '') {
   return `<div class="table-scroll">${tableHtml}</div>`;
 }
 
+/**
+ * Prevent back navigation from dashboard pages
+ * Makes the page idempotent to prevent multiple listeners
+ */
+function preventBackNavigation() {
+  if (window.preventBackNavigationInitialized) {
+    return; // Already initialized
+  }
+  window.preventBackNavigationInitialized = true;
+  
+  // Push current state to history
+  history.pushState(null, '', location.href);
+  
+  // Listen for popstate (back button)
+  window.addEventListener('popstate', function(event) {
+    // Push the state back onto the stack
+    history.pushState(null, '', location.href);
+  });
+}
 
+/**
+ * Setup visibility checks to verify auth on tab focus
+ */
+function setupVisibilityChecks() {
+  if (window.setupVisibilityChecksInitialized) {
+    return; // Already initialized
+  }
+  window.setupVisibilityChecksInitialized = true;
+  
+  document.addEventListener('visibilitychange', async () => {
+    if (!document.hidden) {
+      // Page became visible, verify auth
+      if (!verifyAuth()) {
+        if (!checkAuth()) {
+          logout();
+        }
+      }
+    }
+  });
+  
+  window.addEventListener('focus', async () => {
+    // Window gained focus, verify auth
+    if (!verifyAuth()) {
+      if (!checkAuth()) {
+        logout();
+      }
+    }
+  });
+}
+
+/**
+ * Verify authentication with backend
+ */
+async function verifyAuth() {
+  try {
+    const response = await fetchWithAuth('/api/users/me');
+    if (!response.ok) {
+      return false;
+    }
+    return true;
+  } catch (error) {
+    // Network error, don't aggressively logout
+    return true;
+  }
+}
+
+// Make functions globally available
+window.preventBackNavigation = preventBackNavigation;
+window.setupVisibilityChecks = setupVisibilityChecks;
+window.verifyAuth = verifyAuth;

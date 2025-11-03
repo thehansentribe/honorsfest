@@ -3091,7 +3091,8 @@ window.handleAddStudentToClass = handleAddStudentToClass;
 window.removeStudentFromClass = removeStudentFromClass;
 window.showConflictModal = showConflictModal;
 window.resolveConflict = resolveConflict;
-window.generateReport = generateReport;
+// generateReport removed - use generateEventReport instead
+window.generateEventReport = generateEventReport;
 window.reseedDatabase = reseedDatabase;
 window.updateReportButton = updateReportButton;
 window.renderLocations = renderLocations;
@@ -3481,12 +3482,15 @@ async function handleCreateClass(e) {
 }
 
 async function renderClasses() {
+  const container = document.getElementById('classesList');
+  if (!container) return;
+  
   const select = document.getElementById('classEventFilter');
   const eventId = select?.value;
   const createBtn = document.getElementById('createClassBtn');
   
   if (!eventId) {
-    document.getElementById('classesList').innerHTML = '<p class="text-center">Select an event to view classes</p>';
+    container.innerHTML = '<p class="text-center">Select an event to view classes</p>';
     if (createBtn) createBtn.disabled = true;
     return;
   }
@@ -3498,7 +3502,7 @@ async function renderClasses() {
     allClasses = await response.json();
     
     if (allClasses.length === 0) {
-      document.getElementById('classesList').innerHTML = '<p class="text-center">No classes found for this event</p>';
+      container.innerHTML = '<p class="text-center">No classes found for this event</p>';
       return;
     }
     
@@ -3589,7 +3593,7 @@ async function renderClasses() {
       }, cls.HonorName || 'N/A', actionsHtml);
     }).join('');
     
-    document.getElementById('classesList').innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
+    container.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
   } catch (error) {
     console.error('Error loading classes:', error);
     showNotification('Error loading classes', 'error');
@@ -3601,13 +3605,16 @@ window.renderTimeslots = renderTimeslots;
 
 // Club management functions
 async function renderClubs() {
+  const container = document.getElementById('clubsList');
+  if (!container) return;
+  
   try {
     // Load clubs for assigned event
     const response = await fetchWithAuth(`/api/clubs/event/${assignedEventId}`);
     allClubs = await response.json();
     
     if (allClubs.length === 0) {
-      document.getElementById('clubsList').innerHTML = '<p class="text-center">No clubs found</p>';
+      container.innerHTML = '<p class="text-center">No clubs found</p>';
       return;
     }
     
@@ -3663,7 +3670,7 @@ async function renderClubs() {
       }, club.Name, actionsHtml);
     }).join('');
     
-    document.getElementById('clubsList').innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
+    container.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
   } catch (error) {
     console.error('Error loading clubs:', error);
     showNotification('Error loading clubs', 'error');
