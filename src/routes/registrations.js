@@ -216,12 +216,21 @@ router.post('/admin', requireRole('Admin', 'EventAdmin', 'ClubDirector'), async 
       return res.status(400).json({ error: 'UserID and ClassID are required' });
     }
     
+    // Get student details
+    const User = require('../models/user');
+    const student = User.findById(parseInt(UserID));
+    
+    if (!student) {
+      return res.status(404).json({ error: 'Student not found' });
+    }
+    
+    if (!student.ClubID) {
+      return res.status(400).json({ error: 'Student must be assigned to a club before being added to a class' });
+    }
+    
     // Check if Club Director is trying to add a student not from their club
     if (req.user.role === 'ClubDirector') {
-      const User = require('../models/user');
-      const student = User.findById(parseInt(UserID));
-      
-      if (!student || !student.ClubID || student.ClubID !== req.user.clubId) {
+      if (student.ClubID !== req.user.clubId) {
         return res.status(403).json({ error: 'You can only add students from your own club' });
       }
     }
@@ -236,6 +245,15 @@ router.post('/admin', requireRole('Admin', 'EventAdmin', 'ClubDirector'), async 
     // Check if Event Admin is managing a class from their assigned event
     if (req.user.role === 'EventAdmin' && classData.EventID !== req.user.eventId) {
       return res.status(403).json({ error: 'You can only manage classes from your assigned event' });
+    }
+    
+    // CRITICAL: Check if student's club is participating in the event that the class belongs to
+    // This validation applies to ALL roles (Admin, EventAdmin, ClubDirector)
+    const Club = require('../models/club');
+    if (!Club.isInEvent(student.ClubID, classData.EventID)) {
+      return res.status(403).json({ 
+        error: `Student's club is not participating in this event. Students can only be added to classes for events their club is associated with.` 
+      });
     }
 
     // Check if event is closed (prevent directors and admins from adding students when closed)
@@ -294,9 +312,9 @@ router.get('/available/:classId', requireRole('Admin', 'EventAdmin', 'ClubDirect
     
     // Build query with optional club filter
     let query = `
-      SELECT u.ID, u.FirstName, u.LastName, u.Role, c.Name as ClubName, u.ClubID
+      SELECT u.ID, u.FirstName, u.LastName, u.Role, cl.Name as ClubName, u.ClubID
       FROM Users u
-      LEFT JOIN Clubs c ON u.ClubID = c.ID
+      LEFT JOIN Clubs cl ON u.ClubID = cl.ID
       WHERE u.Role = 'Student' AND u.Active = 1
     `;
     
@@ -313,8 +331,22 @@ router.get('/available/:classId', requireRole('Admin', 'EventAdmin', 'ClubDirect
     // Filter out students already registered in this class
     const enrolledStudentIds = db.prepare('SELECT UserID FROM Registrations WHERE ClassID = ?').all(parseInt(req.params.classId)).map(r => r.UserID);
     
+    // CRITICAL: Filter to only include students whose clubs are participating in the event
+    // This ensures admins can only see/add students from clubs associated with the event
+    const Club = require('../models/club');
     const availableStudents = students
-      .filter(s => !enrolledStudentIds.includes(s.ID))
+      .filter(s => {
+        // Skip if already enrolled
+        if (enrolledStudentIds.includes(s.ID)) {
+          return false;
+        }
+        // Skip if no club assigned
+        if (!s.ClubID) {
+          return false;
+        }
+        // Only include if student's club is participating in the event
+        return Club.isInEvent(s.ClubID, classData.EventID);
+      })
       .map(s => ({ id: s.ID, firstName: s.FirstName, lastName: s.LastName, clubName: s.ClubName || 'No Club' }));
     
     res.json(availableStudents);
