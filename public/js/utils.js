@@ -70,9 +70,34 @@ function showNotification(message, type = 'info') {
 }
 
 function logout() {
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
-  window.location.href = '/login.html';
+  // Clear all localStorage
+  localStorage.clear();
+  
+  // Clear all sessionStorage
+  sessionStorage.clear();
+  
+  // Clear any cached data
+  if (window.allEvents) window.allEvents = [];
+  if (window.allUsers) window.allUsers = [];
+  if (window.allClubs) window.allClubs = [];
+  if (window.allClasses) window.allClasses = [];
+  if (window.allLocations) window.allLocations = [];
+  if (window.allTimeslots) window.allTimeslots = [];
+  if (window.currentUser) window.currentUser = null;
+  
+  // Clear any global state flags
+  if (window.preventBackNavigationInitialized) {
+    window.preventBackNavigationInitialized = false;
+  }
+  if (window.setupVisibilityChecksInitialized) {
+    window.setupVisibilityChecksInitialized = false;
+  }
+  
+  // Prevent back navigation
+  window.history.replaceState(null, '', '/login.html');
+  
+  // Use replace instead of href to prevent back button access
+  window.location.replace('/login.html');
 }
 
 function checkAuth() {
@@ -219,6 +244,7 @@ async function verifyAuth() {
 }
 
 // Make functions globally available
+window.logout = logout;
 window.preventBackNavigation = preventBackNavigation;
 window.setupVisibilityChecks = setupVisibilityChecks;
 window.verifyAuth = verifyAuth;

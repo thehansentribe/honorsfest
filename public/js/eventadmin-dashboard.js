@@ -19,12 +19,39 @@ let showDeactivatedUsers = false;
 
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', async () => {
-  if (!checkAuth()) {
-    window.location.href = '/login.html';
+  // Clear any previous dashboard state
+  if (window.preventBackNavigationInitialized) {
+    window.preventBackNavigationInitialized = false;
+  }
+  if (window.setupVisibilityChecksInitialized) {
+    window.setupVisibilityChecksInitialized = false;
+  }
+  
+  // Verify authentication first
+  const token = localStorage.getItem('token');
+  if (!token) {
+    logout();
     return;
   }
-
+  
+  // Check token validity
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < now) {
+      logout();
+      return;
+    }
+  } catch (error) {
+    logout();
+    return;
+  }
+  
   const user = getCurrentUser();
+  if (!user || !user.role) {
+    logout();
+    return;
+  }
   
   // Only EventAdmin should use this dashboard
   if (user.role !== 'EventAdmin') {
@@ -360,6 +387,7 @@ function getClubsTab() {
     <div class="card">
       <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
         <h2 class="card-title" style="margin: 0;">Clubs</h2>
+        <button onclick="showCreateClubForm()" class="btn btn-primary">Create Club</button>
       </div>
       <div id="clubsList"></div>
     </div>
@@ -3609,6 +3637,24 @@ async function renderClubs() {
   if (!container) return;
   
   try {
+    // Ensure the Create Club button exists and is visible
+    const cardHeader = document.querySelector('#content .card-header');
+    if (cardHeader) {
+      let createClubBtn = cardHeader.querySelector('button[onclick*="showCreateClubForm"]');
+      if (!createClubBtn) {
+        // Button is missing, add it
+        createClubBtn = document.createElement('button');
+        createClubBtn.setAttribute('onclick', 'showCreateClubForm()');
+        createClubBtn.className = 'btn btn-primary';
+        createClubBtn.textContent = 'Create Club';
+        cardHeader.appendChild(createClubBtn);
+      } else {
+        // Button exists, ensure it's visible
+        createClubBtn.style.display = 'block';
+        createClubBtn.style.visibility = 'visible';
+      }
+    }
+    
     // Load clubs for assigned event
     const response = await fetchWithAuth(`/api/clubs/event/${assignedEventId}`);
     allClubs = await response.json();
@@ -3678,11 +3724,11 @@ async function renderClubs() {
 }
 
 async function showCreateClubForm() {
-  const select = document.getElementById('clubEventFilter');
-  const eventId = select?.value;
+  // EventAdmin creates clubs for their assigned event
+  const eventId = assignedEventId;
   
   if (!eventId) {
-    showNotification('Please select an event first', 'error');
+    showNotification('No event assigned. Please contact an administrator.', 'error');
     return;
   }
   
@@ -3729,8 +3775,9 @@ async function showCreateClubForm() {
 async function handleCreateClub(e) {
   e.preventDefault();
   const form = e.target;
-  const select = document.getElementById('clubEventFilter');
-  const eventId = select?.value;
+  
+  // EventAdmin creates clubs for their assigned event
+  const eventId = assignedEventId;
   
   const clubData = {
     Name: form.clubName?.value?.trim() || '',
@@ -3743,18 +3790,38 @@ async function handleCreateClub(e) {
     return;
   }
   
+  if (!eventId) {
+    showNotification('No event assigned. Please contact an administrator.', 'error');
+    return;
+  }
+  
   try {
+    // Create club without EventID, then link to assigned event
     const response = await fetchWithAuth('/api/clubs', {
       method: 'POST',
-      body: JSON.stringify({ ...clubData })
+      body: JSON.stringify(clubData)
     });
     
     const result = await response.json();
     
-    if (response.ok) {
-      showNotification('Club created successfully', 'success');
-      closeModal('createClubModal');
-      await renderClubs();
+    if (response.ok && eventId) {
+      // Link the newly created club to the assigned event
+      const linkResponse = await fetchWithAuth(`/api/clubs/${result.ID}/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ EventID: eventId })
+      });
+      
+      if (linkResponse.ok) {
+        showNotification('Club created and linked to event successfully', 'success');
+        closeModal('createClubModal');
+        await renderClubs();
+      } else {
+        const linkError = await linkResponse.json();
+        showNotification('Club created but failed to link to event: ' + (linkError.error || 'Unknown error'), 'error');
+      }
+    } else if (response.ok) {
+      showNotification('Club created but no event assigned. Please contact an administrator.', 'error');
     } else {
       showNotification(result.error || 'Error creating club', 'error');
     }

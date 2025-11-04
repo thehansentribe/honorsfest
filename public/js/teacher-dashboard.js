@@ -7,12 +7,58 @@ let classRoster = [];
 
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', async () => {
-  if (!checkAuth()) {
-    window.location.href = '/login.html';
+  // Clear any previous dashboard state
+  if (window.preventBackNavigationInitialized) {
+    window.preventBackNavigationInitialized = false;
+  }
+  if (window.setupVisibilityChecksInitialized) {
+    window.setupVisibilityChecksInitialized = false;
+  }
+  
+  // Verify authentication first
+  const token = localStorage.getItem('token');
+  if (!token) {
+    logout();
     return;
   }
-
+  
+  // Check token validity
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < now) {
+      logout();
+      return;
+    }
+  } catch (error) {
+    logout();
+    return;
+  }
+  
   const user = getCurrentUser();
+  if (!user || !user.role) {
+    logout();
+    return;
+  }
+  
+  // Only Teacher should access this dashboard
+  if (user.role !== 'Teacher') {
+    // Redirect to appropriate dashboard
+    if (user.role === 'Admin') {
+      window.location.href = '/admin-dashboard.html';
+      return;
+    } else if (user.role === 'EventAdmin') {
+      window.location.href = '/eventadmin-dashboard.html';
+      return;
+    } else if (user.role === 'ClubDirector') {
+      window.location.href = '/clubdirector-dashboard.html';
+      return;
+    } else {
+      window.location.href = '/student-dashboard.html';
+      return;
+    }
+  }
+  
   currentUser = user;
   document.getElementById('userDisplayName').textContent = `${user.firstName} ${user.lastName}`;
   

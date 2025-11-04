@@ -6,12 +6,39 @@ let myRegistrations = [];
 
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', async () => {
-  if (!checkAuth()) {
-    window.location.href = '/login.html';
+  // Clear any previous dashboard state
+  if (window.preventBackNavigationInitialized) {
+    window.preventBackNavigationInitialized = false;
+  }
+  if (window.setupVisibilityChecksInitialized) {
+    window.setupVisibilityChecksInitialized = false;
+  }
+  
+  // Verify authentication first
+  const token = localStorage.getItem('token');
+  if (!token) {
+    logout();
     return;
   }
-
+  
+  // Check token validity
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < now) {
+      logout();
+      return;
+    }
+  } catch (error) {
+    logout();
+    return;
+  }
+  
   const user = getCurrentUser();
+  if (!user || !user.role) {
+    logout();
+    return;
+  }
   
   // Only Student or Staff should access this dashboard
   if (user.role !== 'Student' && user.role !== 'Staff') {
