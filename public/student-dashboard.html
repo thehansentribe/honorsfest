@@ -8,9 +8,16 @@
 </head>
 <body>
   <div class="top-banner">
-    <h1>Honors Festival</h1>
-    <div class="user-info">
-      <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+    <div class="brand">
+      <img id="siteLogo" class="site-logo" alt="Site Logo">
+      <div class="brand-text">
+        <span id="siteName" class="site-name">Honors Festival</span>
+        <span id="pageTitle" class="page-title">Student Dashboard</span>
+      </div>
+    </div>
+    <div class="user-info" style="flex-direction: column; align-items: flex-end; gap: 0.75rem; width: 100%; max-width: 640px;">
+      <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; justify-content: flex-end; width: 100%;">
+        <span id="clubNameDisplay" class="event-info" style="display: none;"></span>
         <span id="eventSelectorContainer" style="display: none;">
           <select id="eventSelector" class="form-control" style="width: auto; min-width: 200px;" onchange="switchEvent()">
             <option value="">Select Event...</option>
@@ -18,7 +25,7 @@
         </span>
         <span id="eventName" class="event-info"></span>
       </div>
-      <div style="display: flex; align-items: center; gap: 1rem;">
+      <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; justify-content: flex-end; width: 100%;">
         <span id="userName">Welcome, <strong id="userDisplayName"></strong></span>
         <span id="checkInNumberDisplay" class="event-info" style="font-weight: bold;"></span>
         <button onclick="logout()" class="btn btn-outline">Logout</button>
@@ -92,6 +99,8 @@
     document.addEventListener('DOMContentLoaded', async () => {
       if (!checkAuth()) return;
 
+      await applyBranding('Student Dashboard');
+
       const user = getCurrentUser();
       currentUserId = user.id;
       document.getElementById('userDisplayName').textContent = `${user.firstName} ${user.lastName}`;
@@ -100,11 +109,13 @@
       try {
         const userResponse = await fetchWithAuth(`/api/users/${user.id}`);
         const userDetails = await userResponse.json();
+        setClubName(userDetails?.ClubName || null);
         if (userDetails && userDetails.CheckInNumber) {
           document.getElementById('checkInNumberDisplay').textContent = `Check-In: #${userDetails.CheckInNumber}`;
         }
       } catch (error) {
         console.error('Error loading user details:', error);
+        setClubName(null);
       }
 
       await loadEvents();

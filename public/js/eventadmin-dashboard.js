@@ -114,8 +114,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
   
+  await applyBranding('Event Admin Dashboard');
+
   currentUser = user;
   assignedEventId = user.eventId;
+
+  const userDetails = await fetchUserDetails(user.id);
+  setClubName(userDetails?.ClubName || null);
   
   // Display user name
   const userDisplayNameEl = document.getElementById('userDisplayName');
@@ -508,6 +513,7 @@ async function switchTab(tabName, clickedElement = null) {
       break;
     case 'system':
       content.innerHTML = getSystemTab();
+      await initializeSystemTab();
       break;
     default:
       content.innerHTML = await getEventsTab();
@@ -803,75 +809,49 @@ function getSystemTab() {
   return `
     <div class="card">
       <div class="card-header">
-        <h2 class="card-title">System Administration</h2>
+        <h2 class="card-title">Branding</h2>
       </div>
       <div style="padding: 20px;">
-        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ffc107;">
-          <strong>⚠️ Warning:</strong> Resetting the database will delete ALL data including admin users, honors, events, clubs, classes, and registrations. Everything will be recreated fresh. This action cannot be undone.
+        <div class="branding-preview" id="brandingPreview">
+          <img id="brandingPreviewImage" alt="Logo preview">
+          <span id="brandingPreviewPlaceholder">No logo uploaded</span>
         </div>
-        <div class="form-group">
-          <label><strong>Database Reset & Reseed</strong></label>
-          <p style="color: #666; margin: 10px 0;">This will:</p>
-          <ul style="color: #666; margin: 10px 0 20px 20px;">
-            <li>Delete ALL data: honors, events, clubs, all users, classes, locations, timeslots, and registrations</li>
-            <li>Reseed the database with fresh test data</li>
-            <li>Create honors list, 3 admin users, 2 events, 8 clubs, test users, locations, timeslots, and classes</li>
-          </ul>
-          <button onclick="reseedDatabase()" class="btn btn-danger" id="reseedBtn">
-            Reset & Reseed Database
-          </button>
-        </div>
+        <p style="margin-top: 12px;">Current Site Name: <strong id="brandingSiteNameDisplay"></strong></p>
+        <p style="margin-top: 12px; color: var(--text-light);">
+          Branding settings can be managed by an Admin.
+        </p>
       </div>
     </div>
   `;
 }
 
-async function reseedDatabase() {
-  if (!confirm('Are you absolutely sure you want to reset and reseed the database?\n\nThis will delete ALL data including admin users and honors, then recreate everything fresh.\n\nYou will need to log in again after the reset.\n\nThis action CANNOT be undone!')) {
+async function initializeSystemTab() {
+  const previewImage = document.getElementById('brandingPreviewImage');
+  const previewPlaceholder = document.getElementById('brandingPreviewPlaceholder');
+  const siteNameDisplay = document.getElementById('brandingSiteNameDisplay');
+
+  if (!previewImage || !previewPlaceholder || !siteNameDisplay) {
     return;
   }
-  
-  const btn = document.getElementById('reseedBtn');
-  btn.disabled = true;
-  btn.textContent = 'Resetting...';
-  
+
   try {
-    const response = await fetchWithAuth('/api/admin/reseed', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ confirm: true })
-    });
-    
-    // Check if response is JSON
-    const contentType = response.headers.get('content-type');
-    let result;
-    
-    if (contentType && contentType.includes('application/json')) {
-      result = await response.json();
+    const branding = await fetchBrandingSettings();
+    siteNameDisplay.textContent = branding.siteName || 'Honors Festival';
+
+    if (branding.logoData) {
+      previewImage.src = branding.logoData;
+      previewImage.style.display = 'block';
+      previewPlaceholder.style.display = 'none';
     } else {
-      // If not JSON, read as text to see what we got
-      const text = await response.text();
-      console.error('Non-JSON response:', text);
-      throw new Error('Server returned non-JSON response. Check server logs.');
-    }
-    
-    if (response.ok) {
-      showNotification('Database reset and reseeded successfully! Redirecting to login...', 'success');
-      
-      // Redirect to login after 2 seconds since the session will be invalid
-      setTimeout(() => {
-        window.location.href = '/login.html';
-      }, 2000);
-    } else {
-      showNotification(result.error || 'Error resetting database', 'error');
-      btn.disabled = false;
-      btn.textContent = 'Reset & Reseed Database';
+      previewImage.removeAttribute('src');
+      previewImage.style.display = 'none';
+      previewPlaceholder.style.display = 'block';
     }
   } catch (error) {
-    console.error('Reseed error:', error);
-    showNotification('Error resetting database: ' + error.message, 'error');
-    btn.disabled = false;
-    btn.textContent = 'Reset & Reseed Database';
+    console.error('Error loading branding settings:', error);
+    siteNameDisplay.textContent = 'Honors Festival';
+    previewImage.style.display = 'none';
+    previewPlaceholder.style.display = 'block';
   }
 }
 
@@ -3313,7 +3293,6 @@ window.showConflictModal = showConflictModal;
 window.resolveConflict = resolveConflict;
 // generateReport removed - use generateEventReport instead
 window.generateEventReport = generateEventReport;
-window.reseedDatabase = reseedDatabase;
 window.updateReportButton = updateReportButton;
 window.renderLocations = renderLocations;
 // Timeslot management functions

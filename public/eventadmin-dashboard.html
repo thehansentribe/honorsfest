@@ -11,8 +11,15 @@
 </head>
 <body>
   <div class="top-banner">
-    <h1>Event Admin Dashboard</h1>
+    <div class="brand">
+      <img id="siteLogo" class="site-logo" alt="Site Logo">
+      <div class="brand-text">
+        <span id="siteName" class="site-name">Honors Festival</span>
+        <span id="pageTitle" class="page-title">Event Admin Dashboard</span>
+      </div>
+    </div>
     <div class="user-info">
+      <span id="clubNameDisplay" class="event-info" style="display: none;"></span>
       <span id="eventName" class="event-info"></span>
       <span id="userName">Welcome, <strong id="userDisplayName"></strong></span>
       <button onclick="logout()" class="btn btn-outline">Logout</button>

@@ -16,16 +16,18 @@ const codeRoutes = require('./routes/registrationCodes');
 const inviteRoutes = require('./routes/invites');
 const adminRoutes = require('./routes/admin');
 const checkinRoutes = require('./routes/checkin');
+const settingsRoutes = require('./routes/settings');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const JSON_LIMIT = process.env.JSON_LIMIT || '10mb';
 
 // Trust proxy - important for Render and other hosting platforms
 // This allows Express to correctly detect HTTPS from X-Forwarded-Proto header
 app.set('trust proxy', true);
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: JSON_LIMIT }));
 app.use(express.static(path.join(__dirname, '../public')));
 
 // API Routes
@@ -43,6 +45,7 @@ app.use('/api/codes', codeRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/checkin', checkinRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Serve frontend
 app.get('*', (req, res) => {

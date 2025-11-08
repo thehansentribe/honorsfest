@@ -73,21 +73,72 @@ body {
   box-shadow: var(--shadow);
 }
 
-.top-banner h1 {
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.site-logo {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: white;
+  border: 1px solid var(--border);
+  padding: 2px;
+  display: none;
+}
+
+.site-name {
   font-size: 1.25rem;
   font-weight: 600;
   color: var(--primary-color);
+  line-height: 1.2;
+}
+
+.page-title {
+  font-size: 0.875rem;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .top-banner .user-info {
   display: flex;
   gap: 1rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .top-banner .event-info {
   font-weight: 500;
   color: var(--text-light);
+}
+
+.branding-preview {
+  border: 1px dashed var(--border);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 130px;
+  text-align: center;
+}
+
+.branding-preview img {
+  max-height: 110px;
+  max-width: 260px;
+  object-fit: contain;
+  display: none;
 }
 
 /* Buttons */
@@ -600,7 +651,7 @@ body {
     padding: 0.75rem;
   }
 
-  .top-banner h1 {
+  .site-name {
     font-size: 1.125rem;
     margin-bottom: 0.5rem;
   }
@@ -697,7 +748,7 @@ body {
     padding: 0.5rem;
   }
 
-  .top-banner h1 {
+  .site-name {
     font-size: 1rem;
   }
 
@@ -764,7 +815,7 @@ body {
     padding: 0.75rem;
   }
 
-  .top-banner h1 {
+  .site-name {
     font-size: 0.9375rem;
   }
 

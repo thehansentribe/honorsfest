@@ -45,8 +45,9 @@ router.post('/reseed', requireRole('Admin'), async (req, res) => {
     // Delete events (last, since everything references them)
     db.exec(`DELETE FROM Events`);
     
-    // Delete honors - will be re-seeded fresh
+    // Delete honors and settings - will be re-seeded fresh
     db.exec(`DELETE FROM Honors`);
+    db.exec(`DELETE FROM Settings`);
 
     // Re-enable foreign key constraints
     db.pragma('foreign_keys = ON');

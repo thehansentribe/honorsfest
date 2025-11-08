@@ -178,6 +178,11 @@ function initializeDatabase() {
         UNIQUE(ClubID, EventID)
       );
 
+      CREATE TABLE IF NOT EXISTS Settings (
+        Key TEXT PRIMARY KEY,
+        Value TEXT
+      );
+
       CREATE INDEX IF NOT EXISTS idx_club_events_club ON ClubEvents(ClubID);
       CREATE INDEX IF NOT EXISTS idx_club_events_event ON ClubEvents(EventID);
     `;

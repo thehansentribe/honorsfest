@@ -8,11 +8,18 @@
 </head>
 <body>
   <div class="top-banner">
-    <h1>Teacher Dashboard</h1>
-    <div class="user-info">
+    <div class="brand">
+      <img id="siteLogo" class="site-logo" alt="Site Logo">
+      <div class="brand-text">
+        <span id="siteName" class="site-name">Honors Festival</span>
+        <span id="pageTitle" class="page-title">Teacher Dashboard</span>
+      </div>
+    </div>
+    <div class="user-info" style="flex-wrap: wrap; gap: 0.75rem;">
+      <span id="clubNameDisplay" class="event-info" style="display: none;"></span>
       <span id="eventName" class="event-info"></span>
       <span id="userName">Welcome, <strong id="userDisplayName"></strong></span>
-      <span id="checkInNumberDisplay" class="event-info" style="margin-left: 15px; font-weight: bold;"></span>
+      <span id="checkInNumberDisplay" class="event-info" style="font-weight: bold;"></span>
       <button onclick="logout()" class="btn btn-outline">Logout</button>
     </div>
   </div>
@@ -49,6 +56,8 @@
     document.addEventListener('DOMContentLoaded', async () => {
       if (!checkAuth()) return;
 
+      await applyBranding('Teacher Dashboard');
+
       const user = getCurrentUser();
       currentUserId = user.id;
       document.getElementById('userDisplayName').textContent = `${user.firstName} ${user.lastName}`;
@@ -57,11 +66,13 @@
       try {
         const userResponse = await fetchWithAuth(`/api/users/${user.id}`);
         const userDetails = await userResponse.json();
+        setClubName(userDetails?.ClubName || null);
         if (userDetails && userDetails.CheckInNumber) {
           document.getElementById('checkInNumberDisplay').textContent = `Check-In: #${userDetails.CheckInNumber}`;
         }
       } catch (error) {
         console.error('Error loading user details:', error);
+        setClubName(null);
       }
 
       await checkEventStatus();

@@ -777,6 +777,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
   
+  await window.applyBranding('Club Director Dashboard');
+
   // Only ClubDirector should access this dashboard
   if (user.role !== 'ClubDirector') {
     // Redirect to appropriate dashboard
@@ -798,8 +800,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   clubDirectorUser = user;
   document.getElementById('userDisplayName').textContent = `${user.firstName} ${user.lastName}`;
 
-  // Get the director's club from JWT
-  clubDirectorClubId = user.clubId;
+  const userDetails = await window.fetchUserDetails(user.id);
+  window.setClubName(userDetails?.ClubName || null);
+
+  // Get the director's club from JWT or fetched details
+  clubDirectorClubId = userDetails?.ClubID ?? user.clubId ?? null;
   
 
   // Load events for this club

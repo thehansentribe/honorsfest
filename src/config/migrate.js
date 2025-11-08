@@ -116,6 +116,18 @@ function migrateDatabase() {
       db.exec('ALTER TABLE Users ADD COLUMN InviteAccepted BOOLEAN DEFAULT 0');
       console.log('✓ InviteAccepted column added');
     }
+
+    const hasSettingsTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='Settings'").get();
+    if (!hasSettingsTable) {
+      console.log('Creating Settings table...');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS Settings (
+          Key TEXT PRIMARY KEY,
+          Value TEXT
+        )
+      `);
+      console.log('✓ Settings table created');
+    }
     
   } catch (error) {
     console.error('Migration error:', error);

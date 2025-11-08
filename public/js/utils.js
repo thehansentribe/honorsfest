@@ -32,6 +32,132 @@ function getCurrentUser() {
   }
 }
 
+const BRANDING_DEFAULTS = {
+  siteName: 'Honors Festival',
+  logoData: null
+};
+
+let brandingSettingsCache = null;
+let brandingSettingsPromise = null;
+
+async function fetchBrandingSettings() {
+  if (brandingSettingsCache) {
+    return brandingSettingsCache;
+  }
+
+  if (!brandingSettingsPromise) {
+    brandingSettingsPromise = fetch('/api/settings/branding')
+      .then(res => {
+        if (!res.ok) {
+          throw new Error('Failed to load branding settings');
+        }
+        return res.json();
+      })
+      .catch(() => BRANDING_DEFAULTS)
+      .then(data => {
+        brandingSettingsCache = {
+          siteName: data.siteName || BRANDING_DEFAULTS.siteName,
+          logoData: data.logoData || BRANDING_DEFAULTS.logoData
+        };
+        brandingSettingsPromise = null;
+        return brandingSettingsCache;
+      });
+  }
+
+  return brandingSettingsPromise;
+}
+
+function refreshBrandingCache(data) {
+  if (!data) {
+    brandingSettingsCache = null;
+    brandingSettingsPromise = null;
+    return;
+  }
+
+  brandingSettingsCache = {
+    siteName: data.siteName || BRANDING_DEFAULTS.siteName,
+    logoData: data.logoData || BRANDING_DEFAULTS.logoData
+  };
+  brandingSettingsPromise = null;
+}
+
+async function applyBranding(pageTitle) {
+  try {
+    const branding = await fetchBrandingSettings();
+    const siteNameEl = document.getElementById('siteName');
+    const pageTitleEl = document.getElementById('pageTitle');
+    const logoEl = document.getElementById('siteLogo');
+
+    if (siteNameEl) {
+      siteNameEl.textContent = branding.siteName || BRANDING_DEFAULTS.siteName;
+    }
+
+    if (pageTitleEl && pageTitle) {
+      pageTitleEl.textContent = pageTitle;
+    }
+
+    if (logoEl) {
+      if (branding.logoData) {
+        logoEl.src = branding.logoData;
+        logoEl.style.display = 'block';
+      } else {
+        logoEl.removeAttribute('src');
+        logoEl.style.display = 'none';
+      }
+    }
+  } catch (error) {
+    console.warn('Unable to apply branding:', error);
+    const siteNameEl = document.getElementById('siteName');
+    const pageTitleEl = document.getElementById('pageTitle');
+    const logoEl = document.getElementById('siteLogo');
+
+    if (siteNameEl) {
+      siteNameEl.textContent = BRANDING_DEFAULTS.siteName;
+    }
+    if (pageTitleEl && pageTitle) {
+      pageTitleEl.textContent = pageTitle;
+    }
+    if (logoEl) {
+      logoEl.style.display = 'none';
+    }
+  }
+}
+
+const userDetailsCache = new Map();
+
+async function fetchUserDetails(userId) {
+  if (!userId) return null;
+  if (userDetailsCache.has(userId)) {
+    return userDetailsCache.get(userId);
+  }
+
+  try {
+    const response = await fetchWithAuth(`/api/users/${userId}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch user ${userId}`);
+    }
+    const data = await response.json();
+    userDetailsCache.set(userId, data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching user details:', error);
+    return null;
+  }
+}
+
+function setClubName(clubName) {
+  const el = document.getElementById('clubNameDisplay');
+  if (!el) return;
+
+  if (clubName) {
+    el.textContent = `Club: ${clubName}`;
+    el.style.display = '';
+  } else {
+    el.textContent = 'Club: None';
+    el.style.display = '';
+  }
+}
+
 function formatDate(dateStr) {
   if (!dateStr) return '';
   const date = new Date(dateStr);
@@ -155,6 +281,12 @@ function createMobileCard(rowData, headerText = null, actionsHtml = '') {
     </div>
   `;
 }
+
+window.fetchBrandingSettings = fetchBrandingSettings;
+window.applyBranding = applyBranding;
+window.refreshBrandingCache = refreshBrandingCache;
+window.fetchUserDetails = fetchUserDetails;
+window.setClubName = setClubName;
 
 /**
  * Wrap table HTML with responsive wrapper and add mobile card view

@@ -8,8 +8,15 @@
 </head>
 <body>
   <div class="top-banner">
-    <h1>Club Director Dashboard</h1>
-    <div class="user-info">
+    <div class="brand">
+      <img id="siteLogo" class="site-logo" alt="Site Logo">
+      <div class="brand-text">
+        <span id="siteName" class="site-name">Honors Festival</span>
+        <span id="pageTitle" class="page-title">Club Director Dashboard</span>
+      </div>
+    </div>
+    <div class="user-info" style="flex-wrap: wrap; gap: 0.75rem;">
+      <span id="clubNameDisplay" class="event-info" style="display: none;"></span>
       <span id="eventSelectorContainer" style="display: none;">
         <select id="eventSelector" onchange="switchClubDirectorEvent(this.value)" style="margin-right: 15px; padding: 5px 10px; border-radius: 4px; border: 1px solid #ccc;">
           <!-- Options populated dynamically -->

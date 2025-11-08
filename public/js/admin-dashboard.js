@@ -8,6 +8,7 @@ let allTimeslots = [];
 let allClubs = [];
 let allClasses = [];
 let currentUser = null;
+let brandingFormState = { logoData: null };
 
 function formatClubOptionLabel(club) {
   if (!club) return '';
@@ -120,8 +121,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
   
+  await applyBranding('Admin Dashboard');
+
   currentUser = user;
   document.getElementById('userDisplayName').textContent = `${user.firstName} ${user.lastName}`;
+
+  const userDetails = await fetchUserDetails(user.id);
+  setClubName(userDetails?.ClubName || null);
 
   // Make switchTab available globally
   window.switchTab = switchTab;
@@ -493,6 +499,7 @@ async function switchTab(tabName, clickedElement = null) {
       break;
     case 'system':
       content.innerHTML = getSystemTab();
+      await initializeSystemTab();
       break;
     default:
       content.innerHTML = await getEventsTab();
@@ -601,11 +608,186 @@ function getReportsTab() {
   `;
 }
 
+async function initializeSystemTab() {
+  await initializeBrandingSection();
+}
+
+async function initializeBrandingSection() {
+  const form = document.getElementById('brandingForm');
+  if (!form) return;
+
+  const siteNameInput = document.getElementById('siteNameInput');
+  const logoInput = document.getElementById('logoInput');
+  const previewImage = document.getElementById('brandingPreviewImage');
+  const previewPlaceholder = document.getElementById('brandingPreviewPlaceholder');
+  const removeLogoBtn = document.getElementById('removeLogoBtn');
+
+  if (!siteNameInput || !logoInput || !previewImage || !previewPlaceholder || !removeLogoBtn) {
+    return;
+  }
+
+  if (form.dataset.initialized === 'true') {
+    return;
+  }
+  form.dataset.initialized = 'true';
+
+  try {
+    const branding = await fetchBrandingSettings();
+    siteNameInput.value = branding.siteName || '';
+    brandingFormState.logoData = branding.logoData || null;
+  } catch (error) {
+    console.error('Error loading branding settings:', error);
+    siteNameInput.value = '';
+    brandingFormState.logoData = null;
+  }
+
+  updateBrandingPreviewDisplay(previewImage, previewPlaceholder);
+  toggleRemoveLogoButton(removeLogoBtn);
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const submitBtn = form.querySelector('button[type="submit"]');
+
+    const payload = {
+      siteName: siteNameInput.value.trim(),
+      logoData: brandingFormState.logoData
+    };
+
+    if (!payload.siteName) {
+      showNotification('Site name is required', 'error');
+      return;
+    }
+
+    try {
+      if (submitBtn) submitBtn.disabled = true;
+      if (removeLogoBtn) removeLogoBtn.disabled = true;
+
+      const response = await fetchWithAuth('/api/settings/branding', {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        showNotification(result.error || 'Error saving branding settings', 'error');
+        return;
+      }
+
+      brandingFormState.logoData = result.logoData || null;
+      siteNameInput.value = result.siteName || siteNameInput.value;
+      updateBrandingPreviewDisplay(previewImage, previewPlaceholder);
+      toggleRemoveLogoButton(removeLogoBtn);
+
+      refreshBrandingCache(result);
+      await applyBranding('Admin Dashboard');
+      showNotification('Branding saved successfully', 'success');
+    } catch (error) {
+      console.error('Error saving branding:', error);
+      showNotification('Error saving branding settings', 'error');
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+      if (removeLogoBtn) removeLogoBtn.disabled = !brandingFormState.logoData;
+      if (logoInput) logoInput.value = '';
+    }
+  });
+
+  logoInput.addEventListener('change', async (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    const maxSize = 2 * 1024 * 1024; // 2 MB
+    if (file.size > maxSize) {
+      showNotification('Logo must be 2 MB or smaller', 'error');
+      event.target.value = '';
+      return;
+    }
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      brandingFormState.logoData = dataUrl;
+      updateBrandingPreviewDisplay(previewImage, previewPlaceholder);
+      toggleRemoveLogoButton(removeLogoBtn);
+    } catch (error) {
+      console.error('Error reading logo file:', error);
+      showNotification('Error reading logo file', 'error');
+    }
+  });
+
+  removeLogoBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    brandingFormState.logoData = null;
+    updateBrandingPreviewDisplay(previewImage, previewPlaceholder);
+    toggleRemoveLogoButton(removeLogoBtn);
+    if (logoInput) logoInput.value = '';
+  });
+}
+
+function updateBrandingPreviewDisplay(previewImage, previewPlaceholder) {
+  if (!previewImage || !previewPlaceholder) return;
+
+  if (brandingFormState.logoData) {
+    previewImage.src = brandingFormState.logoData;
+    previewImage.style.display = 'block';
+    previewPlaceholder.style.display = 'none';
+  } else {
+    previewImage.removeAttribute('src');
+    previewImage.style.display = 'none';
+    previewPlaceholder.style.display = 'block';
+  }
+}
+
+function toggleRemoveLogoButton(button) {
+  if (!button) return;
+  button.disabled = !brandingFormState.logoData;
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 // Check-in functionality now uses the reusable module in checkin.js
 // Old check-in functions removed
 
 function getSystemTab() {
   return `
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Branding</h2>
+      </div>
+      <div style="padding: 20px;">
+        <form id="brandingForm">
+          <div class="form-group">
+            <label for="siteNameInput">Display Name</label>
+            <input type="text" id="siteNameInput" class="form-control" maxlength="100" required>
+          </div>
+          <div class="form-group">
+            <label for="logoInput">Logo</label>
+            <input type="file" id="logoInput" accept="image/png,image/jpeg,image/svg+xml">
+            <small style="color: var(--text-light); display: block; margin-top: 4px;">
+              Recommended: PNG, JPG, or SVG up to 2 MB.
+            </small>
+          </div>
+          <div class="form-group">
+            <label>Preview</label>
+            <div class="branding-preview" id="brandingPreview">
+              <img id="brandingPreviewImage" alt="Logo preview">
+              <span id="brandingPreviewPlaceholder">No logo uploaded</span>
+            </div>
+          </div>
+          <div class="form-actions" style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            <button type="button" id="removeLogoBtn" class="btn btn-outline">Remove Logo</button>
+            <button type="submit" class="btn btn-primary">Save Branding</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-header">
         <h2 class="card-title">System Administration</h2>

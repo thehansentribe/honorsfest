@@ -3,6 +3,7 @@ const fs = require('fs');
 const bcrypt = require('bcrypt');
 const path = require('path');
 const { db, initializeDatabase } = require('./db');
+const Setting = require('../models/setting');
 
 function seedDatabase() {
   try {
@@ -315,6 +316,9 @@ function seedDatabase() {
         }
       }
     });
+
+    Setting.set('siteName', 'Honors Festival');
+    Setting.delete('logoData');
 
     console.log('\n=== Database seeding completed successfully ===');
     console.log('\nSummary:');
