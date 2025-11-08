@@ -400,14 +400,17 @@ async function renderClasses() {
     
     clubDirectorClasses = await response.json();
     
-    // Filter out inactive classes for Club Directors
     const activeClasses = clubDirectorClasses.filter(c => c.Active);
+    const inactiveClasses = clubDirectorClasses.filter(c => !c.Active);
     
-    if (activeClasses.length === 0) {
-      container.innerHTML = '<p class="text-center">No active classes found for this event</p>';
+    if (activeClasses.length === 0 && inactiveClasses.length === 0) {
+      container.innerHTML = '<p class="text-center">No classes found for this event</p>';
       return;
     }
     
+    const hasActive = activeClasses.length > 0;
+    const hasInactive = inactiveClasses.length > 0;
+
     const tableHtml = `
       <table class="data-table">
         <thead>
@@ -422,10 +425,9 @@ async function renderClasses() {
           </tr>
         </thead>
         <tbody>
-          ${activeClasses.map(cls => {
-            // Check if current director created this class
-            const canEdit = cls.CreatedBy === clubDirectorUser?.id;
-            return `
+          ${hasActive ? activeClasses.map(cls => {
+              const canEdit = cls.CreatedBy === clubDirectorUser?.id;
+              return `
           <tr style="border-bottom: 1px solid #e0e0e0;">
             <td style="padding: 12px 8px; text-align: left;"><strong>${cls.HonorName || 'N/A'}</strong></td>
             <td style="padding: 12px 8px; text-align: left;">${cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
@@ -442,29 +444,50 @@ async function renderClasses() {
             </td>
           </tr>
         `;
-        }).join('')}
+            }).join('') : ''}
+        ${hasInactive ? `
+          <tr style="background: #f9f9f9; border-top: 2px solid #ccc;">
+            <td colspan="7" style="padding: 10px; font-weight: bold; color: #666;">Deactivated Classes</td>
+          </tr>
+          ${inactiveClasses.map(cls => `
+          <tr style="border-bottom: 1px solid #e0e0e0; opacity: 0.7; background: #f9f9f9;">
+            <td style="padding: 12px 8px; text-align: left;"><strong>${cls.HonorName || 'N/A'}</strong></td>
+            <td style="padding: 12px 8px; text-align: left;">${cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
+            <td style="padding: 12px 8px; text-align: left;">${cls.LocationName || 'N/A'}</td>
+            <td style="padding: 12px 8px; text-align: left;">
+              ${cls.TimeslotDate || 'N/A'}<br>
+              <small style="color: var(--text-light);">${cls.TimeslotStartTime ? convertTo12Hour(cls.TimeslotStartTime) : ''} - ${cls.TimeslotEndTime ? convertTo12Hour(cls.TimeslotEndTime) : ''}</small>
+            </td>
+            <td style="padding: 12px 8px; text-align: left;">${cls.EnrolledCount || 0}/${cls.WaitlistCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}</td>
+            <td style="padding: 12px 8px; text-align: left;"><span class="badge bg-danger">Inactive</span></td>
+            <td style="padding: 12px 8px; text-align: left;"><span style="color: #999;">Inactive class</span></td>
+          </tr>
+        `).join('')}
+        ` : ''}
         </tbody>
       </table>
     `;
     
-    const mobileCards = activeClasses.map(cls => {
+    const mobileCards = [...activeClasses, ...inactiveClasses].map(cls => {
       const canEdit = cls.CreatedBy === clubDirectorUser?.id;
-      const dateTime = cls.TimeslotDate 
+      const dateTime = cls.TimeslotDate
         ? `${cls.TimeslotDate}<br><small style="color: var(--text-light);">${cls.TimeslotStartTime ? convertTo12Hour(cls.TimeslotStartTime) : ''} - ${cls.TimeslotEndTime ? convertTo12Hour(cls.TimeslotEndTime) : ''}</small>`
         : 'N/A';
-      
-      const actionsHtml = `
-        <button onclick="viewClassStudents(${cls.ID})" class="btn btn-sm btn-info">Manage Students</button>
-        ${canEdit ? `<button onclick="editClass(${cls.ID})" class="btn btn-sm btn-secondary">Edit</button>` : ''}
-      `;
-      
+
+      const actionsHtml = cls.Active
+        ? `
+          <button onclick="viewClassStudents(${cls.ID})" class="btn btn-sm btn-info">Manage Students</button>
+          ${canEdit ? `<button onclick="editClass(${cls.ID})" class="btn btn-sm btn-secondary">Edit</button>` : ''}
+        `
+        : `<span style="color: #999;">Inactive class</span>`;
+
       return createMobileCard({
         'Honor': cls.HonorName || 'N/A',
         'Teacher': cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : 'Unassigned',
         'Location': cls.LocationName || 'N/A',
         'Date/Time': dateTime,
         'Capacity': `${cls.EnrolledCount || 0}/${cls.WaitlistCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}`,
-        'Status': 'Active'
+        'Status': cls.Active ? 'Active' : 'Inactive'
       }, cls.HonorName || 'N/A', actionsHtml);
     }).join('');
     
