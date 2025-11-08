@@ -63,6 +63,11 @@ let showDeactivatedUsers = false;
 
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', async () => {
+  const isAdminPage = window.location.pathname.includes('admin-dashboard');
+  if (!isAdminPage) {
+    return;
+  }
+
   // Clear any previous dashboard state
   if (window.preventBackNavigationInitialized) {
     window.preventBackNavigationInitialized = false;
@@ -154,11 +159,13 @@ async function toggleEventDropdown(role) {
   const eventSelect = document.getElementById('eventId');
   const clubSelect = document.getElementById('clubId');
   const summaryEl = document.getElementById('clubEventSummary');
-  const isClubDirector = role === 'ClubDirector';
-  
+
   if (!eventContainer || !clubContainer) return;
-  
-  // Helper to ensure event dropdown is populated once
+
+  const clubOnlyRoles = ['ClubDirector', 'Teacher', 'Student', 'Staff'];
+  const requiresEventSelection = role === 'EventAdmin';
+  const requiresClubSelection = clubOnlyRoles.includes(role);
+
   async function ensureEventOptions() {
     if (!eventSelect || eventSelect.dataset.loaded === 'true') return;
     const response = await fetchWithAuth('/api/events');
@@ -171,41 +178,26 @@ async function toggleEventDropdown(role) {
     });
     eventSelect.dataset.loaded = 'true';
   }
-  
-  if (isClubDirector) {
+
+  if (requiresEventSelection) {
+    eventContainer.style.display = 'block';
+    await ensureEventOptions();
+  } else {
     eventContainer.style.display = 'none';
     if (eventSelect) {
       eventSelect.value = '';
     }
-    if (clubContainer) clubContainer.style.display = 'block';
-    await loadClubsForCreateUser();
-    updateClubEventSummaryFromSelect(clubSelect, summaryEl);
-    return;
   }
 
-  if (role === 'EventAdmin' || role === 'Student' || role === 'Teacher') {
-    eventContainer.style.display = 'block';
-    await ensureEventOptions();
-    
-    // Show club selector for roles that must belong to a club
-    if (role === 'Student' || role === 'Teacher') {
-      clubContainer.style.display = 'block';
-      
-      // If an event is already selected, refresh the club list
-      if (eventSelect && eventSelect.value) {
-        await loadClubsForCreateUser(eventSelect.value);
-      } else {
-        await loadClubsForCreateUser(null);
-      }
-    } else {
-      if (summaryEl) {
-        summaryEl.style.display = 'none';
-      }
-      clubContainer.style.display = 'none';
-    }
+  if (requiresClubSelection) {
+    clubContainer.style.display = 'block';
+    await loadClubsForCreateUser();
+    updateClubEventSummaryFromSelect(clubSelect, summaryEl);
   } else {
-    eventContainer.style.display = 'none';
     clubContainer.style.display = 'none';
+    if (summaryEl) {
+      summaryEl.style.display = 'none';
+    }
   }
 }
 
@@ -216,10 +208,13 @@ async function toggleEditEventDropdown(role) {
   const eventSelect = document.getElementById('editEventId');
   const clubSelect = document.getElementById('editClubId');
   const summaryEl = document.getElementById('editClubEventSummary');
-  const isClubDirector = role === 'ClubDirector';
-  
+
   if (!eventContainer || !clubContainer) return;
-  
+
+  const clubOnlyRoles = ['ClubDirector', 'Teacher', 'Student', 'Staff'];
+  const requiresEventSelection = role === 'EventAdmin';
+  const requiresClubSelection = clubOnlyRoles.includes(role);
+
   async function ensureEventOptions() {
     if (!eventSelect || eventSelect.dataset.loaded === 'true') return;
     const response = await fetchWithAuth('/api/events');
@@ -232,7 +227,6 @@ async function toggleEditEventDropdown(role) {
     });
     eventSelect.dataset.loaded = 'true';
     
-    // Preserve current selection if available
     const formEl = document.getElementById('editUserForm');
     const userId = formEl ? parseInt(formEl.dataset.userId) : null;
     const currentUser = allUsers.find(u => u.ID === userId);
@@ -240,34 +234,23 @@ async function toggleEditEventDropdown(role) {
       eventSelect.value = currentUser.EventID;
     }
   }
-  
-  if (isClubDirector) {
-    if (eventContainer) eventContainer.style.display = 'none';
+
+  if (requiresEventSelection) {
+    eventContainer.style.display = 'block';
+    await ensureEventOptions();
+  } else {
+    eventContainer.style.display = 'none';
     if (eventSelect) {
       eventSelect.value = '';
     }
-    if (clubContainer) clubContainer.style.display = 'block';
-    await loadClubsForEditUser();
-    updateClubEventSummaryFromSelect(clubSelect, summaryEl);
-    return;
   }
 
-  if (role === 'EventAdmin' || ['Student', 'Teacher'].includes(role)) {
-    if (eventContainer) eventContainer.style.display = 'block';
-    await ensureEventOptions();
+  if (requiresClubSelection) {
+    clubContainer.style.display = 'block';
+    await loadClubsForEditUser();
+    updateClubEventSummaryFromSelect(clubSelect, summaryEl);
   } else {
-    if (eventContainer) eventContainer.style.display = 'none';
-  }
-  
-  if (['Student', 'Teacher'].includes(role)) {
-    if (clubContainer) clubContainer.style.display = 'block';
-    if (eventSelect && eventSelect.value) {
-      await loadClubsForEditUser(eventSelect.value);
-    } else {
-      await loadClubsForEditUser(null);
-    }
-  } else {
-    if (clubContainer) clubContainer.style.display = 'none';
+    clubContainer.style.display = 'none';
     if (summaryEl) {
       summaryEl.style.display = 'none';
     }
@@ -280,12 +263,13 @@ async function loadClubsForCreateUser(eventId) {
   const clubSelect = document.getElementById('clubId');
   const summaryEl = document.getElementById('clubEventSummary');
   const role = document.getElementById('role')?.value || '';
-  const isClubDirector = role === 'ClubDirector';
+  const clubOnlyRoles = ['ClubDirector', 'Teacher', 'Student', 'Staff'];
+  const useAllClubs = clubOnlyRoles.includes(role);
   const selectedEventId = eventId ? parseInt(eventId, 10) : null;
   
   if (!clubSelect) return;
 
-  if (!isClubDirector && !selectedEventId) {
+  if (!useAllClubs && !selectedEventId) {
     if (clubContainer) clubContainer.style.display = 'none';
     clubSelect.innerHTML = '<option value="">No Club</option>';
     clubSelect._clubData = [];
@@ -302,7 +286,7 @@ async function loadClubsForCreateUser(eventId) {
     allClubs = clubsResponse;
     let clubs = clubsResponse;
 
-    if (!isClubDirector && selectedEventId) {
+    if (!useAllClubs && selectedEventId) {
       clubs = clubs.filter(club =>
         (club.Events || []).some(event => event.ID === selectedEventId)
       );
@@ -314,14 +298,14 @@ async function loadClubsForCreateUser(eventId) {
       if (clubs.length === 0) {
         const emptyOption = document.createElement('option');
         emptyOption.value = '';
-        emptyOption.textContent = isClubDirector
+        emptyOption.textContent = useAllClubs
           ? 'No clubs available'
           : 'No clubs linked to this event';
         emptyOption.disabled = true;
         clubSelect.appendChild(emptyOption);
         clubSelect.disabled = true;
         if (summaryEl) {
-          summaryEl.textContent = isClubDirector
+          summaryEl.textContent = useAllClubs
             ? 'No clubs are available yet. Create a club to assign a director.'
             : 'No clubs are currently linked to the selected event.';
           summaryEl.style.display = 'block';
@@ -360,12 +344,13 @@ async function loadClubsForEditUser(eventId) {
   const user = allUsers.find(u => u.ID === parseInt(document.getElementById('editUserForm')?.dataset.userId || 0));
   const summaryEl = document.getElementById('editClubEventSummary');
   const role = document.getElementById('editRole')?.value || user?.Role || '';
-  const isClubDirector = role === 'ClubDirector';
+  const clubOnlyRoles = ['ClubDirector', 'Teacher', 'Student', 'Staff'];
+  const useAllClubs = clubOnlyRoles.includes(role);
   const selectedEventId = eventId ? parseInt(eventId, 10) : null;
   
   if (!clubSelect) return;
 
-  if (!isClubDirector && !selectedEventId) {
+  if (!useAllClubs && !selectedEventId) {
     if (clubContainer) clubContainer.style.display = 'none';
     clubSelect.innerHTML = '<option value="">No Club</option>';
     clubSelect._clubData = [];
@@ -382,7 +367,7 @@ async function loadClubsForEditUser(eventId) {
     allClubs = clubsResponse;
     let clubs = clubsResponse;
 
-    if (!isClubDirector && selectedEventId) {
+    if (!useAllClubs && selectedEventId) {
       clubs = clubs.filter(club =>
         (club.Events || []).some(event => event.ID === selectedEventId)
       );
@@ -401,14 +386,14 @@ async function loadClubsForEditUser(eventId) {
       if (clubs.length === 0) {
         const emptyOption = document.createElement('option');
         emptyOption.value = '';
-        emptyOption.textContent = isClubDirector
+        emptyOption.textContent = useAllClubs
           ? 'No clubs available'
           : 'No clubs linked to this event';
         emptyOption.disabled = true;
         clubSelect.appendChild(emptyOption);
         clubSelect.disabled = true;
         if (summaryEl) {
-          summaryEl.textContent = isClubDirector
+          summaryEl.textContent = useAllClubs
             ? 'No clubs are available yet. Create a club to assign a director.'
             : 'No clubs are currently linked to the selected event.';
           summaryEl.style.display = 'block';
@@ -451,6 +436,10 @@ window.loadClubsForCreateUser = loadClubsForCreateUser;
 window.loadClubsForEditUser = loadClubsForEditUser;
 
 async function switchTab(tabName, clickedElement = null) {
+  if (tabName === 'locations') {
+    tabName = 'clubs';
+  }
+
   currentTab = tabName;
   try { localStorage.setItem('adminCurrentTab', tabName); } catch (e) {}
   
@@ -480,11 +469,6 @@ async function switchTab(tabName, clickedElement = null) {
       content.innerHTML = await getUsersTab();
       await renderUsers();
       break;
-    case 'locations':
-      content.innerHTML = await getLocationsTab();
-      updateEventDropdowns(); // Populate event dropdown
-      await renderLocations();
-      break;
     case 'timeslots':
       content.innerHTML = await getTimeslotsTab();
       updateEventDropdowns(); // Populate event dropdown
@@ -499,16 +483,20 @@ async function switchTab(tabName, clickedElement = null) {
       updateEventDropdowns(); // Populate event dropdown
       await renderClasses();
       break;
-    case 'reports':
-      content.innerHTML = await getReportsTab();
-      updateEventDropdowns(); // Populate event dropdown
-      break;
     case 'checkin':
       content.innerHTML = getCheckInTab({ eventId: null, userRole: currentUser.role, userClubId: null });
       await checkInPopulateEventSelector();
       break;
+    case 'reports':
+      content.innerHTML = await getReportsTab();
+      updateEventDropdowns(); // Populate event dropdown
+      break;
     case 'system':
       content.innerHTML = getSystemTab();
+      break;
+    default:
+      content.innerHTML = await getEventsTab();
+      await renderEvents();
       break;
   }
 }
