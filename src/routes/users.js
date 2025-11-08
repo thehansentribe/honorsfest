@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const User = require('../models/user');
+const { allowMultipleClubDirectors } = require('../config/features');
 
 const router = express.Router();
 
@@ -82,6 +83,8 @@ router.get('/:id', (req, res) => {
 router.post('/', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) => {
   try {
     const { FirstName, LastName, DateOfBirth, Email, Phone, Password, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck } = req.body;
+    const clubIdInt = ClubID ? parseInt(ClubID, 10) : null;
+    const eventIdInt = EventID ? parseInt(EventID, 10) : null;
 
     if (!FirstName || !LastName || !DateOfBirth || !Role) {
       return res.status(400).json({ error: 'Missing required fields: FirstName, LastName, DateOfBirth, and Role are required' });
@@ -94,6 +97,16 @@ router.post('/', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) 
 
     const passwordHash = bcrypt.hashSync(Password || 'password123', 10);
     
+    if (Role === 'ClubDirector' && !clubIdInt) {
+      return res.status(400).json({ error: 'ClubDirector must be assigned to a club' });
+    }
+
+    if (!allowMultipleClubDirectors && Role === 'ClubDirector' && clubIdInt) {
+      if (User.hasDirectorConflict(clubIdInt)) {
+        return res.status(409).json({ error: 'This club already has a director assigned.' });
+      }
+    }
+
     // Validate only Admin or EventAdmin can set background check
     const currentUser = req.user;
     if (BackgroundCheck && !['Admin', 'EventAdmin'].includes(currentUser.role)) {
@@ -109,8 +122,8 @@ router.post('/', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) 
       PasswordHash: passwordHash,
       Role,
       InvestitureLevel,
-      ClubID,
-      EventID,
+      ClubID: clubIdInt,
+      EventID: eventIdInt,
       Active,
       BackgroundCheck
     };
@@ -147,6 +160,12 @@ router.post('/bulk', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, r
 router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) => {
   try {
     const updates = req.body;
+    const userId = parseInt(req.params.id);
+    const currentRecord = User.findById(userId);
+
+    if (!currentRecord) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     
     // Remove fields that shouldn't be updated via API
     delete updates.Username;
@@ -162,7 +181,32 @@ router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res
       return res.status(403).json({ error: 'Only Admin or EventAdmin can update background check status' });
     }
 
-    const user = User.update(parseInt(req.params.id), updates);
+    if (updates.ClubID !== undefined) {
+      const parsedClubId = updates.ClubID ? parseInt(updates.ClubID, 10) : null;
+      if (updates.ClubID && Number.isNaN(parsedClubId)) {
+        return res.status(400).json({ error: 'Invalid ClubID' });
+      }
+      updates.ClubID = parsedClubId;
+    }
+
+    if (updates.EventID !== undefined) {
+      const parsedEventId = updates.EventID ? parseInt(updates.EventID, 10) : null;
+      if (updates.EventID && Number.isNaN(parsedEventId)) {
+        return res.status(400).json({ error: 'Invalid EventID' });
+      }
+      updates.EventID = parsedEventId;
+    }
+
+    const resolvedRole = updates.Role || currentRecord.Role;
+    const resolvedClubId = updates.ClubID !== undefined ? updates.ClubID : currentRecord.ClubID;
+
+    if (!allowMultipleClubDirectors && resolvedRole === 'ClubDirector' && resolvedClubId) {
+      if (User.hasDirectorConflict(resolvedClubId, currentRecord.ID)) {
+        return res.status(409).json({ error: 'This club already has a director assigned.' });
+      }
+    }
+
+    const user = User.update(userId, updates);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }

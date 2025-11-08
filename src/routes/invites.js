@@ -2,6 +2,7 @@ const express = require('express');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const InviteCode = require('../models/inviteCode');
 const User = require('../models/user');
+const { allowMultipleClubDirectors } = require('../config/features');
 const bcrypt = require('bcrypt');
 const StytchService = require('../services/stytch');
 const { determineAuthMethod } = require('../utils/authHelper');
@@ -13,6 +14,8 @@ const router = express.Router();
 router.post('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => {
   try {
     const { firstName, lastName, email, role, clubId, eventId, expiresInDays } = req.body;
+    const parsedClubId = clubId ? parseInt(clubId, 10) : null;
+    const parsedEventId = eventId ? parseInt(eventId, 10) : null;
     
     if (!firstName || !lastName || !email || !role) {
       return res.status(400).json({ error: 'firstName, lastName, email, and role are required' });
@@ -24,23 +27,37 @@ router.post('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => 
     }
     
     // Validate role-specific requirements
-    if (role === 'EventAdmin' && !eventId) {
+    if (role === 'EventAdmin' && !parsedEventId) {
       return res.status(400).json({ error: 'EventAdmin must have an eventId' });
     }
     
-    if (role === 'ClubDirector' && !clubId) {
+    if (clubId && Number.isNaN(parsedClubId)) {
+      return res.status(400).json({ error: 'Invalid clubId' });
+    }
+
+    if (eventId && Number.isNaN(parsedEventId)) {
+      return res.status(400).json({ error: 'Invalid eventId' });
+    }
+
+    if (role === 'ClubDirector' && !parsedClubId) {
       return res.status(400).json({ error: 'ClubDirector must have a clubId' });
+    }
+
+    if (!allowMultipleClubDirectors && role === 'ClubDirector' && parsedClubId) {
+      if (User.hasDirectorConflict(parsedClubId)) {
+        return res.status(409).json({ error: 'This club already has a director assigned.' });
+      }
     }
     
     // EventAdmin can only create invites for their assigned event
     if (req.user.role === 'EventAdmin') {
-      if (eventId && parseInt(eventId) !== req.user.eventId) {
+      if (eventId && parsedEventId !== req.user.eventId) {
         return res.status(403).json({ error: 'You can only create invites for your assigned event' });
       }
       // Force eventId to their assigned event
       const assignedEventId = req.user.eventId;
       const invite = InviteCode.generate(
-        { FirstName: firstName, LastName: lastName, Email: email, Role: role, ClubID: clubId || null, EventID: assignedEventId },
+        { FirstName: firstName, LastName: lastName, Email: email, Role: role, ClubID: parsedClubId || null, EventID: assignedEventId },
         req.user.id,
         expiresInDays || 30
       );
@@ -53,7 +70,7 @@ router.post('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => 
           Email: email,
           PasswordHash: '', // Empty for invited users until they set password
           Role: role,
-          ClubID: clubId || null,
+          ClubID: parsedClubId || null,
           EventID: assignedEventId,
           Active: false, // Inactive until they accept invite
           Invited: true,
@@ -79,7 +96,7 @@ router.post('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => 
     
     // Admin can create invites for any role/event/club
     const invite = InviteCode.generate(
-      { FirstName: firstName, LastName: lastName, Email: email, Role: role, ClubID: clubId || null, EventID: eventId || null },
+      { FirstName: firstName, LastName: lastName, Email: email, Role: role, ClubID: parsedClubId || null, EventID: parsedEventId || null },
       req.user.id,
       expiresInDays || 30
     );
@@ -92,8 +109,8 @@ router.post('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => 
         Email: email,
         PasswordHash: '', // Empty for invited users until they set password
         Role: role,
-        ClubID: clubId || null,
-        EventID: eventId || null,
+        ClubID: parsedClubId || null,
+        EventID: parsedEventId || null,
         Active: false, // Inactive until they accept invite
         Invited: true,
         InviteAccepted: false,

@@ -1,6 +1,7 @@
 const express = require('express');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const Club = require('../models/club');
+const { allowMultipleClubDirectors } = require('../config/features');
 
 const router = express.Router();
 router.use(verifyToken);
@@ -8,7 +9,8 @@ router.use(verifyToken);
 // GET /api/clubs - Get all clubs (must come before /:id routes)
 router.get('/', (req, res) => {
   try {
-    const clubs = Club.getAll();
+    const includeEvents = req.query.includeEvents === 'true';
+    const clubs = includeEvents ? Club.getAllWithEvents() : Club.getAll();
     res.json(clubs);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -58,16 +60,24 @@ router.post('/', requireRole('Admin', 'EventAdmin'), (req, res) => {
   try {
     const { Name, Church, DirectorID, EventID } = req.body;
     const User = require('../models/user');
+    const directorIdInt = DirectorID ? parseInt(DirectorID, 10) : null;
     
     if (!Name) {
       return res.status(400).json({ error: 'Name is required' });
     }
+
+    if (DirectorID && Number.isNaN(directorIdInt)) {
+      return res.status(400).json({ error: 'Invalid DirectorID' });
+    }
     
-    const club = Club.create({ Name, Church, DirectorID });
+    const club = Club.create({ Name, Church, DirectorID: directorIdInt });
     
     // If a director was assigned, automatically add them to the club
-    if (DirectorID && club.ID) {
-      User.update(parseInt(DirectorID), { ClubID: club.ID });
+    if (directorIdInt && club.ID) {
+      if (!allowMultipleClubDirectors && User.hasDirectorConflict(club.ID, directorIdInt)) {
+        return res.status(409).json({ error: 'This club already has a director assigned.' });
+      }
+      User.update(directorIdInt, { ClubID: club.ID });
     }
     
     // Optionally link to event if provided
@@ -85,15 +95,35 @@ router.post('/', requireRole('Admin', 'EventAdmin'), (req, res) => {
 router.put('/:id', requireRole('Admin', 'EventAdmin'), (req, res) => {
   try {
     const updates = req.body;
-    const club = Club.update(parseInt(req.params.id), updates);
+    const clubId = parseInt(req.params.id);
+    if (Number.isNaN(clubId)) {
+      return res.status(400).json({ error: 'Invalid club ID' });
+    }
+
+    const User = require('../models/user');
+    let directorIdInt = null;
+    if (updates.DirectorID !== undefined) {
+      directorIdInt = updates.DirectorID ? parseInt(updates.DirectorID, 10) : null;
+      if (updates.DirectorID && Number.isNaN(directorIdInt)) {
+        return res.status(400).json({ error: 'Invalid DirectorID' });
+      }
+      updates.DirectorID = directorIdInt;
+    }
+
+    if (!allowMultipleClubDirectors && directorIdInt) {
+      if (User.hasDirectorConflict(clubId, directorIdInt)) {
+        return res.status(409).json({ error: 'This club already has a director assigned.' });
+      }
+    }
+
+    const club = Club.update(clubId, updates);
     if (!club) {
       return res.status(404).json({ error: 'Club not found' });
     }
     
     // If a director was assigned, automatically add them to the club
-    const User = require('../models/user');
-    if (updates.DirectorID) {
-      User.update(parseInt(updates.DirectorID), { ClubID: club.ID });
+    if (directorIdInt) {
+      User.update(directorIdInt, { ClubID: club.ID });
     }
     
     res.json(club);

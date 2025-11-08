@@ -257,6 +257,31 @@ class User {
     return user;
   }
 
+  static getClubDirectors(clubId, excludeUserId = null) {
+    if (!clubId) return [];
+
+    let query = `
+      SELECT *
+      FROM Users
+      WHERE ClubID = ?
+        AND Role = 'ClubDirector'
+        AND (Active = 1 OR Invited = 1)
+    `;
+    const params = [clubId];
+
+    if (excludeUserId) {
+      query += ' AND ID != ?';
+      params.push(excludeUserId);
+    }
+
+    return db.prepare(query).all(...params);
+  }
+
+  static hasDirectorConflict(clubId, excludeUserId = null) {
+    const directors = this.getClubDirectors(clubId, excludeUserId);
+    return directors.length > 0;
+  }
+
   static deactivate(id) {
     // Remove user from all classes
     db.prepare('DELETE FROM Registrations WHERE UserID = ?').run(id);

@@ -11,6 +11,52 @@ let currentUser = null;
 let assignedEventId = null;
 let assignedEvent = null;
 
+function formatClubOptionLabel(club) {
+  if (!club) return '';
+  const eventNames = (club.Events || [])
+    .map(event => event?.Name)
+    .filter(Boolean);
+  const eventSummary = eventNames.length
+    ? `— Events: ${eventNames.join(', ')}`
+    : '— No linked events';
+  return `${club.Name} ${eventSummary}`;
+}
+
+function updateClubEventSummaryFromSelect(selectEl, summaryEl) {
+  if (!summaryEl) return;
+
+  if (!selectEl || !selectEl.value) {
+    summaryEl.textContent = 'Select a club to view linked events.';
+    summaryEl.style.display = 'block';
+    return;
+  }
+
+  const selectedId = parseInt(selectEl.value, 10);
+  if (Number.isNaN(selectedId)) {
+    summaryEl.textContent = 'Select a club to view linked events.';
+    summaryEl.style.display = 'block';
+    return;
+  }
+
+  const clubs = selectEl._clubData || [];
+  const club = clubs.find(c => c.ID === selectedId);
+
+  if (!club) {
+    summaryEl.textContent = 'Select a club to view linked events.';
+    summaryEl.style.display = 'block';
+    return;
+  }
+
+  const eventNames = (club.Events || [])
+    .map(event => event?.Name)
+    .filter(Boolean);
+
+  summaryEl.textContent = eventNames.length
+    ? `Linked events: ${eventNames.join(', ')}`
+    : 'This club is not currently linked to any events.';
+  summaryEl.style.display = 'block';
+}
+
 // Filter state for user table
 let userFilters = {};
 let userSortColumn = null;
@@ -129,16 +175,33 @@ async function toggleEventDropdown(role) {
   const eventContainer = document.getElementById('eventContainer');
   const clubContainer = document.getElementById('clubContainer');
   const eventSelect = document.getElementById('eventId');
+  const clubSelect = document.getElementById('clubId');
+  const summaryEl = document.getElementById('clubEventSummary');
+  const isClubDirector = role === 'ClubDirector';
   
   if (!eventContainer || !clubContainer) return;
   
   if (role === 'EventAdmin') {
     eventContainer.style.display = 'none';
     clubContainer.style.display = 'none';
+    if (summaryEl) {
+      summaryEl.style.display = 'none';
+    }
     return;
   }
   
-  if (role === 'Student' || role === 'Teacher' || role === 'ClubDirector') {
+  if (isClubDirector) {
+    eventContainer.style.display = 'none';
+    if (eventSelect) {
+      eventSelect.value = '';
+    }
+    clubContainer.style.display = 'block';
+    await loadClubsForCreateUser(null);
+    updateClubEventSummaryFromSelect(clubSelect, summaryEl);
+    return;
+  }
+
+  if (role === 'Student' || role === 'Teacher') {
     eventContainer.style.display = 'block';
     if (eventSelect && eventSelect.options.length === 1) {
       eventSelect.innerHTML = '<option value="">Select Event</option>';
@@ -155,16 +218,17 @@ async function toggleEventDropdown(role) {
     
     const selectedEvent = eventSelect?.value || assignedEventId;
     if (selectedEvent) {
-      loadClubsForCreateUser(selectedEvent);
+      await loadClubsForCreateUser(selectedEvent);
     } else {
-      const clubSelect = document.getElementById('clubId');
-      if (clubSelect) {
-        clubSelect.innerHTML = '<option value="">No Club</option>';
-      }
+      await loadClubsForCreateUser(null);
     }
-  } else {
-    eventContainer.style.display = 'none';
-    clubContainer.style.display = 'none';
+    return;
+  }
+
+  eventContainer.style.display = 'none';
+  clubContainer.style.display = 'none';
+  if (summaryEl) {
+    summaryEl.style.display = 'none';
   }
 }
 
@@ -173,6 +237,9 @@ async function toggleEditEventDropdown(role) {
   const eventContainer = document.getElementById('editEventContainer');
   const clubContainer = document.getElementById('editClubContainer');
   const eventSelect = document.getElementById('editEventId');
+  const clubSelect = document.getElementById('editClubId');
+  const summaryEl = document.getElementById('editClubEventSummary');
+  const isClubDirector = role === 'ClubDirector';
   
   if (!eventContainer || !clubContainer) return;
   
@@ -196,20 +263,43 @@ async function toggleEditEventDropdown(role) {
     }
   }
   
-  if (role === 'EventAdmin' || ['Student', 'Teacher', 'ClubDirector'].includes(role)) {
+  if (role === 'EventAdmin') {
     eventContainer.style.display = 'block';
     await ensureEventOptions();
-  } else {
-    eventContainer.style.display = 'none';
+    clubContainer.style.display = 'none';
+    if (summaryEl) {
+      summaryEl.style.display = 'none';
+    }
+    return;
   }
-  
-  if (['Student', 'Teacher', 'ClubDirector'].includes(role)) {
+
+  if (isClubDirector) {
+    eventContainer.style.display = 'none';
+    if (eventSelect) {
+      eventSelect.value = '';
+    }
+    clubContainer.style.display = 'block';
+    await loadClubsForEditUser(null);
+    updateClubEventSummaryFromSelect(clubSelect, summaryEl);
+    return;
+  }
+
+  if (['Student', 'Teacher'].includes(role)) {
+    eventContainer.style.display = 'block';
+    await ensureEventOptions();
     clubContainer.style.display = 'block';
     if (eventSelect && eventSelect.value) {
       await loadClubsForEditUser(eventSelect.value);
+    } else {
+      await loadClubsForEditUser(null);
     }
-  } else {
-    clubContainer.style.display = 'none';
+    return;
+  }
+
+  clubContainer.style.display = 'none';
+  eventContainer.style.display = 'none';
+  if (summaryEl) {
+    summaryEl.style.display = 'none';
   }
 }
 
@@ -217,20 +307,36 @@ async function toggleEditEventDropdown(role) {
 async function loadClubsForCreateUser(eventId) {
   const clubContainer = document.getElementById('clubContainer');
   const clubSelect = document.getElementById('clubId');
-  
-  const targetEventId = eventId || assignedEventId;
-  
-  if (!targetEventId) {
+  const summaryEl = document.getElementById('clubEventSummary');
+  const role = document.getElementById('role')?.value || '';
+  const isClubDirector = role === 'ClubDirector';
+  const explicitEventId = eventId ? parseInt(eventId, 10) : null;
+  const targetEventId = isClubDirector ? null : (explicitEventId || assignedEventId || null);
+
+  if (!clubSelect) return;
+
+  if (!isClubDirector && !targetEventId) {
     if (clubContainer) clubContainer.style.display = 'none';
-    if (clubSelect) {
-      clubSelect.innerHTML = '<option value="">No Club</option>';
+    clubSelect.innerHTML = '<option value="">No Club</option>';
+    clubSelect._clubData = [];
+    if (summaryEl) {
+      summaryEl.textContent = 'Select an event to view available clubs.';
+      summaryEl.style.display = 'block';
     }
     return;
   }
   
   try {
-    const response = await fetchWithAuth(`/api/clubs/event/${targetEventId}`);
-    const clubs = await response.json();
+    const response = await fetchWithAuth(`/api/clubs?includeEvents=true`);
+    const clubsResponse = await response.json();
+    allClubs = clubsResponse;
+    let clubs = clubsResponse;
+
+    if (!isClubDirector && targetEventId) {
+      clubs = clubs.filter(club =>
+        (club.Events || []).some(event => event.ID === targetEventId)
+      );
+    }
     
     if (clubSelect) {
       clubSelect.innerHTML = '<option value="">No Club</option>';
@@ -238,22 +344,45 @@ async function loadClubsForCreateUser(eventId) {
       if (clubs.length === 0) {
         const emptyOption = document.createElement('option');
         emptyOption.value = '';
-        emptyOption.textContent = 'No clubs linked to this event';
+        emptyOption.textContent = isClubDirector
+          ? 'No clubs available'
+          : 'No clubs linked to this event';
         emptyOption.disabled = true;
         clubSelect.appendChild(emptyOption);
+        clubSelect.disabled = true;
+        if (summaryEl) {
+          summaryEl.textContent = isClubDirector
+            ? 'No clubs are available yet. Create a club to assign a director.'
+            : 'No clubs are currently linked to the selected event.';
+          summaryEl.style.display = 'block';
+        }
       } else {
+        clubSelect.disabled = false;
+        const seen = new Set();
         clubs.forEach(club => {
+          if (seen.has(club.ID)) return;
+          seen.add(club.ID);
           const option = document.createElement('option');
           option.value = club.ID;
-          option.textContent = club.Name;
+          option.textContent = formatClubOptionLabel(club);
           clubSelect.appendChild(option);
         });
       }
+
+      clubSelect._clubData = clubs;
+      clubSelect.onchange = () => updateClubEventSummaryFromSelect(clubSelect, summaryEl);
     }
     
     if (clubContainer) clubContainer.style.display = 'block';
+    if (clubs.length > 0) {
+      updateClubEventSummaryFromSelect(clubSelect, summaryEl);
+    }
   } catch (error) {
     console.error('Error loading clubs:', error);
+    if (summaryEl) {
+      summaryEl.textContent = 'Error loading clubs. Please try again.';
+      summaryEl.style.display = 'block';
+    }
   }
 }
 
@@ -262,21 +391,43 @@ async function loadClubsForEditUser(eventId) {
   const clubContainer = document.getElementById('editClubContainer');
   const clubSelect = document.getElementById('editClubId');
   const user = allUsers.find(u => u.ID === parseInt(document.getElementById('editUserForm')?.dataset.userId || 0));
-  
-  // Use assigned event if no eventId provided
-  const targetEventId = eventId || assignedEventId;
-  
-  if (!targetEventId) {
+  const summaryEl = document.getElementById('editClubEventSummary');
+  const role = document.getElementById('editRole')?.value || user?.Role || '';
+  const isClubDirector = role === 'ClubDirector';
+  const explicitEventId = eventId ? parseInt(eventId, 10) : null;
+  const targetEventId = isClubDirector ? null : (explicitEventId || assignedEventId || null);
+
+  if (!clubSelect) return;
+
+  if (!isClubDirector && !targetEventId) {
     if (clubContainer) clubContainer.style.display = 'none';
-    if (clubSelect) {
-      clubSelect.innerHTML = '<option value="">No Club</option>';
+    clubSelect.innerHTML = '<option value="">No Club</option>';
+    clubSelect._clubData = [];
+    if (summaryEl) {
+      summaryEl.textContent = 'Select an event to view available clubs.';
+      summaryEl.style.display = 'block';
     }
     return;
   }
   
   try {
-    const response = await fetchWithAuth(`/api/clubs/event/${targetEventId}`);
-    const clubs = await response.json();
+    const response = await fetchWithAuth(`/api/clubs?includeEvents=true`);
+    const clubsResponse = await response.json();
+    allClubs = clubsResponse;
+    let clubs = clubsResponse;
+
+    if (!isClubDirector && targetEventId) {
+      clubs = clubs.filter(club =>
+        (club.Events || []).some(event => event.ID === targetEventId)
+      );
+    }
+
+    if (user?.ClubID && !clubs.some(club => club.ID === user.ClubID)) {
+      const existingClub = clubsResponse.find(club => club.ID === user.ClubID);
+      if (existingClub) {
+        clubs = [existingClub, ...clubs];
+      }
+    }
     
     if (clubSelect) {
       clubSelect.innerHTML = '<option value="">No Club</option>';
@@ -284,25 +435,48 @@ async function loadClubsForEditUser(eventId) {
       if (clubs.length === 0) {
         const emptyOption = document.createElement('option');
         emptyOption.value = '';
-        emptyOption.textContent = 'No clubs linked to this event';
+        emptyOption.textContent = isClubDirector
+          ? 'No clubs available'
+          : 'No clubs linked to this event';
         emptyOption.disabled = true;
         clubSelect.appendChild(emptyOption);
+        clubSelect.disabled = true;
+        if (summaryEl) {
+          summaryEl.textContent = isClubDirector
+            ? 'No clubs are available yet. Create a club to assign a director.'
+            : 'No clubs are currently linked to the selected event.';
+          summaryEl.style.display = 'block';
+        }
       } else {
+        clubSelect.disabled = false;
+        const seen = new Set();
         clubs.forEach(club => {
+          if (seen.has(club.ID)) return;
+          seen.add(club.ID);
           const option = document.createElement('option');
           option.value = club.ID;
-          option.textContent = club.Name;
+          option.textContent = formatClubOptionLabel(club);
           if (user && user.ClubID === club.ID) {
             option.selected = true;
           }
           clubSelect.appendChild(option);
         });
       }
+
+      clubSelect._clubData = clubs;
+      clubSelect.onchange = () => updateClubEventSummaryFromSelect(clubSelect, summaryEl);
     }
     
     if (clubContainer) clubContainer.style.display = 'block';
+    if (clubs.length > 0) {
+      updateClubEventSummaryFromSelect(clubSelect, summaryEl);
+    }
   } catch (error) {
     console.error('Error loading clubs:', error);
+    if (summaryEl) {
+      summaryEl.textContent = 'Error loading clubs. Please try again.';
+      summaryEl.style.display = 'block';
+    }
   }
 }
 
@@ -2448,6 +2622,7 @@ function showCreateUserForm() {
           <select id="clubId" name="clubId" class="form-control">
             <option value="">No Club</option>
           </select>
+          <div id="clubEventSummary" style="margin-top: 6px; color: var(--text-light); display: none; font-size: 0.9rem;">Select a club to view linked events.</div>
           <small style="color: var(--text-light); display: block; margin-top: 5px;">Users without a club cannot register for classes</small>
         </div>
         <div class="form-group">
@@ -2625,17 +2800,18 @@ async function editUser(userId) {
             <option value="Staff" ${user.Role === 'Staff' ? 'selected' : ''}>Staff</option>
           </select>
         </div>
-        <div class="form-group" id="editEventContainer" style="display: ${['EventAdmin', 'Student', 'Teacher', 'ClubDirector'].includes(user.Role) ? 'block' : 'none'};">
+        <div class="form-group" id="editEventContainer" style="display: ${['EventAdmin', 'Student', 'Teacher'].includes(user.Role) ? 'block' : 'none'};">
           <label for="editEventId">Event${user.Role === 'EventAdmin' ? ' *' : ''}</label>
           <select id="editEventId" name="editEventId" class="form-control" onchange="loadClubsForEditUser(this.value)">
             <option value="">Select Event</option>
           </select>
         </div>
-        <div class="form-group" id="editClubContainer" style="display: ${['Student', 'Teacher'].includes(user.Role) ? 'block' : 'none'};">
+        <div class="form-group" id="editClubContainer" style="display: ${['Student', 'Teacher', 'ClubDirector'].includes(user.Role) ? 'block' : 'none'};">
           <label for="editClubId">Club <span style="color: #999;">(None = cannot register)</span></label>
           <select id="editClubId" name="editClubId" class="form-control">
             <option value="">No Club</option>
           </select>
+          <div id="editClubEventSummary" style="margin-top: 6px; color: var(--text-light); display: none; font-size: 0.9rem;">Select a club to view linked events.</div>
           <small style="color: var(--text-light); display: block; margin-top: 5px;">Users without a club cannot register for classes</small>
         </div>
         <div class="form-group">
@@ -2666,7 +2842,7 @@ async function editUser(userId) {
   document.body.appendChild(modal);
   
   // Populate events and clubs based on role
-  if (['EventAdmin', 'Student', 'Teacher', 'ClubDirector'].includes(user.Role)) {
+  if (['EventAdmin', 'Student', 'Teacher'].includes(user.Role)) {
     const eventSelect = document.getElementById('editEventId');
     if (eventSelect) {
       fetchWithAuth('/api/events')
@@ -2689,6 +2865,10 @@ async function editUser(userId) {
           }
         });
     }
+  }
+
+  if (user.Role === 'ClubDirector') {
+    await loadClubsForEditUser(null);
   }
   
   // Add change listener for role dropdown

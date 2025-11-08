@@ -104,6 +104,40 @@ class Club {
     `).all();
   }
 
+  static getAllWithEvents() {
+    const rows = db.prepare(`
+      SELECT 
+        c.*,
+        u.FirstName as DirectorFirstName,
+        u.LastName as DirectorLastName,
+        GROUP_CONCAT(e.ID || '|' || e.Name, ';') as EventList
+      FROM Clubs c
+      LEFT JOIN Users u ON c.DirectorID = u.ID
+      LEFT JOIN ClubEvents ce ON c.ID = ce.ClubID
+      LEFT JOIN Events e ON ce.EventID = e.ID
+      GROUP BY c.ID
+      ORDER BY c.Name
+    `).all();
+
+    return rows.map(row => {
+      const events = row.EventList
+        ? row.EventList.split(';').filter(Boolean).map(eventEntry => {
+            const [id, name] = eventEntry.split('|');
+            return {
+              ID: id ? parseInt(id, 10) : null,
+              Name: name || ''
+            };
+          })
+        : [];
+
+      const { EventList, ...club } = row;
+      return {
+        ...club,
+        Events: events
+      };
+    });
+  }
+
   static update(id, updates) {
     const allowedUpdates = ['Name', 'Church', 'DirectorID'];
     const setClause = [];
