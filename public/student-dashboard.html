@@ -257,6 +257,11 @@
         const timeslots = await timeslotsResponse.json();
         
         const timeslotSelect = document.getElementById('timeslotFilter');
+        const previousTimeslot = timeslotSelect.value;
+        while (timeslotSelect.options.length > 1) {
+          timeslotSelect.remove(1);
+        }
+        
         timeslots.forEach(ts => {
           const option = document.createElement('option');
           option.value = ts.ID;
@@ -272,6 +277,11 @@
           option.textContent = `${ts.Date} - ${convertTo12Hour(ts.StartTime)} to ${convertTo12Hour(ts.EndTime)}`;
           timeslotSelect.appendChild(option);
         });
+        if (previousTimeslot && Array.from(timeslotSelect.options).some(opt => opt.value === previousTimeslot)) {
+          timeslotSelect.value = previousTimeslot;
+        } else {
+          timeslotSelect.value = '';
+        }
         
         // Load teachers
         const teachersMap = new Map();
@@ -288,12 +298,21 @@
         });
         
         const teacherSelect = document.getElementById('teacherFilter');
+        const previousTeacher = teacherSelect.value;
+        while (teacherSelect.options.length > 1) {
+          teacherSelect.remove(1);
+        }
         Array.from(teachersMap.values()).sort((a, b) => a.name.localeCompare(b.name)).forEach(teacher => {
           const option = document.createElement('option');
           option.value = teacher.id;
           option.textContent = teacher.name;
           teacherSelect.appendChild(option);
         });
+        if (previousTeacher && Array.from(teacherSelect.options).some(opt => opt.value === previousTeacher)) {
+          teacherSelect.value = previousTeacher;
+        } else {
+          teacherSelect.value = '';
+        }
       } catch (error) {
         console.error('Error loading filters:', error);
       }
