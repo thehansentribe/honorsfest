@@ -130,26 +130,41 @@ async function toggleEventDropdown(role) {
   const clubContainer = document.getElementById('clubContainer');
   const eventSelect = document.getElementById('eventId');
   
+  if (!eventContainer || !clubContainer) return;
+  
   if (role === 'EventAdmin') {
-    // EventAdmin can't create other EventAdmins
-    if (eventContainer) eventContainer.style.display = 'none';
-  } else if (role === 'Student' || role === 'Teacher' || role === 'ClubDirector') {
-    // Show event container for students, teachers, and club directors
-    if (eventContainer) eventContainer.style.display = 'block';
+    eventContainer.style.display = 'none';
+    clubContainer.style.display = 'none';
+    return;
+  }
+  
+  if (role === 'Student' || role === 'Teacher' || role === 'ClubDirector') {
+    eventContainer.style.display = 'block';
     if (eventSelect && eventSelect.options.length === 1) {
-      // Only show the assigned event
-      const option = document.createElement('option');
-      option.value = assignedEventId;
-      option.textContent = assignedEvent ? assignedEvent.Name : 'Assigned Event';
-      eventSelect.appendChild(option);
+      eventSelect.innerHTML = '<option value="">Select Event</option>';
+      if (assignedEventId) {
+        const option = document.createElement('option');
+        option.value = assignedEventId;
+        option.textContent = assignedEvent ? assignedEvent.Name : 'Assigned Event';
+        option.selected = true;
+        eventSelect.appendChild(option);
+      }
     }
-    // Show club container for students and teachers
-    if (role === 'Student' || role === 'Teacher') {
-      if (clubContainer) clubContainer.style.display = 'block';
+    
+    clubContainer.style.display = 'block';
+    
+    const selectedEvent = eventSelect?.value || assignedEventId;
+    if (selectedEvent) {
+      loadClubsForCreateUser(selectedEvent);
+    } else {
+      const clubSelect = document.getElementById('clubId');
+      if (clubSelect) {
+        clubSelect.innerHTML = '<option value="">No Club</option>';
+      }
     }
   } else {
-    if (eventContainer) eventContainer.style.display = 'none';
-    if (clubContainer) clubContainer.style.display = 'none';
+    eventContainer.style.display = 'none';
+    clubContainer.style.display = 'none';
   }
 }
 
@@ -159,42 +174,42 @@ async function toggleEditEventDropdown(role) {
   const clubContainer = document.getElementById('editClubContainer');
   const eventSelect = document.getElementById('editEventId');
   
-  if (role === 'EventAdmin') {
-    if (eventContainer) eventContainer.style.display = 'block';
-    if (eventSelect && eventSelect.options.length === 1) { // Only has "Select Event" option
-      // Populate events
-      const response = await fetchWithAuth('/api/events');
-      const events = await response.json();
-      events.forEach(event => {
-        const option = document.createElement('option');
-        option.value = event.ID;
-        option.textContent = event.Name;
-        eventSelect.appendChild(option);
-      });
-      
-      // Set current event if user already has one
-      const currentUser = allUsers.find(u => u.ID === parseInt(eventSelect.closest('form').getAttribute('data-user-id')));
-      if (currentUser && currentUser.EventID) {
-        eventSelect.value = currentUser.EventID;
-      }
+  if (!eventContainer || !clubContainer) return;
+  
+  async function ensureEventOptions() {
+    if (!eventSelect || eventSelect.dataset.loaded === 'true') return;
+    const response = await fetchWithAuth('/api/events');
+    const events = await response.json();
+    events.forEach(event => {
+      const option = document.createElement('option');
+      option.value = event.ID;
+      option.textContent = event.Name;
+      eventSelect.appendChild(option);
+    });
+    eventSelect.dataset.loaded = 'true';
+    
+    const formEl = document.getElementById('editUserForm');
+    const userId = formEl ? parseInt(formEl.dataset.userId) : null;
+    const currentUser = allUsers.find(u => u.ID === userId);
+    if (currentUser?.EventID && eventSelect) {
+      eventSelect.value = currentUser.EventID;
     }
-  } else if (['Student', 'Teacher', 'ClubDirector'].includes(role)) {
-    if (eventContainer) eventContainer.style.display = 'block';
-    if (clubContainer) clubContainer.style.display = 'block'; // Show club container for these roles
-    if (eventSelect && eventSelect.options.length === 1) {
-      // Populate events
-      const response = await fetchWithAuth('/api/events');
-      const events = await response.json();
-      events.forEach(event => {
-        const option = document.createElement('option');
-        option.value = event.ID;
-        option.textContent = event.Name;
-        eventSelect.appendChild(option);
-      });
+  }
+  
+  if (role === 'EventAdmin' || ['Student', 'Teacher', 'ClubDirector'].includes(role)) {
+    eventContainer.style.display = 'block';
+    await ensureEventOptions();
+  } else {
+    eventContainer.style.display = 'none';
+  }
+  
+  if (['Student', 'Teacher', 'ClubDirector'].includes(role)) {
+    clubContainer.style.display = 'block';
+    if (eventSelect && eventSelect.value) {
+      await loadClubsForEditUser(eventSelect.value);
     }
   } else {
-    if (eventContainer) eventContainer.style.display = 'none';
-    if (clubContainer) clubContainer.style.display = 'none';
+    clubContainer.style.display = 'none';
   }
 }
 
@@ -203,11 +218,13 @@ async function loadClubsForCreateUser(eventId) {
   const clubContainer = document.getElementById('clubContainer');
   const clubSelect = document.getElementById('clubId');
   
-  // Use assigned event if no eventId provided
   const targetEventId = eventId || assignedEventId;
   
   if (!targetEventId) {
     if (clubContainer) clubContainer.style.display = 'none';
+    if (clubSelect) {
+      clubSelect.innerHTML = '<option value="">No Club</option>';
+    }
     return;
   }
   
@@ -217,12 +234,21 @@ async function loadClubsForCreateUser(eventId) {
     
     if (clubSelect) {
       clubSelect.innerHTML = '<option value="">No Club</option>';
-      clubs.forEach(club => {
-        const option = document.createElement('option');
-        option.value = club.ID;
-        option.textContent = club.Name;
-        clubSelect.appendChild(option);
-      });
+      
+      if (clubs.length === 0) {
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = 'No clubs linked to this event';
+        emptyOption.disabled = true;
+        clubSelect.appendChild(emptyOption);
+      } else {
+        clubs.forEach(club => {
+          const option = document.createElement('option');
+          option.value = club.ID;
+          option.textContent = club.Name;
+          clubSelect.appendChild(option);
+        });
+      }
     }
     
     if (clubContainer) clubContainer.style.display = 'block';
@@ -242,6 +268,9 @@ async function loadClubsForEditUser(eventId) {
   
   if (!targetEventId) {
     if (clubContainer) clubContainer.style.display = 'none';
+    if (clubSelect) {
+      clubSelect.innerHTML = '<option value="">No Club</option>';
+    }
     return;
   }
   
@@ -251,15 +280,24 @@ async function loadClubsForEditUser(eventId) {
     
     if (clubSelect) {
       clubSelect.innerHTML = '<option value="">No Club</option>';
-      clubs.forEach(club => {
-        const option = document.createElement('option');
-        option.value = club.ID;
-        option.textContent = club.Name;
-        if (user && user.ClubID === club.ID) {
-          option.selected = true;
-        }
-        clubSelect.appendChild(option);
-      });
+      
+      if (clubs.length === 0) {
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = 'No clubs linked to this event';
+        emptyOption.disabled = true;
+        clubSelect.appendChild(emptyOption);
+      } else {
+        clubs.forEach(club => {
+          const option = document.createElement('option');
+          option.value = club.ID;
+          option.textContent = club.Name;
+          if (user && user.ClubID === club.ID) {
+            option.selected = true;
+          }
+          clubSelect.appendChild(option);
+        });
+      }
     }
     
     if (clubContainer) clubContainer.style.display = 'block';
