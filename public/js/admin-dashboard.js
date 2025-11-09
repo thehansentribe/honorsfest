@@ -127,7 +127,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   currentUser = user;
   document.getElementById('userDisplayName').textContent = `${user.firstName} ${user.lastName}`;
 
-  isSuperAdmin = (user.username || '').toLowerCase() === 'admin';
+  const usernameLower = (user.username || '').toLowerCase();
+  isSuperAdmin = usernameLower === 'admin' || usernameLower === 'jason.hansen';
 
   const systemTabButton = document.getElementById('systemTabButton');
   if (!isSuperAdmin && systemTabButton) {
