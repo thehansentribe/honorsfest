@@ -845,9 +845,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   } else {
     if (noEventsBanner) noEventsBanner.style.display = 'none';
     // Select first event (prefer active events, then first available)
+    const storedEventId = parseInt(localStorage.getItem('clubDirectorSelectedEventId') || '', 10);
     const activeEvent = clubDirectorEvents.find(e => e.Active);
-    clubDirectorEventId = activeEvent ? activeEvent.ID : clubDirectorEvents[0].ID;
-    clubDirectorSelectedEventId = clubDirectorEventId;
+    const storedEvent = clubDirectorEvents.find(e => e.ID === storedEventId);
+    const fallbackEvent = activeEvent || clubDirectorEvents[0];
+    
+    clubDirectorEventId = fallbackEvent.ID;
+    clubDirectorSelectedEventId = storedEvent ? storedEvent.ID : fallbackEvent.ID;
   }
   
   // Setup event selector UI (even if no events, to show message)
@@ -1748,15 +1752,16 @@ Thank you!`;
     // Show selector if there are multiple events
     if (clubDirectorEvents.length > 1) {
       if (selectorContainer) selectorContainer.style.display = 'inline-block';
-      
-      // Populate selector
-      selector.innerHTML = clubDirectorEvents.map(event => 
-        `<option value="${event.ID}" ${event.ID === clubDirectorSelectedEventId ? 'selected' : ''}>
-          ${event.Name} ${event.Active ? '' : '(Inactive)'}
-        </option>`
-      ).join('');
-      
-      // Hide event name when selector is shown
+      selector.innerHTML = '';
+      clubDirectorEvents.forEach(event => {
+        const option = document.createElement('option');
+        option.value = event.ID;
+        option.textContent = `${event.Name} ${event.Active ? '' : '(Inactive)'}`;
+        if (event.ID === clubDirectorSelectedEventId) {
+          option.selected = true;
+        }
+        selector.appendChild(option);
+      });
       eventNameEl.textContent = '';
     } else if (clubDirectorEvents.length === 1) {
       // Single event - hide selector and show event name
@@ -1805,8 +1810,15 @@ Thank you!`;
         if (content) {
           content.innerHTML = getReportsTab();
         }
+        setupEventSelector();
         break;
       // 'users' tab doesn't need to reload on event switch
+    }
+    
+    try {
+      localStorage.setItem('clubDirectorSelectedEventId', clubDirectorSelectedEventId);
+    } catch (error) {
+      console.warn('Unable to persist selected event:', error);
     }
     
     showNotification(`Switched to event: ${selectedEvent.Name}`, 'success');
