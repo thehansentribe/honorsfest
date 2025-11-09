@@ -1,13 +1,14 @@
 const express = require('express');
-const { verifyToken, requireRole } = require('../middleware/auth');
+const { verifyToken, requireSuperAdmin } = require('../middleware/auth');
 const { seedDatabase } = require('../config/seed');
 const { db, initializeDatabase } = require('../config/db');
+const Setting = require('../models/setting');
 
 const router = express.Router();
 router.use(verifyToken);
 
-// POST /api/admin/reseed - Reset and reseed database (Admin only)
-router.post('/reseed', requireRole('Admin'), async (req, res) => {
+// POST /api/admin/reseed - Reset and reseed database (Super Admin only)
+router.post('/reseed', requireSuperAdmin, async (req, res) => {
   try {
     // Confirm action
     if (!req.body.confirm) {
@@ -87,6 +88,48 @@ router.post('/reseed', requireRole('Admin'), async (req, res) => {
     res.status(500).json({ 
       error: error.message || 'Unknown error occurred',
       details: error.stack 
+    });
+  }
+});
+
+// POST /api/admin/clear - Clear operational data for production launch (Super Admin only)
+router.post('/clear', requireSuperAdmin, async (req, res) => {
+  try {
+    if (!req.body.confirm) {
+      return res.status(400).json({ error: 'Confirmation required. Send { confirm: true }' });
+    }
+
+    db.pragma('foreign_keys = OFF');
+
+    db.exec(`
+      DELETE FROM Attendance;
+      DELETE FROM Registrations;
+      DELETE FROM RegistrationCodes;
+      DELETE FROM Classes;
+      DELETE FROM ClubEvents;
+      DELETE FROM Timeslots;
+      DELETE FROM Locations;
+      DELETE FROM Events;
+      DELETE FROM Clubs;
+    `);
+
+    db.prepare(`DELETE FROM Users WHERE Username != 'admin'`).run();
+
+    db.pragma('foreign_keys = ON');
+
+    initializeDatabase();
+
+    Setting.delete('logoData');
+
+    res.json({
+      message: 'Database cleared for launch. Super admin account retained.',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error clearing database:', error);
+    res.status(500).json({
+      error: error.message || 'Unknown error occurred',
+      details: error.stack
     });
   }
 });

@@ -30,6 +30,22 @@ function requireRole(...allowedRoles) {
   };
 }
 
-module.exports = { verifyToken, requireRole };
+function requireSuperAdmin(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const isSuperAdmin =
+    req.user.role === 'Admin' &&
+    (req.user.username === 'admin' || req.user.username === 'Admin');
+
+  if (!isSuperAdmin) {
+    return res.status(403).json({ error: 'Super admin permissions required' });
+  }
+
+  next();
+}
+
+module.exports = { verifyToken, requireRole, requireSuperAdmin };
 
 

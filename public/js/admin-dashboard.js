@@ -8,6 +8,7 @@ let allTimeslots = [];
 let allClubs = [];
 let allClasses = [];
 let currentUser = null;
+let isSuperAdmin = false;
 let brandingFormState = { logoData: null };
 
 function formatClubOptionLabel(club) {
@@ -126,6 +127,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   currentUser = user;
   document.getElementById('userDisplayName').textContent = `${user.firstName} ${user.lastName}`;
 
+  isSuperAdmin = (user.username || '').toLowerCase() === 'admin';
+
+  const systemTabButton = document.getElementById('systemTabButton');
+  if (!isSuperAdmin && systemTabButton) {
+    systemTabButton.remove();
+    try {
+      if (localStorage.getItem('adminCurrentTab') === 'system') {
+        localStorage.removeItem('adminCurrentTab');
+      }
+    } catch (error) {
+      console.warn('Unable to clear saved system tab preference:', error);
+    }
+  }
+
   const userDetails = await fetchUserDetails(user.id);
   setClubName(userDetails?.ClubName || null);
 
@@ -136,7 +151,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   await loadEvents();
   await loadUsers();
-  const savedTab = localStorage.getItem('adminCurrentTab') || 'events';
+  let savedTab = 'events';
+  try {
+    const storedTab = localStorage.getItem('adminCurrentTab');
+    if (storedTab && (storedTab !== 'system' || isSuperAdmin)) {
+      savedTab = storedTab;
+    }
+  } catch (error) {
+    console.warn('Unable to load saved admin tab:', error);
+  }
   switchTab(savedTab);
 });
 
@@ -442,6 +465,11 @@ window.loadClubsForCreateUser = loadClubsForCreateUser;
 window.loadClubsForEditUser = loadClubsForEditUser;
 
 async function switchTab(tabName, clickedElement = null) {
+  if (tabName === 'system' && !isSuperAdmin) {
+    showNotification('You do not have access to the System tab.', 'error');
+    return;
+  }
+
   if (tabName === 'locations') {
     tabName = 'clubs';
   }
@@ -755,6 +783,21 @@ function readFileAsDataUrl(file) {
 // Old check-in functions removed
 
 function getSystemTab() {
+  if (!isSuperAdmin) {
+    return `
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">System Administration</h2>
+        </div>
+        <div style="padding: 20px;">
+          <p style="color: #d32f2f; font-weight: 500;">
+            Access denied. Only the super admin can manage system settings.
+          </p>
+        </div>
+      </div>
+    `;
+  }
+
   return `
     <div class="card">
       <div class="card-header">
@@ -794,18 +837,27 @@ function getSystemTab() {
       </div>
       <div style="padding: 20px;">
         <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ffc107;">
-          <strong>⚠️ Warning:</strong> Resetting the database will delete ALL data including admin users, honors, events, clubs, classes, and registrations. Everything will be recreated fresh. This action cannot be undone.
+          <strong>⚠️ Warning:</strong> These actions permanently modify the database. Proceed with caution.
         </div>
         <div class="form-group">
           <label><strong>Database Reset & Reseed</strong></label>
-          <p style="color: #666; margin: 10px 0;">This will:</p>
-          <ul style="color: #666; margin: 10px 0 20px 20px;">
-            <li>Delete ALL data: honors, events, clubs, all users, classes, locations, timeslots, and registrations</li>
-            <li>Reseed the database with fresh test data</li>
-            <li>Create honors list, 3 admin users, 2 events, 8 clubs, test users, locations, timeslots, and classes</li>
-          </ul>
+          <p style="color: #666; margin: 10px 0;">
+            Delete all data and repopulate with comprehensive demo/test content (events, clubs, classes, users, honors, etc.). The super admin account
+            remains <code>admin / @dudlybob3X</code>.
+          </p>
           <button onclick="reseedDatabase()" class="btn btn-danger" id="reseedBtn">
             Reset & Reseed Database
+          </button>
+        </div>
+        <hr style="margin: 24px 0;">
+        <div class="form-group">
+          <label><strong>Prepare for Launch</strong></label>
+          <p style="color: #666; margin: 10px 0;">
+            Remove operational data (events, clubs, classes, registrations, and additional users) while keeping honors, branding, and the super admin account.
+            This is ideal for preparing a clean production environment.
+          </p>
+          <button onclick="clearDatabaseForLaunch()" class="btn btn-warning" id="clearLaunchBtn">
+            Clear Database for Launch
           </button>
         </div>
       </div>
@@ -859,6 +911,42 @@ async function reseedDatabase() {
     showNotification('Error resetting database: ' + error.message, 'error');
     btn.disabled = false;
     btn.textContent = 'Reset & Reseed Database';
+  }
+}
+
+async function clearDatabaseForLaunch() {
+  if (!confirm('Prepare the database for launch?\n\nThis will delete ALL events, clubs, classes, registrations, and non-super-admin users.\nHonors, branding, and the super admin account will remain.\n\nYou will be signed out after the operation completes.\n\nThis action cannot be undone.')) {
+    return;
+  }
+
+  const btn = document.getElementById('clearLaunchBtn');
+  btn.disabled = true;
+  btn.textContent = 'Clearing...';
+
+  try {
+    const response = await fetchWithAuth('/api/admin/clear', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: true })
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      showNotification('Database cleared for launch. Redirecting to login...', 'success');
+      setTimeout(() => {
+        window.location.href = '/login.html';
+      }, 2000);
+    } else {
+      showNotification(result.error || 'Error clearing database', 'error');
+      btn.disabled = false;
+      btn.textContent = 'Clear Database for Launch';
+    }
+  } catch (error) {
+    console.error('Clear database error:', error);
+    showNotification('Error clearing database: ' + error.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Clear Database for Launch';
   }
 }
 
@@ -3206,6 +3294,7 @@ window.showConflictModal = showConflictModal;
 window.resolveConflict = resolveConflict;
 window.generateReport = generateReport;
 window.reseedDatabase = reseedDatabase;
+window.clearDatabaseForLaunch = clearDatabaseForLaunch;
 window.updateReportButton = updateReportButton;
 window.renderLocations = renderLocations;
 // Timeslot management functions

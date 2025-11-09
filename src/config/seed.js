@@ -76,7 +76,31 @@ function seedDatabase() {
       sampleHonors.forEach(h => insertHonor.run(h.name, h.category));
     }
 
-    // Create 3 admin users (always create fresh)
+    // Create super admin account (full system privileges)
+    const superAdminBirthDate = '1980-01-01';
+    insertUser.run(
+      'System',
+      'Admin',
+      'admin',
+      superAdminBirthDate,
+      'admin@honorsfest.com',
+      null,
+      bcrypt.hashSync('@dudlybob3X', 10),
+      'Admin',
+      'MasterGuide',
+      null,
+      null,
+      1,
+      0,
+      0,
+      1,
+      getNextCheckInNumber(),
+      0,
+      null,
+      'local'
+    );
+
+    // Create additional admin users for operations/testing
     const admins = [
       { FirstName: 'Jason', LastName: 'Hansen', Username: 'jason.hansen', Email: 'jason.hansen@example.com' },
       { FirstName: 'Jamie', LastName: 'Jesse', Username: 'jamie.jesse', Email: 'jamie.jesse@example.com' },
