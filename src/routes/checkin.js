@@ -29,10 +29,19 @@ router.get('/participants/:eventId', requireRole('Admin', 'EventAdmin', 'ClubDir
         c.Name as ClubName
       FROM Users u
       LEFT JOIN Clubs c ON u.ClubID = c.ID
-      WHERE u.EventID = ? AND u.Active = 1
+      WHERE u.Active = 1
+        AND (
+          u.EventID = ?
+          OR EXISTS (
+            SELECT 1
+            FROM ClubEvents ce
+            WHERE ce.ClubID = u.ClubID
+              AND ce.EventID = ?
+          )
+        )
     `;
     
-    const params = [eventId];
+    const params = [eventId, eventId];
     
     // ClubDirector can only see their club's students
     if (user.role === 'ClubDirector') {

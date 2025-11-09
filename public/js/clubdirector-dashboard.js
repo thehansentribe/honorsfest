@@ -70,7 +70,9 @@ async function clubdirectorSwitchTab(tabName, clickedElement = null) {
         userClubId: clubDirectorClubId 
       });
       if (clubDirectorSelectedEventId) {
-        await checkInLoadParticipants();
+        if (typeof checkInLoadParticipants === 'function') {
+          await checkInLoadParticipants();
+        }
       }
       break;
   }
@@ -1770,7 +1772,8 @@ Thank you!`;
         }
         selector.appendChild(option);
       });
-      eventNameEl.textContent = '';
+      const selectedEvent = clubDirectorEvents.find(e => e.ID === clubDirectorSelectedEventId);
+      eventNameEl.textContent = selectedEvent ? selectedEvent.Name : '';
     } else if (clubDirectorEvents.length === 1) {
       // Single event - hide selector and show event name
       if (selectorContainer) selectorContainer.style.display = 'none';
@@ -1821,6 +1824,11 @@ Thank you!`;
           content.innerHTML = getReportsTab();
         }
         setupEventSelector();
+        break;
+      case 'checkin':
+        if (typeof checkInLoadParticipants === 'function') {
+          await checkInLoadParticipants();
+        }
         break;
       // 'users' tab doesn't need to reload on event switch
     }

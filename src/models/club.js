@@ -70,7 +70,9 @@ class Club {
 
       const updateUsers = db.prepare(`
         UPDATE Users SET EventID = ?
-        WHERE ClubID = ? AND Role IN ('ClubDirector', 'Teacher', 'Student', 'Staff')
+        WHERE ClubID = ?
+          AND Role IN ('ClubDirector', 'Teacher', 'Student', 'Staff')
+          AND EventID IS NULL
       `);
       updateUsers.run(eventId, clubId);
       return true;
@@ -78,7 +80,9 @@ class Club {
       if (error.message.includes('UNIQUE constraint')) {
         const updateUsers = db.prepare(`
           UPDATE Users SET EventID = ?
-          WHERE ClubID = ? AND Role IN ('ClubDirector', 'Teacher', 'Student', 'Staff')
+          WHERE ClubID = ?
+            AND Role IN ('ClubDirector', 'Teacher', 'Student', 'Staff')
+            AND EventID IS NULL
         `);
         updateUsers.run(eventId, clubId);
         // Already linked, return true
@@ -96,11 +100,23 @@ class Club {
     const result = stmt.run(clubId, eventId);
 
     if (result.changes > 0) {
-      const removeUsers = db.prepare(`
-        UPDATE Users SET EventID = NULL
-        WHERE ClubID = ? AND EventID = ? AND Role IN ('ClubDirector', 'Teacher', 'Student', 'Staff')
+      const remainingEvent = db.prepare(`
+        SELECT EventID
+        FROM ClubEvents
+        WHERE ClubID = ?
+        ORDER BY EventID
+        LIMIT 1
+      `).get(clubId);
+
+      const newEventId = remainingEvent ? remainingEvent.EventID : null;
+      const reassignUsers = db.prepare(`
+        UPDATE Users
+        SET EventID = ?
+        WHERE ClubID = ?
+          AND EventID = ?
+          AND Role IN ('ClubDirector', 'Teacher', 'Student', 'Staff')
       `);
-      removeUsers.run(clubId, eventId);
+      reassignUsers.run(newEventId, clubId, eventId);
     }
 
     return result.changes > 0;
