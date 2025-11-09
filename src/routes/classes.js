@@ -47,10 +47,10 @@ router.get('/:eventId', (req, res) => {
     
     // Non-admins can only see active events
     if (user.role !== 'Admin' && user.role !== 'EventAdmin') {
-      if (!event.Active) {
+      if (!event.Active && user.role !== 'ClubDirector') {
         return res.status(403).json({ error: 'This event is not currently active.' });
       }
-      
+
       // Check if user's club participates in this event
       const User = require('../models/user');
       const userData = User.findById(user.id);

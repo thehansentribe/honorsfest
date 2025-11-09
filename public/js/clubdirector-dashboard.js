@@ -382,6 +382,8 @@ async function renderClasses() {
     return;
   }
   
+  console.log('[ClubDirector] renderClasses for event', clubDirectorSelectedEventId);
+  
   if (!clubDirectorSelectedEventId) {
     if (clubDirectorEvents.length === 0) {
       container.innerHTML = '<p class="text-center" style="color: #d32f2f;">No events assigned to your club. Please contact an administrator.</p>';
@@ -395,10 +397,12 @@ async function renderClasses() {
     const response = await fetchWithAuth(`/api/classes/${clubDirectorSelectedEventId}`);
     
     if (!response.ok) {
-      throw new Error(`Failed to load classes: ${response.status}`);
+      const errorBody = await response.json().catch(() => ({}));
+      throw new Error(`Failed to load classes: ${response.status}${errorBody.error ? ` - ${errorBody.error}` : ''}`);
     }
     
     clubDirectorClasses = await response.json();
+    console.log('[ClubDirector] Classes response:', clubDirectorClasses);
     
     const normalizeActive = (value) => value === 1 || value === true || value === '1';
     const activeClasses = clubDirectorClasses.filter(c => normalizeActive(c.Active));
@@ -508,6 +512,7 @@ async function loadEvents() {
     // Use /api/events/my to get events for this club
     const response = await fetchWithAuth('/api/events/my');
     clubDirectorEvents = await response.json();
+    console.log('[ClubDirector] Events loaded:', clubDirectorEvents);
     
   } catch (error) {
     console.error('Error loading events:', error);
@@ -1131,6 +1136,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     
+    console.log('[ClubDirector] renderCodes for event', clubDirectorSelectedEventId);
+    
     container.innerHTML = '<p class="text-center">Loading codes...</p>';
     
     // Check if events are available
@@ -1167,6 +1174,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       
       const codes = await response.json();
+      console.log('[ClubDirector] Codes response:', codes);
       
       if (!Array.isArray(codes)) {
         console.error('Invalid response format:', codes);
@@ -1789,6 +1797,8 @@ Thank you!`;
       showNotification('Selected event not found', 'error');
       return;
     }
+    
+    console.log('[ClubDirector] Switching to event', selectedEvent);
     
     clubDirectorSelectedEventId = eventIdInt;
     clubDirectorEventId = clubDirectorSelectedEventId;
