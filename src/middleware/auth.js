@@ -35,9 +35,9 @@ function requireSuperAdmin(req, res, next) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const isSuperAdmin =
-    req.user.role === 'Admin' &&
-    (req.user.username === 'admin' || req.user.username === 'Admin');
+  const username = (req.user.username || '').toLowerCase();
+  const superAdminUsernames = ['admin', 'jason.hansen'];
+  const isSuperAdmin = req.user.role === 'Admin' && superAdminUsernames.includes(username);
 
   if (!isSuperAdmin) {
     return res.status(403).json({ error: 'Super admin permissions required' });
