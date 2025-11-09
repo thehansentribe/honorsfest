@@ -71,12 +71,6 @@ router.get('/:eventId', (req, res) => {
       teacherId: req.query.teacherId
     };
     
-    // Admin and EventAdmin see all classes (active and inactive)
-    // Other roles (ClubDirector, Teacher, Student) only see active classes
-    if (user.role !== 'Admin' && user.role !== 'EventAdmin') {
-      filters.active = true;
-    }
-    
     const classes = Class.findByEvent(eventId, filters);
     res.json(classes);
   } catch (error) {
