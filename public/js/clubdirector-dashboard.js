@@ -400,8 +400,9 @@ async function renderClasses() {
     
     clubDirectorClasses = await response.json();
     
-    const activeClasses = clubDirectorClasses.filter(c => c.Active);
-    const inactiveClasses = clubDirectorClasses.filter(c => !c.Active);
+    const normalizeActive = (value) => value === 1 || value === true || value === '1';
+    const activeClasses = clubDirectorClasses.filter(c => normalizeActive(c.Active));
+    const inactiveClasses = clubDirectorClasses.filter(c => !normalizeActive(c.Active));
     
     if (activeClasses.length === 0 && inactiveClasses.length === 0) {
       container.innerHTML = '<p class="text-center">No classes found for this event</p>';
@@ -426,7 +427,8 @@ async function renderClasses() {
         </thead>
         <tbody>
           ${hasActive ? activeClasses.map(cls => {
-              const canEdit = cls.CreatedBy === clubDirectorUser?.id;
+              const isActive = normalizeActive(cls.Active);
+              const canEdit = isActive && cls.CreatedBy === clubDirectorUser?.id;
               return `
           <tr style="border-bottom: 1px solid #e0e0e0;">
             <td style="padding: 12px 8px; text-align: left;"><strong>${cls.HonorName || 'N/A'}</strong></td>
@@ -469,7 +471,8 @@ async function renderClasses() {
     `;
     
     const mobileCards = [...activeClasses, ...inactiveClasses].map(cls => {
-      const canEdit = cls.CreatedBy === clubDirectorUser?.id;
+      const isActive = normalizeActive(cls.Active);
+      const canEdit = isActive && cls.CreatedBy === clubDirectorUser?.id;
       const dateTime = cls.TimeslotDate
         ? `${cls.TimeslotDate}<br><small style="color: var(--text-light);">${cls.TimeslotStartTime ? convertTo12Hour(cls.TimeslotStartTime) : ''} - ${cls.TimeslotEndTime ? convertTo12Hour(cls.TimeslotEndTime) : ''}</small>`
         : 'N/A';
@@ -487,7 +490,7 @@ async function renderClasses() {
         'Location': cls.LocationName || 'N/A',
         'Date/Time': dateTime,
         'Capacity': `${cls.EnrolledCount || 0}/${cls.WaitlistCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}`,
-        'Status': cls.Active ? 'Active' : 'Inactive'
+        'Status': isActive ? 'Active' : 'Inactive'
       }, cls.HonorName || 'N/A', actionsHtml);
     }).join('');
     
