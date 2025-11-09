@@ -67,9 +67,20 @@ class Club {
         VALUES (?, ?)
       `);
       stmt.run(clubId, eventId);
+
+      const updateUsers = db.prepare(`
+        UPDATE Users SET EventID = ?
+        WHERE ClubID = ? AND Role IN ('ClubDirector', 'Teacher', 'Student', 'Staff')
+      `);
+      updateUsers.run(eventId, clubId);
       return true;
     } catch (error) {
       if (error.message.includes('UNIQUE constraint')) {
+        const updateUsers = db.prepare(`
+          UPDATE Users SET EventID = ?
+          WHERE ClubID = ? AND Role IN ('ClubDirector', 'Teacher', 'Student', 'Staff')
+        `);
+        updateUsers.run(eventId, clubId);
         // Already linked, return true
         return true;
       }
@@ -83,6 +94,15 @@ class Club {
       WHERE ClubID = ? AND EventID = ?
     `);
     const result = stmt.run(clubId, eventId);
+
+    if (result.changes > 0) {
+      const removeUsers = db.prepare(`
+        UPDATE Users SET EventID = NULL
+        WHERE ClubID = ? AND EventID = ? AND Role IN ('ClubDirector', 'Teacher', 'Student', 'Staff')
+      `);
+      removeUsers.run(clubId, eventId);
+    }
+
     return result.changes > 0;
   }
 
