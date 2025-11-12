@@ -200,11 +200,15 @@ async function toggleEventDropdown(role) {
     if (!eventSelect || eventSelect.dataset.loaded === 'true') return;
     const response = await fetchWithAuth('/api/events');
     const events = await response.json();
+    const seenEventIds = new Set();
     events.forEach(event => {
-      const option = document.createElement('option');
-      option.value = event.ID;
-      option.textContent = event.Name;
-      eventSelect.appendChild(option);
+      if (event && !seenEventIds.has(event.ID)) {
+        seenEventIds.add(event.ID);
+        const option = document.createElement('option');
+        option.value = event.ID;
+        option.textContent = event.Name;
+        eventSelect.appendChild(option);
+      }
     });
     eventSelect.dataset.loaded = 'true';
   }
@@ -249,11 +253,15 @@ async function toggleEditEventDropdown(role) {
     if (!eventSelect || eventSelect.dataset.loaded === 'true') return;
     const response = await fetchWithAuth('/api/events');
     const events = await response.json();
+    const seenEventIds = new Set();
     events.forEach(event => {
-      const option = document.createElement('option');
-      option.value = event.ID;
-      option.textContent = event.Name;
-      eventSelect.appendChild(option);
+      if (event && !seenEventIds.has(event.ID)) {
+        seenEventIds.add(event.ID);
+        const option = document.createElement('option');
+        option.value = event.ID;
+        option.textContent = event.Name;
+        eventSelect.appendChild(option);
+      }
     });
     eventSelect.dataset.loaded = 'true';
     
