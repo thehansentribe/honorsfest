@@ -11,6 +11,34 @@ let currentUser = null;
 let assignedEventId = null;
 let assignedEvent = null;
 
+function populateEventOptions(selectEl, events, placeholderText = 'Select Event') {
+  if (!selectEl || !Array.isArray(events)) return;
+
+  const previousValue = selectEl.value;
+  if (placeholderText !== null) {
+    selectEl.innerHTML = `<option value="">${placeholderText}</option>`;
+  } else {
+    selectEl.innerHTML = '';
+  }
+
+  const seenKeys = new Set();
+  events.forEach(event => {
+    if (!event) return;
+    const key = `${event.ID ?? ''}::${event.Name ?? ''}`;
+    if (seenKeys.has(key)) return;
+    seenKeys.add(key);
+
+    const option = document.createElement('option');
+    option.value = event.ID;
+    option.textContent = event.Name;
+    selectEl.appendChild(option);
+  });
+
+  if (previousValue && Array.from(selectEl.options).some(opt => opt.value === previousValue)) {
+    selectEl.value = previousValue;
+  }
+}
+
 function formatClubOptionLabel(club) {
   if (!club) return '';
   const eventNames = (club.Events || [])
@@ -232,16 +260,7 @@ async function toggleEditEventDropdown(role) {
     if (!eventSelect || eventSelect.dataset.loaded === 'true') return;
     const response = await fetchWithAuth('/api/events');
     const events = await response.json();
-    const seenEventIds = new Set();
-    events.forEach(event => {
-      if (event && !seenEventIds.has(event.ID)) {
-        seenEventIds.add(event.ID);
-        const option = document.createElement('option');
-        option.value = event.ID;
-        option.textContent = event.Name;
-        eventSelect.appendChild(option);
-      }
-    });
+    populateEventOptions(eventSelect, events, 'Select Event');
     eventSelect.dataset.loaded = 'true';
     
     const formEl = document.getElementById('editUserForm');
