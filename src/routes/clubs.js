@@ -100,6 +100,8 @@ router.put('/:id', requireRole('Admin', 'EventAdmin'), (req, res) => {
       return res.status(400).json({ error: 'Invalid club ID' });
     }
 
+    const existingClub = Club.findById(clubId);
+
     const User = require('../models/user');
     let directorIdInt = null;
     if (updates.DirectorID !== undefined) {
@@ -121,9 +123,15 @@ router.put('/:id', requireRole('Admin', 'EventAdmin'), (req, res) => {
       return res.status(404).json({ error: 'Club not found' });
     }
     
-    // If a director was assigned, automatically add them to the club
-    if (directorIdInt) {
-      User.update(directorIdInt, { ClubID: club.ID });
+    // If DirectorID explicitly provided
+    if (updates.DirectorID !== undefined) {
+      if (directorIdInt) {
+        User.update(directorIdInt, { ClubID: club.ID, Role: 'ClubDirector' });
+      }
+      
+      if (existingClub?.DirectorID && existingClub.DirectorID !== directorIdInt) {
+        User.update(existingClub.DirectorID, { ClubID: null });
+      }
     }
     
     res.json(club);

@@ -56,7 +56,7 @@ router.post('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => 
       }
       // Force eventId to their assigned event
       const assignedEventId = req.user.eventId;
-      const invite = InviteCode.generate(
+    const invite = InviteCode.generate(
         { FirstName: firstName, LastName: lastName, Email: email, Role: role, ClubID: parsedClubId || null, EventID: assignedEventId },
         req.user.id,
         expiresInDays || 30
@@ -83,11 +83,14 @@ router.post('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => 
         // If user already exists, update their invite status
         const existingUser = User.findByEmail(email);
         if (existingUser) {
-          db.prepare(`
-            UPDATE Users 
-            SET Invited = 1, InviteAccepted = 0, Active = 0
-            WHERE Email = ?
-          `).run(email);
+      User.update(existingUser.ID, {
+        Role: role,
+        ClubID: parsedClubId || existingUser.ClubID || null,
+        EventID: assignedEventId,
+        Active: 0,
+        Invited: 1,
+        InviteAccepted: 0
+      });
         }
       }
       
@@ -122,11 +125,14 @@ router.post('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => 
       // If user already exists, update their invite status
       const existingUser = User.findByEmail(email);
       if (existingUser) {
-        db.prepare(`
-          UPDATE Users 
-          SET Invited = 1, InviteAccepted = 0, Active = 0
-          WHERE Email = ?
-        `).run(email);
+      User.update(existingUser.ID, {
+        Role: role,
+        ClubID: parsedClubId || existingUser.ClubID || null,
+        EventID: parsedEventId || existingUser.EventID || null,
+        Active: 0,
+        Invited: 1,
+        InviteAccepted: 0
+      });
       }
     }
     

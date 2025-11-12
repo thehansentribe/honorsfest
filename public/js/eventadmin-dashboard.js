@@ -2912,6 +2912,8 @@ async function handleCreateUser(e) {
       // Show invite code and email template
       showInviteModal(invite, inviteData);
       closeModal('createUserModal');
+      await loadUsers();
+      await loadClubs();
     } catch (error) {
       showNotification('Error generating invite: ' + error.message, 'error');
     }
@@ -2951,6 +2953,7 @@ async function handleCreateUser(e) {
       showNotification('User created successfully', 'success');
       closeModal('createUserModal');
       await loadUsers();
+      await loadClubs();
     } else {
       showNotification(result.error || 'Error creating user', 'error');
     }
@@ -3118,6 +3121,7 @@ async function handleEditUser(e, userId) {
       showNotification('User updated successfully', 'success');
       closeModal('editUserModal');
       await loadUsers();
+      await loadClubs();
     } else {
       showNotification(result.error || 'Error updating user', 'error');
     }

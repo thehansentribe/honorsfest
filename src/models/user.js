@@ -85,7 +85,9 @@ class User {
       auth_method || 'local'
     );
 
-    return this.findById(result.lastInsertRowid);
+    const createdUser = this.findById(result.lastInsertRowid);
+    this.syncClubDirectorAssignment(createdUser);
+    return createdUser;
   }
 
   static bulkCreate(users) {
@@ -245,7 +247,9 @@ class User {
     const stmt = db.prepare(`UPDATE Users SET ${setClause.join(', ')} WHERE ID = ?`);
     stmt.run(...values);
 
-    return this.findById(id);
+    const updatedUser = this.findById(id);
+    this.syncClubDirectorAssignment(updatedUser);
+    return updatedUser;
   }
 
   static findByCheckInNumber(checkInNumber) {
@@ -288,6 +292,21 @@ class User {
     
     // Update user to inactive
     return this.update(id, { Active: 0 });
+  }
+
+  static syncClubDirectorAssignment(user) {
+    if (!user) return;
+
+    if (user.Role === 'ClubDirector') {
+      if (user.ClubID) {
+        db.prepare('UPDATE Clubs SET DirectorID = NULL WHERE DirectorID = ? AND ID != ?').run(user.ID, user.ClubID);
+        db.prepare('UPDATE Clubs SET DirectorID = ? WHERE ID = ?').run(user.ID, user.ClubID);
+      } else {
+        db.prepare('UPDATE Clubs SET DirectorID = NULL WHERE DirectorID = ?').run(user.ID);
+      }
+    } else {
+      db.prepare('UPDATE Clubs SET DirectorID = NULL WHERE DirectorID = ?').run(user.ID);
+    }
   }
 }
 
