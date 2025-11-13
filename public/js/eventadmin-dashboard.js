@@ -2580,9 +2580,9 @@ function showCreateUserForm() {
           <small style="color: var(--text-light);">Age will be calculated automatically</small>
         </div>
         <div class="form-group">
-          <label for="email">Email *</label>
+          <label for="email" id="emailLabel">Email *</label>
           <input type="email" id="email" name="email" class="form-control" required>
-          <small style="color: var(--text-light);">Required for Admin, Event Admin, and Club Director invitations</small>
+          <small id="emailHelp" style="color: var(--text-light);">Required for Admin, Event Admin, and Club Director invitations</small>
         </div>
         <div class="form-group" id="phoneContainer">
           <label for="phone">Phone</label>
@@ -2660,10 +2660,50 @@ function showCreateUserForm() {
     const dateOfBirthContainer = document.getElementById('dateOfBirthContainer');
     const dateOfBirthInput = document.getElementById('dateOfBirth');
     const phoneContainer = document.getElementById('phoneContainer');
+    const emailInput = document.getElementById('email');
+    const emailLabel = document.getElementById('emailLabel');
+    const emailHelp = document.getElementById('emailHelp');
     
     if (!roleSelect) return;
     
     const role = roleSelect.value;
+    const emailRequiredRoles = ['Admin', 'EventAdmin', 'ClubDirector'];
+    const emailOptionalRoles = ['Teacher', 'Student', 'Staff'];
+    
+    if (emailRequiredRoles.includes(role)) {
+      // Email required for Admin, EventAdmin, ClubDirector
+      if (emailInput) {
+        emailInput.required = true;
+      }
+      if (emailLabel) {
+        emailLabel.textContent = 'Email *';
+      }
+      if (emailHelp) {
+        emailHelp.textContent = 'Required for Admin, Event Admin, and Club Director invitations';
+      }
+    } else if (emailOptionalRoles.includes(role)) {
+      // Email optional for Teacher, Student, Staff
+      if (emailInput) {
+        emailInput.required = false;
+      }
+      if (emailLabel) {
+        emailLabel.textContent = 'Email';
+      }
+      if (emailHelp) {
+        emailHelp.textContent = 'Optional - Not required for Teachers, Staff, and Students';
+      }
+    } else {
+      // Default: email required (for safety)
+      if (emailInput) {
+        emailInput.required = true;
+      }
+      if (emailLabel) {
+        emailLabel.textContent = 'Email *';
+      }
+      if (emailHelp) {
+        emailHelp.textContent = 'Required for Admin, Event Admin, and Club Director invitations';
+      }
+    }
     
     if (['Admin', 'EventAdmin', 'ClubDirector'].includes(role)) {
       // Invite roles: hide password, date of birth, and phone, change button text
@@ -2759,8 +2799,9 @@ async function editUser(userId) {
         </div>
         ` : ''}
         <div class="form-group">
-          <label for="editEmail">Email</label>
-          <input type="email" id="editEmail" name="editEmail" class="form-control" value="${user.Email || ''}">
+          <label for="editEmail" id="editEmailLabel">Email${['Admin', 'EventAdmin', 'ClubDirector'].includes(user.Role) ? ' *' : ''}</label>
+          <input type="email" id="editEmail" name="editEmail" class="form-control" value="${user.Email || ''}" ${['Admin', 'EventAdmin', 'ClubDirector'].includes(user.Role) ? 'required' : ''}>
+          <small id="editEmailHelp" style="color: var(--text-light);">${['Admin', 'EventAdmin', 'ClubDirector'].includes(user.Role) ? 'Required for Admin, Event Admin, and Club Director' : 'Optional - Not required for Teachers, Staff, and Students'}</small>
         </div>
         <div class="form-group">
           <label for="editPhone">Phone</label>
@@ -2848,11 +2889,57 @@ async function editUser(userId) {
     await loadClubsForEditUser(null);
   }
   
+  // Function to update email field based on role for edit form
+  function updateEditEmailField(role) {
+    const emailInput = document.getElementById('editEmail');
+    const emailLabel = document.getElementById('editEmailLabel');
+    const emailHelp = document.getElementById('editEmailHelp');
+    const emailRequiredRoles = ['Admin', 'EventAdmin', 'ClubDirector'];
+    const emailOptionalRoles = ['Teacher', 'Student', 'Staff'];
+    
+    if (emailRequiredRoles.includes(role)) {
+      // Email required for Admin, EventAdmin, ClubDirector
+      if (emailInput) {
+        emailInput.required = true;
+      }
+      if (emailLabel) {
+        emailLabel.textContent = 'Email *';
+      }
+      if (emailHelp) {
+        emailHelp.textContent = 'Required for Admin, Event Admin, and Club Director';
+      }
+    } else if (emailOptionalRoles.includes(role)) {
+      // Email optional for Teacher, Student, Staff
+      if (emailInput) {
+        emailInput.required = false;
+      }
+      if (emailLabel) {
+        emailLabel.textContent = 'Email';
+      }
+      if (emailHelp) {
+        emailHelp.textContent = 'Optional - Not required for Teachers, Staff, and Students';
+      }
+    } else {
+      // Default: email required (for safety)
+      if (emailInput) {
+        emailInput.required = true;
+      }
+      if (emailLabel) {
+        emailLabel.textContent = 'Email *';
+      }
+      if (emailHelp) {
+        emailHelp.textContent = 'Required for Admin, Event Admin, and Club Director';
+      }
+    }
+  }
+  
   // Add change listener for role dropdown
   const editRoleSelect = document.getElementById('editRole');
   if (editRoleSelect) {
     editRoleSelect.addEventListener('change', function() {
-      toggleEditEventDropdown(this.value);
+      const role = this.value;
+      toggleEditEventDropdown(role);
+      updateEditEmailField(role);
     });
   }
 }
@@ -2921,11 +3008,21 @@ async function handleCreateUser(e) {
   }
   
   // For other roles (Student, Teacher, Staff) - create user directly
+  // Email is optional for Teachers, Staff, and Students
+  const emailOptionalRoles = ['Teacher', 'Student', 'Staff'];
+  const emailRequired = !emailOptionalRoles.includes(role);
+  
+  // Validate email only if required for this role
+  if (emailRequired && !email) {
+    showNotification('Email is required for this role', 'error');
+    return;
+  }
+  
   const userData = {
     FirstName: firstName,
     LastName: lastName,
     DateOfBirth: form.dateOfBirth?.value || '',
-    Email: email,
+    Email: email || null, // Allow null for Teachers, Staff, and Students
     Phone: form.phone?.value?.trim() || null,
     Role: role,
     InvestitureLevel: form.investitureLevel?.value || 'None',
@@ -3106,6 +3203,16 @@ async function handleEditUser(e, userId) {
   // Validate EventAdmin must have EventID
   if (userData.Role === 'EventAdmin' && !userData.EventID) {
     showNotification('EventAdmin must be assigned to an event', 'error');
+    return;
+  }
+
+  // Validate email requirement based on role
+  // Email is required for Admin, EventAdmin, and ClubDirector
+  // Email is optional for Teacher, Student, and Staff
+  const emailRequiredRoles = ['Admin', 'EventAdmin', 'ClubDirector'];
+  const emailOptionalRoles = ['Teacher', 'Student', 'Staff'];
+  if (emailRequiredRoles.includes(userData.Role) && !userData.Email) {
+    showNotification('Email is required for ' + userData.Role, 'error');
     return;
   }
 

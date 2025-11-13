@@ -90,6 +90,14 @@ router.post('/', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) 
       return res.status(400).json({ error: 'Missing required fields: FirstName, LastName, DateOfBirth, and Role are required' });
     }
 
+    // Validate email requirement based on role
+    // Email is required for Admin, EventAdmin, and ClubDirector
+    // Email is optional for Teacher, Student, and Staff
+    const emailRequiredRoles = ['Admin', 'EventAdmin', 'ClubDirector'];
+    if (emailRequiredRoles.includes(Role) && !Email) {
+      return res.status(400).json({ error: 'Email is required for ' + Role });
+    }
+
     // Validate EventAdmin must have an EventID
     if (Role === 'EventAdmin' && !EventID) {
       return res.status(400).json({ error: 'EventAdmin must be assigned to an event' });
@@ -199,6 +207,15 @@ router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res
 
     const resolvedRole = updates.Role || currentRecord.Role;
     const resolvedClubId = updates.ClubID !== undefined ? updates.ClubID : currentRecord.ClubID;
+    const resolvedEmail = updates.Email !== undefined ? updates.Email : currentRecord.Email;
+
+    // Validate email requirement based on role
+    // Email is required for Admin, EventAdmin, and ClubDirector
+    // Email is optional for Teacher, Student, and Staff
+    const emailRequiredRoles = ['Admin', 'EventAdmin', 'ClubDirector'];
+    if (emailRequiredRoles.includes(resolvedRole) && !resolvedEmail) {
+      return res.status(400).json({ error: 'Email is required for ' + resolvedRole });
+    }
 
     if (!allowMultipleClubDirectors && resolvedRole === 'ClubDirector' && resolvedClubId) {
       if (User.hasDirectorConflict(resolvedClubId, currentRecord.ID)) {
