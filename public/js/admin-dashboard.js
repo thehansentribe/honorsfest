@@ -224,21 +224,29 @@ async function toggleEventDropdown(role) {
   const requiresEventSelection = role === 'EventAdmin';
   const requiresClubSelection = clubOnlyRoles.includes(role);
 
-  async function ensureEventOptions() {
-    if (!eventSelect || eventSelect.dataset.loaded === 'true') return;
-    const response = await fetchWithAuth('/api/events');
-    const events = await response.json();
-    populateEventOptions(eventSelect, events, 'Select Event');
-    eventSelect.dataset.loaded = 'true';
+  async function ensureEventOptions(forceRefresh = false) {
+    if (!eventSelect) return;
+    // Always refresh events when EventAdmin is selected to ensure latest data
+    if (forceRefresh || eventSelect.dataset.loaded !== 'true') {
+      const response = await fetchWithAuth('/api/events');
+      const events = await response.json();
+      // Update global allEvents array to keep it in sync
+      allEvents = events;
+      populateEventOptions(eventSelect, events, 'Select Event');
+      eventSelect.dataset.loaded = 'true';
+    }
   }
 
   if (requiresEventSelection) {
     eventContainer.style.display = 'block';
-    await ensureEventOptions();
+    // Always refresh events when EventAdmin is selected
+    await ensureEventOptions(true);
   } else {
     eventContainer.style.display = 'none';
     if (eventSelect) {
       eventSelect.value = '';
+      // Clear the loaded flag when hiding so it refreshes next time
+      eventSelect.dataset.loaded = 'false';
     }
   }
 
@@ -268,12 +276,17 @@ async function toggleEditEventDropdown(role) {
   const requiresEventSelection = role === 'EventAdmin';
   const requiresClubSelection = clubOnlyRoles.includes(role);
 
-  async function ensureEventOptions() {
-    if (!eventSelect || eventSelect.dataset.loaded === 'true') return;
-    const response = await fetchWithAuth('/api/events');
-    const events = await response.json();
-    populateEventOptions(eventSelect, events, 'Select Event');
-    eventSelect.dataset.loaded = 'true';
+  async function ensureEventOptions(forceRefresh = false) {
+    if (!eventSelect) return;
+    // Always refresh events when EventAdmin is selected to ensure latest data
+    if (forceRefresh || eventSelect.dataset.loaded !== 'true') {
+      const response = await fetchWithAuth('/api/events');
+      const events = await response.json();
+      // Update global allEvents array to keep it in sync
+      allEvents = events;
+      populateEventOptions(eventSelect, events, 'Select Event');
+      eventSelect.dataset.loaded = 'true';
+    }
     
     const formEl = document.getElementById('editUserForm');
     const userId = formEl ? parseInt(formEl.dataset.userId) : null;
@@ -285,11 +298,14 @@ async function toggleEditEventDropdown(role) {
 
   if (requiresEventSelection) {
     eventContainer.style.display = 'block';
-    await ensureEventOptions();
+    // Always refresh events when EventAdmin is selected
+    await ensureEventOptions(true);
   } else {
     eventContainer.style.display = 'none';
     if (eventSelect) {
       eventSelect.value = '';
+      // Clear the loaded flag when hiding so it refreshes next time
+      eventSelect.dataset.loaded = 'false';
     }
   }
 
@@ -2911,6 +2927,10 @@ async function handleCreateUser(e) {
       showInviteModal(invite, inviteData);
       closeModal('createUserModal');
       await loadUsers();
+      // Reload events if EventAdmin was created to refresh dropdowns
+      if (role === 'EventAdmin') {
+        await loadEvents();
+      }
       await renderClubs();
     } catch (error) {
       showNotification('Error generating invite: ' + error.message, 'error');
@@ -2951,6 +2971,10 @@ async function handleCreateUser(e) {
       showNotification('User created successfully', 'success');
       closeModal('createUserModal');
       await loadUsers();
+      // Reload events if EventAdmin was created to refresh dropdowns
+      if (userData.Role === 'EventAdmin') {
+        await loadEvents();
+      }
       await renderClubs();
     } else {
       showNotification(result.error || 'Error creating user', 'error');
@@ -3119,6 +3143,10 @@ async function handleEditUser(e, userId) {
       showNotification('User updated successfully', 'success');
       closeModal('editUserModal');
       await loadUsers();
+      // Reload events if EventAdmin was updated to refresh dropdowns
+      if (userData.Role === 'EventAdmin') {
+        await loadEvents();
+      }
       // Only refresh clubs if clubs tab is active (will refresh when tab is clicked anyway)
       if (currentTab === 'clubs') {
         // Small delay to ensure backend sync before refreshing clubs
