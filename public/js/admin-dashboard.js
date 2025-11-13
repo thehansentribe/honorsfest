@@ -489,10 +489,6 @@ async function switchTab(tabName, clickedElement = null) {
     return;
   }
 
-  if (tabName === 'locations') {
-    tabName = 'clubs';
-  }
-
   currentTab = tabName;
   try { localStorage.setItem('adminCurrentTab', tabName); } catch (e) {}
   
@@ -517,6 +513,11 @@ async function switchTab(tabName, clickedElement = null) {
     case 'events':
       content.innerHTML = await getEventsTab();
       await renderEvents();
+      break;
+    case 'locations':
+      content.innerHTML = await getLocationsTab();
+      updateEventDropdowns(); // Populate event dropdown
+      await renderLocations();
       break;
     case 'users':
       content.innerHTML = await getUsersTab();
