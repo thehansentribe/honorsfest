@@ -222,6 +222,26 @@ class User {
   }
 
   static update(id, updates) {
+    const currentUser = this.findById(id);
+    if (!currentUser) {
+      return null;
+    }
+
+    // Check if ClubID is changing
+    const oldClubId = currentUser.ClubID;
+    const newClubId = updates.ClubID !== undefined ? updates.ClubID : currentUser.ClubID;
+    
+    // If club is changing, handle the change before updating
+    // This will update EventID and remove incompatible registrations
+    if (oldClubId !== newClubId) {
+      const newEventId = this.handleClubChange(id, oldClubId, newClubId);
+      // Automatically set EventID to match new club's events
+      // Unless EventID is explicitly being set in updates (in which case, explicit wins)
+      if (updates.EventID === undefined) {
+        updates.EventID = newEventId;
+      }
+    }
+
     const allowedUpdates = ['FirstName', 'LastName', 'DateOfBirth', 'Email', 'Phone', 'Role', 'InvestitureLevel', 'ClubID', 'EventID', 'Active', 'BackgroundCheck', 'PasswordHash', 'CheckedIn', 'stytch_user_id', 'auth_method'];
     const setClause = [];
     const values = [];
@@ -232,6 +252,11 @@ class User {
         let dbValue = value;
         if (typeof value === 'boolean') {
           dbValue = value ? 1 : 0;
+        }
+        
+        // Handle null values
+        if (value === null) {
+          dbValue = null;
         }
         
         setClause.push(`${key} = ?`);
@@ -292,6 +317,73 @@ class User {
     
     // Update user to inactive
     return this.update(id, { Active: 0 });
+  }
+
+  /**
+   * Handle club change for a user - updates EventID and removes registrations for incompatible events
+   * @param {number} userId - The user ID
+   * @param {number|null} oldClubId - The previous club ID (null if user had no club)
+   * @param {number|null} newClubId - The new club ID (null if user is being removed from club)
+   * @returns {number|null} - The new EventID that should be set for the user
+   */
+  static handleClubChange(userId, oldClubId, newClubId) {
+    const user = this.findById(userId);
+    if (!user) {
+      return null;
+    }
+
+    // If club isn't actually changing, no action needed
+    const oldClubIdNum = oldClubId ? parseInt(oldClubId, 10) : null;
+    const newClubIdNum = newClubId ? parseInt(newClubId, 10) : null;
+    if (oldClubIdNum === newClubIdNum) {
+      return user.EventID; // Return current EventID, no change needed
+    }
+
+    const Club = require('./club');
+    const Registration = require('./registration');
+
+    // Get new club's events (empty array if no club)
+    const newClubEvents = newClubIdNum ? Club.getEvents(newClubIdNum) : [];
+    const newClubEventIds = newClubEvents.map(e => e.ID);
+
+    // Determine new EventID: use first event if available, otherwise null
+    // Events are ordered by StartDate DESC, so first is most recent
+    const newEventId = newClubEvents.length > 0 ? newClubEvents[0].ID : null;
+
+    // Remove registrations for events not in new club's events
+    // Note: This only affects student registrations (enrollments), not teaching assignments
+    // Teachers can still teach classes for events their club isn't in (that's stored in Class.TeacherID)
+    // But if they're also registered as students in those classes, those registrations will be removed
+    
+    // Get all user's registrations with their class's event IDs
+    const registrations = db.prepare(`
+      SELECT r.ID, r.Status, c.EventID, c.ID as ClassID
+      FROM Registrations r
+      JOIN Classes c ON r.ClassID = c.ID
+      WHERE r.UserID = ?
+    `).all(userId);
+
+    // Remove registrations for events not in new club's events
+    let removedCount = 0;
+    for (const reg of registrations) {
+      // If new club has no events, remove all registrations
+      // If new club has events, only remove registrations for events not in the list
+      if (newClubEventIds.length === 0 || !newClubEventIds.includes(reg.EventID)) {
+        try {
+          // Use Registration.remove to properly handle waitlist processing
+          Registration.remove(reg.ID);
+          removedCount++;
+        } catch (error) {
+          console.error(`Error removing registration ${reg.ID} for user ${userId}:`, error);
+        }
+      }
+    }
+
+    if (removedCount > 0) {
+      console.log(`Removed ${removedCount} registration(s) for user ${userId} (${user.Role}) when switching from club ${oldClubIdNum || 'none'} to club ${newClubIdNum || 'none'}`);
+    }
+
+    return newEventId;
   }
 
   static syncClubDirectorAssignment(user) {
