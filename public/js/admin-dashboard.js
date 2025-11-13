@@ -3118,9 +3118,12 @@ async function handleEditUser(e, userId) {
       showNotification('User updated successfully', 'success');
       closeModal('editUserModal');
       await loadUsers();
-      // Small delay to ensure backend sync before refreshing clubs
-      await new Promise(resolve => setTimeout(resolve, 100));
-      await renderClubs();
+      // Only refresh clubs if clubs tab is active (will refresh when tab is clicked anyway)
+      if (currentTab === 'clubs') {
+        // Small delay to ensure backend sync before refreshing clubs
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await renderClubs();
+      }
     } else {
       showNotification(result.error || 'Error updating user', 'error');
     }
@@ -3821,6 +3824,13 @@ window.renderTimeslots = renderTimeslots;
 // Club management functions
 async function renderClubs() {
   try {
+    // Check if clubs tab is active and clubsList element exists
+    const clubsListEl = document.getElementById('clubsList');
+    if (!clubsListEl) {
+      // Clubs tab is not active, silently return (data will refresh when tab is clicked)
+      return;
+    }
+    
     // Ensure the Create Club button exists and is visible
     const cardHeader = document.querySelector('#content .card-header');
     if (cardHeader) {
@@ -3844,7 +3854,7 @@ async function renderClubs() {
     allClubs = await response.json();
     
     if (allClubs.length === 0) {
-      document.getElementById('clubsList').innerHTML = '<p class="text-center">No clubs found</p>';
+      clubsListEl.innerHTML = '<p class="text-center">No clubs found</p>';
       return;
     }
     
@@ -3900,7 +3910,7 @@ async function renderClubs() {
       }, club.Name, actionsHtml);
     }).join('');
     
-    document.getElementById('clubsList').innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
+    clubsListEl.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
   } catch (error) {
     console.error('Error loading clubs:', error);
     showNotification('Error loading clubs', 'error');

@@ -3121,9 +3121,12 @@ async function handleEditUser(e, userId) {
       showNotification('User updated successfully', 'success');
       closeModal('editUserModal');
       await loadUsers();
-      // Small delay to ensure backend sync before refreshing clubs
-      await new Promise(resolve => setTimeout(resolve, 100));
-      await loadClubs();
+      // Only refresh clubs if clubs tab is active (will refresh when tab is clicked anyway)
+      if (currentTab === 'clubs') {
+        // Small delay to ensure backend sync before refreshing clubs
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await loadClubs();
+      }
     } else {
       showNotification(result.error || 'Error updating user', 'error');
     }
