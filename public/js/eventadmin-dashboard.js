@@ -509,7 +509,7 @@ async function switchTab(tabName, clickedElement = null) {
       break;
     case 'users':
       content.innerHTML = await getUsersTab();
-      await renderUsers();
+      await loadUsers(); // Reload fresh data when switching to users tab
       break;
     case 'timeslots':
       content.innerHTML = await getTimeslotsTab();
@@ -517,7 +517,7 @@ async function switchTab(tabName, clickedElement = null) {
       break;
     case 'clubs':
       content.innerHTML = await getClubsTab();
-      await renderClubs();
+      await loadClubs(); // Reload fresh data when switching to clubs tab
       break;
     case 'classes':
       content.innerHTML = await getClassesTab();
@@ -3121,6 +3121,8 @@ async function handleEditUser(e, userId) {
       showNotification('User updated successfully', 'success');
       closeModal('editUserModal');
       await loadUsers();
+      // Small delay to ensure backend sync before refreshing clubs
+      await new Promise(resolve => setTimeout(resolve, 100));
       await loadClubs();
     } else {
       showNotification(result.error || 'Error updating user', 'error');
@@ -4098,7 +4100,11 @@ async function handleEditClub(e, clubId) {
     if (response.ok) {
       showNotification('Club updated successfully', 'success');
       closeModal('editClubModal');
-      await renderClubs();
+      await loadClubs();
+      // Also refresh users if we're on the users tab (data will refresh when tab is clicked)
+      if (currentTab === 'users') {
+        await loadUsers();
+      }
     } else {
       showNotification(result.error || 'Error updating club', 'error');
     }
