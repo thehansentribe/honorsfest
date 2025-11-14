@@ -521,6 +521,8 @@ async function switchTab(tabName, clickedElement = null) {
       break;
     case 'classes':
       content.innerHTML = await getClassesTab();
+      // Auto-populate and select assigned event in classEventFilter
+      await setupClassesEventFilter();
       await renderClasses();
       break;
     case 'checkin':
@@ -3516,11 +3518,11 @@ function convertTo12Hour(time24) {
 }
 
 function showCreateTimeslotForm() {
-  const select = document.getElementById('timeslotEventFilter');
-  const eventId = select?.value;
+  // For EventAdmin, use assignedEventId directly (no dropdown needed)
+  const eventId = assignedEventId;
   
   if (!eventId) {
-    showNotification('Please select an event first', 'error');
+    showNotification('No event assigned. Please contact an administrator.', 'error');
     return;
   }
   
@@ -3560,8 +3562,8 @@ function showCreateTimeslotForm() {
 async function handleCreateTimeslot(e) {
   e.preventDefault();
   const form = e.target;
-  const select = document.getElementById('timeslotEventFilter');
-  const eventId = select?.value;
+  // For EventAdmin, use assignedEventId directly
+  const eventId = assignedEventId;
   
   const timeslotData = {
     Date: form.slotDate?.value || '',
@@ -3693,11 +3695,15 @@ async function deleteTimeslot(timeslotId) {
 
 // Class management functions
 async function showCreateClassForm() {
+  // For EventAdmin, use assignedEventId directly (dropdown is auto-selected)
   const select = document.getElementById('classEventFilter');
-  const eventId = select?.value;
+  let eventId = select?.value;
+  if (!eventId && assignedEventId) {
+    eventId = assignedEventId;
+  }
   
   if (!eventId) {
-    showNotification('Please select an event first', 'error');
+    showNotification('No event assigned. Please contact an administrator.', 'error');
     return;
   }
   
@@ -3778,8 +3784,12 @@ async function showCreateClassForm() {
 async function handleCreateClass(e) {
   e.preventDefault();
   const form = e.target;
+  // For EventAdmin, use assignedEventId if dropdown is empty
   const select = document.getElementById('classEventFilter');
-  const eventId = select?.value;
+  let eventId = select?.value;
+  if (!eventId && assignedEventId) {
+    eventId = assignedEventId;
+  }
   
   const selectedTimeslots = Array.from(form.querySelectorAll('input[name="classTimeslots"]:checked')).map(cb => cb.value);
   
@@ -3801,12 +3811,19 @@ async function handleCreateClass(e) {
   }
   
   try {
+    // For EventAdmin, ensure we use the correct eventId
+    const targetEventId = eventId || assignedEventId;
+    if (!targetEventId) {
+      showNotification('No event assigned. Please contact an administrator.', 'error');
+      return;
+    }
+    
     // Create a separate class for each selected timeslot
     const results = [];
     for (const timeslotId of selectedTimeslots) {
       const response = await fetchWithAuth(`/api/classes`, {
         method: 'POST',
-        body: JSON.stringify({ ...classData, EventID: assignedEventId, TimeslotID: timeslotId })
+        body: JSON.stringify({ ...classData, EventID: targetEventId, TimeslotID: timeslotId })
       });
       const result = await response.json();
       results.push(result);
@@ -3820,12 +3837,51 @@ async function handleCreateClass(e) {
   }
 }
 
+/**
+ * Setup classes event filter - populate and auto-select assigned event for EventAdmin
+ */
+async function setupClassesEventFilter() {
+  const select = document.getElementById('classEventFilter');
+  if (!select) return;
+  
+  // For EventAdmin, populate with assigned event and auto-select it
+  if (assignedEventId && assignedEvent) {
+    // Clear existing options
+    select.innerHTML = '';
+    // Add assigned event as option
+    const option = document.createElement('option');
+    option.value = assignedEvent.ID;
+    option.textContent = assignedEvent.Name;
+    option.selected = true;
+    select.appendChild(option);
+  } else if (assignedEventId) {
+    // If we have assignedEventId but not assignedEvent, load it
+    await loadAssignedEvent();
+    if (assignedEvent) {
+      select.innerHTML = '';
+      const option = document.createElement('option');
+      option.value = assignedEvent.ID;
+      option.textContent = assignedEvent.Name;
+      option.selected = true;
+      select.appendChild(option);
+    }
+  }
+}
+
 async function renderClasses() {
   const container = document.getElementById('classesList');
   if (!container) return;
   
   const select = document.getElementById('classEventFilter');
-  const eventId = select?.value;
+  // For EventAdmin, use assignedEventId if no event is selected in dropdown
+  let eventId = select?.value;
+  if (!eventId && assignedEventId) {
+    eventId = assignedEventId;
+    // Auto-select the assigned event in the dropdown if it exists
+    if (select && assignedEvent) {
+      select.value = assignedEventId;
+    }
+  }
   const createBtn = document.getElementById('createClassBtn');
   
   if (!eventId) {
