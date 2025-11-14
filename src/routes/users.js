@@ -165,77 +165,8 @@ router.post('/bulk', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, r
   }
 });
 
-// PUT /api/users/:id - Update user
-router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) => {
-  try {
-    const updates = req.body;
-    const userId = parseInt(req.params.id);
-    const currentRecord = User.findById(userId);
-
-    if (!currentRecord) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    // Remove fields that shouldn't be updated via API
-    delete updates.Username;
-    
-    // Handle password update if provided
-    if (updates.Password) {
-      updates.PasswordHash = bcrypt.hashSync(updates.Password, 10);
-      delete updates.Password;
-    }
-    
-    // Validate only Admin or EventAdmin can update background check
-    if (updates.BackgroundCheck !== undefined && !['Admin', 'EventAdmin'].includes(req.user.role)) {
-      return res.status(403).json({ error: 'Only Admin or EventAdmin can update background check status' });
-    }
-
-    if (updates.ClubID !== undefined) {
-      const parsedClubId = updates.ClubID ? parseInt(updates.ClubID, 10) : null;
-      if (updates.ClubID && Number.isNaN(parsedClubId)) {
-        return res.status(400).json({ error: 'Invalid ClubID' });
-      }
-      updates.ClubID = parsedClubId;
-    }
-
-    if (updates.EventID !== undefined) {
-      const parsedEventId = updates.EventID ? parseInt(updates.EventID, 10) : null;
-      if (updates.EventID && Number.isNaN(parsedEventId)) {
-        return res.status(400).json({ error: 'Invalid EventID' });
-      }
-      updates.EventID = parsedEventId;
-    }
-
-    const resolvedRole = updates.Role || currentRecord.Role;
-    const resolvedClubId = updates.ClubID !== undefined ? updates.ClubID : currentRecord.ClubID;
-    const resolvedEmail = updates.Email !== undefined ? updates.Email : currentRecord.Email;
-
-    // Validate email requirement based on role
-    // Email is required for Admin, EventAdmin, and ClubDirector
-    // Email is optional for Teacher, Student, and Staff
-    const emailRequiredRoles = ['Admin', 'EventAdmin', 'ClubDirector'];
-    if (emailRequiredRoles.includes(resolvedRole) && !resolvedEmail) {
-      return res.status(400).json({ error: 'Email is required for ' + resolvedRole });
-    }
-
-    if (!allowMultipleClubDirectors && resolvedRole === 'ClubDirector' && resolvedClubId) {
-      if (User.hasDirectorConflict(resolvedClubId, currentRecord.ID)) {
-        return res.status(409).json({ error: 'This club already has a director assigned.' });
-      }
-    }
-
-    const user = User.update(userId, updates);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    res.json(user);
-  } catch (error) {
-    console.error('Error updating user:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // PUT /api/users/me - Update current user's own profile (all authenticated users)
+// NOTE: This route MUST come before /:id route to avoid "me" being treated as an ID
 router.put('/me', verifyToken, async (req, res) => {
   try {
     const updates = req.body;
@@ -311,6 +242,76 @@ router.put('/me', verifyToken, async (req, res) => {
     res.json({ user: updatedUser, token });
   } catch (error) {
     console.error('Error updating user profile:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /api/users/:id - Update user
+router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) => {
+  try {
+    const updates = req.body;
+    const userId = parseInt(req.params.id);
+    const currentRecord = User.findById(userId);
+
+    if (!currentRecord) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Remove fields that shouldn't be updated via API
+    delete updates.Username;
+    
+    // Handle password update if provided
+    if (updates.Password) {
+      updates.PasswordHash = bcrypt.hashSync(updates.Password, 10);
+      delete updates.Password;
+    }
+    
+    // Validate only Admin or EventAdmin can update background check
+    if (updates.BackgroundCheck !== undefined && !['Admin', 'EventAdmin'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'Only Admin or EventAdmin can update background check status' });
+    }
+
+    if (updates.ClubID !== undefined) {
+      const parsedClubId = updates.ClubID ? parseInt(updates.ClubID, 10) : null;
+      if (updates.ClubID && Number.isNaN(parsedClubId)) {
+        return res.status(400).json({ error: 'Invalid ClubID' });
+      }
+      updates.ClubID = parsedClubId;
+    }
+
+    if (updates.EventID !== undefined) {
+      const parsedEventId = updates.EventID ? parseInt(updates.EventID, 10) : null;
+      if (updates.EventID && Number.isNaN(parsedEventId)) {
+        return res.status(400).json({ error: 'Invalid EventID' });
+      }
+      updates.EventID = parsedEventId;
+    }
+
+    const resolvedRole = updates.Role || currentRecord.Role;
+    const resolvedClubId = updates.ClubID !== undefined ? updates.ClubID : currentRecord.ClubID;
+    const resolvedEmail = updates.Email !== undefined ? updates.Email : currentRecord.Email;
+
+    // Validate email requirement based on role
+    // Email is required for Admin, EventAdmin, and ClubDirector
+    // Email is optional for Teacher, Student, and Staff
+    const emailRequiredRoles = ['Admin', 'EventAdmin', 'ClubDirector'];
+    if (emailRequiredRoles.includes(resolvedRole) && !resolvedEmail) {
+      return res.status(400).json({ error: 'Email is required for ' + resolvedRole });
+    }
+
+    if (!allowMultipleClubDirectors && resolvedRole === 'ClubDirector' && resolvedClubId) {
+      if (User.hasDirectorConflict(resolvedClubId, currentRecord.ID)) {
+        return res.status(409).json({ error: 'This club already has a director assigned.' });
+      }
+    }
+
+    const user = User.update(userId, updates);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json(user);
+  } catch (error) {
+    console.error('Error updating user:', error);
     res.status(500).json({ error: error.message });
   }
 });
