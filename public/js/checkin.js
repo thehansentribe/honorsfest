@@ -30,6 +30,25 @@ function getCheckInTab(config) {
     </div>
   ` : '';
 
+  // Show Confirm Attendance button only for ClubDirector
+  const confirmAttendanceButton = config.userRole === 'ClubDirector' && config.eventId ? `
+    <div style="margin-bottom: 20px; padding: 15px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px;">
+      <h3 style="margin-top: 0; color: #856404;">Confirm Attendance</h3>
+      <p style="margin-bottom: 10px; color: #856404;">
+        Click the button below to remove all students who are not checked in from their registered classes. 
+        This will update waitlists for all affected classes.
+      </p>
+      <button onclick="checkInConfirmAttendance(${config.eventId}, ${config.userClubId || 'null'})" 
+              class="btn btn-warning" 
+              style="background: #ffc107; color: #000; border: none; font-weight: bold;">
+        Confirm Attendance & Remove Unchecked-In Students
+      </button>
+      <small style="display: block; margin-top: 5px; color: #856404;">
+        ⚠️ This action cannot be undone. Only students who are NOT checked in will be removed from classes.
+      </small>
+    </div>
+  ` : '';
+
   return `
     <div class="card">
       <div class="card-header">
@@ -37,6 +56,8 @@ function getCheckInTab(config) {
       </div>
       <div style="padding: 20px;">
         ${eventSelectorHtml}
+        
+        ${confirmAttendanceButton}
         
         <div class="form-group" style="margin-bottom: 20px;">
           <label for="checkInNumberFilter"><strong>Filter by Check-In Number</strong></label>
@@ -86,11 +107,56 @@ async function checkInLoadParticipants() {
     
     checkInParticipants = participants;
     checkInEventId = targetEventId;
+    
+    // Update Confirm Attendance button if ClubDirector
+    if (user.role === 'ClubDirector' && user.clubId) {
+      updateConfirmAttendanceButton(targetEventId, user.clubId);
+    }
+    
     checkInRenderParticipants();
   } catch (error) {
     showNotification('Error loading participants: ' + error.message, 'error');
   }
 }
+
+/**
+ * Update or add Confirm Attendance button dynamically
+ */
+function updateConfirmAttendanceButton(eventId, clubId) {
+  // Remove existing button if present
+  const existingButton = document.getElementById('confirmAttendanceButton');
+  if (existingButton) {
+    existingButton.remove();
+  }
+  
+  // Add button before participants list
+  const participantsList = document.getElementById('checkInParticipantsList');
+  if (!participantsList || !eventId) return;
+  
+  const buttonContainer = document.createElement('div');
+  buttonContainer.id = 'confirmAttendanceButton';
+  buttonContainer.innerHTML = `
+    <div style="margin-bottom: 20px; padding: 15px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px;">
+      <h3 style="margin-top: 0; color: #856404;">Confirm Attendance</h3>
+      <p style="margin-bottom: 10px; color: #856404;">
+        Click the button below to remove all students who are not checked in from their registered classes. 
+        This will update waitlists for all affected classes.
+      </p>
+      <button onclick="checkInConfirmAttendance(${eventId}, ${clubId || 'null'})" 
+              class="btn btn-warning" 
+              style="background: #ffc107; color: #000; border: none; font-weight: bold;">
+        Confirm Attendance & Remove Unchecked-In Students
+      </button>
+      <small style="display: block; margin-top: 5px; color: #856404;">
+        ⚠️ This action cannot be undone. Only students who are NOT checked in will be removed from classes.
+      </small>
+    </div>
+  `;
+  
+  participantsList.parentNode.insertBefore(buttonContainer, participantsList);
+}
+
+window.updateConfirmAttendanceButton = updateConfirmAttendanceButton;
 
 /**
  * Filter participants by check-in number
@@ -456,6 +522,54 @@ async function checkInPopulateEventSelector() {
   }
 }
 
+/**
+ * Confirm attendance - Remove all unchecked-in students from classes
+ */
+async function checkInConfirmAttendance(eventId, clubId) {
+  if (!eventId) {
+    showNotification('Please select an event first', 'error');
+    return;
+  }
+
+  // Confirm action
+  const confirmed = confirm(
+    '⚠️ WARNING: This will remove ALL students who are NOT checked in from their registered classes.\n\n' +
+    'Students who are checked in will keep their registrations.\n' +
+    'Students who are NOT checked in will be removed from all classes.\n\n' +
+    'Waitlists will be automatically updated.\n\n' +
+    'This action cannot be undone. Are you sure you want to continue?'
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    showNotification('Processing attendance confirmation...', 'info');
+    
+    const response = await fetchWithAuth(`/api/checkin/confirm-attendance/${eventId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clubId: clubId || null })
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      showNotification(
+        `Attendance confirmed! Removed ${result.removedCount || 0} student(s) from classes. Waitlists updated.`,
+        'success'
+      );
+      // Reload participants to reflect changes
+      await checkInLoadParticipants();
+    } else {
+      showNotification(result.error || 'Error confirming attendance', 'error');
+    }
+  } catch (error) {
+    showNotification('Error confirming attendance: ' + error.message, 'error');
+  }
+}
+
 // Make functions globally available
 window.getCheckInTab = getCheckInTab;
 window.checkInLoadParticipants = checkInLoadParticipants;
@@ -465,4 +579,5 @@ window.checkInToggleBackgroundCheck = checkInToggleBackgroundCheck;
 window.checkInViewDetails = checkInViewDetails;
 window.checkInUpdateUser = checkInUpdateUser;
 window.checkInPopulateEventSelector = checkInPopulateEventSelector;
+window.checkInConfirmAttendance = checkInConfirmAttendance;
 
