@@ -993,12 +993,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const classData = {
       EventID: clubDirectorSelectedEventId, // Use the director's event
       HonorID: form.classHonor?.value,
-      TeacherID: form.classTeacher?.value,
+      TeacherID: form.classTeacher?.value || null, // Teacher is optional
       LocationID: null, // Club Directors don't set location - admins do this
       TeacherMaxStudents: parseInt(form.classMaxCapacity?.value) || 0
     };
     
-    if (!classData.HonorID || !classData.TeacherID || !classData.TeacherMaxStudents) {
+    if (!classData.HonorID || !classData.TeacherMaxStudents) {
       showNotification('Please fill in all required fields', 'error');
       return;
     }
