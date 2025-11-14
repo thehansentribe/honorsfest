@@ -375,8 +375,173 @@ async function verifyAuth() {
   }
 }
 
+/**
+ * Close a modal by ID
+ */
+function closeModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.remove();
+  }
+}
+
+/**
+ * Show profile edit modal for current user
+ */
+async function showEditMyProfile() {
+  const user = getCurrentUser();
+  if (!user) {
+    showNotification('User not found', 'error');
+    return;
+  }
+
+  // Fetch full user details
+  const response = await fetchWithAuth(`/api/users/${user.id}`);
+  if (!response.ok) {
+    showNotification('Error loading user details', 'error');
+    return;
+  }
+
+  const userData = await response.json();
+  const authMethod = userData.auth_method || 'local';
+
+  const modal = document.createElement('div');
+  modal.id = 'editMyProfileModal';
+  modal.className = 'modal';
+  modal.style.display = 'flex';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Edit My Profile</h2>
+        <button onclick="closeModal('editMyProfileModal')" class="btn btn-outline">×</button>
+      </div>
+      <form id="editMyProfileForm" onsubmit="handleUpdateMyProfile(event)">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" value="${userData.Username}" class="form-control" disabled>
+          <small style="color: var(--text-light);">Username cannot be changed</small>
+        </div>
+        <div class="form-group">
+          <label for="editMyFirstName">First Name *</label>
+          <input type="text" id="editMyFirstName" name="editMyFirstName" class="form-control" value="${userData.FirstName || ''}" required>
+        </div>
+        <div class="form-group">
+          <label for="editMyLastName">Last Name *</label>
+          <input type="text" id="editMyLastName" name="editMyLastName" class="form-control" value="${userData.LastName || ''}" required>
+        </div>
+        <div class="form-group">
+          <label for="editMyEmail">Email ${['Admin', 'EventAdmin', 'ClubDirector'].includes(userData.Role) ? '*' : ''}</label>
+          <input type="email" id="editMyEmail" name="editMyEmail" class="form-control" value="${userData.Email || ''}" ${['Admin', 'EventAdmin', 'ClubDirector'].includes(userData.Role) ? 'required' : ''}>
+          <small style="color: var(--text-light);">${['Admin', 'EventAdmin', 'ClubDirector'].includes(userData.Role) ? 'Required for ' + userData.Role : 'Optional'}</small>
+        </div>
+        <div class="form-group">
+          <label for="editMyPhone">Phone</label>
+          <input type="text" id="editMyPhone" name="editMyPhone" class="form-control" value="${userData.Phone || ''}">
+        </div>
+        <div class="form-group">
+          <label for="editMyInvestitureLevel">Investiture Level</label>
+          <select id="editMyInvestitureLevel" name="editMyInvestitureLevel" class="form-control">
+            <option value="None" ${userData.InvestitureLevel === 'None' ? 'selected' : ''}>None</option>
+            <option value="Friend" ${userData.InvestitureLevel === 'Friend' ? 'selected' : ''}>Friend</option>
+            <option value="Companion" ${userData.InvestitureLevel === 'Companion' ? 'selected' : ''}>Companion</option>
+            <option value="Explorer" ${userData.InvestitureLevel === 'Explorer' ? 'selected' : ''}>Explorer</option>
+            <option value="Ranger" ${userData.InvestitureLevel === 'Ranger' ? 'selected' : ''}>Ranger</option>
+            <option value="Voyager" ${userData.InvestitureLevel === 'Voyager' ? 'selected' : ''}>Voyager</option>
+            <option value="Guide" ${userData.InvestitureLevel === 'Guide' ? 'selected' : ''}>Guide</option>
+            <option value="MasterGuide" ${userData.InvestitureLevel === 'MasterGuide' ? 'selected' : ''}>Master Guide</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Password Reset</label>
+          ${authMethod === 'stytch' ? `
+            <div style="padding: 10px; background: #f5f5f5; border-radius: 5px; margin-bottom: 10px;">
+              <small style="color: var(--text-light); display: block; margin-bottom: 5px;">Your account uses Stytch authentication. Password changes must be done through Stytch.</small>
+              <button type="button" onclick="window.location.href='/forgot-password.html'" class="btn btn-secondary" style="width: 100%;">Reset Password via Stytch</button>
+            </div>
+          ` : `
+            <input type="password" id="editMyPassword" name="editMyPassword" class="form-control" placeholder="Leave blank to keep current password">
+            <small style="color: var(--text-light);">Enter new password to change it, or leave blank to keep current password</small>
+          `}
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Update Profile</button>
+          <button type="button" onclick="closeModal('editMyProfileModal')" class="btn btn-outline">Cancel</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+/**
+ * Handle profile update form submission
+ */
+async function handleUpdateMyProfile(e) {
+  e.preventDefault();
+  const form = e.target;
+
+  const userData = {
+    FirstName: form.editMyFirstName?.value?.trim() || '',
+    LastName: form.editMyLastName?.value?.trim() || '',
+    Email: form.editMyEmail?.value?.trim() || null,
+    Phone: form.editMyPhone?.value?.trim() || null,
+    InvestitureLevel: form.editMyInvestitureLevel?.value || 'None'
+  };
+
+  // Add password if provided (only for local auth users)
+  const newPassword = form.editMyPassword?.value?.trim();
+  if (newPassword) {
+    userData.Password = newPassword;
+  }
+
+  // Validate
+  if (!userData.FirstName || !userData.LastName) {
+    showNotification('First Name and Last Name are required', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetchWithAuth('/api/users/me', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      showNotification('Profile updated successfully', 'success');
+      
+      // If token was refreshed, update it
+      if (result.token) {
+        localStorage.setItem('token', result.token);
+        
+        // Update user display name in banner
+        const userDisplayNameEl = document.getElementById('userDisplayName');
+        if (userDisplayNameEl) {
+          userDisplayNameEl.textContent = `${userData.FirstName} ${userData.LastName}`;
+        }
+      }
+      
+      closeModal('editMyProfileModal');
+      
+      // Reload page to reflect changes in any cached data
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } else {
+      showNotification(result.error || 'Error updating profile', 'error');
+    }
+  } catch (error) {
+    showNotification('Error updating profile: ' + error.message, 'error');
+  }
+}
+
 // Make functions globally available
 window.logout = logout;
 window.preventBackNavigation = preventBackNavigation;
 window.setupVisibilityChecks = setupVisibilityChecks;
 window.verifyAuth = verifyAuth;
+window.closeModal = closeModal;
+window.showEditMyProfile = showEditMyProfile;
+window.handleUpdateMyProfile = handleUpdateMyProfile;

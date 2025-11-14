@@ -1,5 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const User = require('../models/user');
 const { allowMultipleClubDirectors } = require('../config/features');
@@ -230,6 +231,86 @@ router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res
     res.json(user);
   } catch (error) {
     console.error('Error updating user:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /api/users/me - Update current user's own profile (all authenticated users)
+router.put('/me', verifyToken, async (req, res) => {
+  try {
+    const updates = req.body;
+    const userId = req.user.id;
+    const currentUser = User.findById(userId);
+
+    if (!currentUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Users can only update: FirstName, LastName, Email, Phone, InvestitureLevel, Password
+    const allowedFields = ['FirstName', 'LastName', 'Email', 'Phone', 'InvestitureLevel', 'Password'];
+    const filteredUpdates = {};
+    
+    for (const [key, value] of Object.entries(updates)) {
+      if (allowedFields.includes(key)) {
+        filteredUpdates[key] = value;
+      }
+    }
+
+    // Email validation for roles that require it
+    const emailRequiredRoles = ['Admin', 'EventAdmin', 'ClubDirector'];
+    const newEmail = filteredUpdates.Email !== undefined ? filteredUpdates.Email : currentUser.Email;
+    const newRole = currentUser.Role; // Role shouldn't change, but use current role
+    
+    if (emailRequiredRoles.includes(newRole) && !newEmail) {
+      return res.status(400).json({ error: 'Email is required for ' + newRole });
+    }
+
+    // Handle password update - check auth method
+    if (filteredUpdates.Password) {
+      const authMethod = currentUser.auth_method || 'local';
+      
+      if (authMethod === 'stytch') {
+        // For Stytch users, password must be changed via Stytch
+        return res.status(400).json({ 
+          error: 'Password must be changed through Stytch. Please use the "Forgot Password" feature or contact an administrator.' 
+        });
+      } else {
+        // For local users, hash the password
+        filteredUpdates.PasswordHash = bcrypt.hashSync(filteredUpdates.Password, 10);
+        delete filteredUpdates.Password;
+      }
+    }
+
+    // Prevent users from changing role, club, event, or other sensitive fields
+    delete filteredUpdates.Role;
+    delete filteredUpdates.ClubID;
+    delete filteredUpdates.EventID;
+    delete filteredUpdates.Active;
+    delete filteredUpdates.BackgroundCheck;
+
+    const updatedUser = User.update(userId, filteredUpdates);
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Refresh JWT token if name changed (so it reflects in the token)
+    const token = jwt.sign(
+      {
+        id: updatedUser.ID,
+        username: updatedUser.Username,
+        firstName: updatedUser.FirstName,
+        lastName: updatedUser.LastName,
+        role: updatedUser.Role,
+        clubId: updatedUser.ClubID,
+        eventId: updatedUser.EventID
+      },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '24h' }
+    );
+
+    res.json({ user: updatedUser, token });
+  } catch (error) {
+    console.error('Error updating user profile:', error);
     res.status(500).json({ error: error.message });
   }
 });
