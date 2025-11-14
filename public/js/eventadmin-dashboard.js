@@ -3733,11 +3733,12 @@ async function showCreateClassForm() {
           </select>
         </div>
         <div class="form-group">
-          <label for="classTeacher">Teacher *</label>
-          <select id="classTeacher" name="classTeacher" class="form-control" required>
-            <option value="">Select Teacher</option>
+          <label for="classTeacher">Teacher</label>
+          <select id="classTeacher" name="classTeacher" class="form-control">
+            <option value="">No Teacher (Unassigned)</option>
             ${teachers.map(t => `<option value="${t.ID}">${t.FirstName} ${t.LastName}</option>`).join('')}
           </select>
+          <small style="color: var(--text-light);">Optional - Teacher can be assigned later</small>
         </div>
         <div class="form-group">
           <label for="classLocation">Location *</label>
@@ -3789,12 +3790,12 @@ async function handleCreateClass(e) {
   
   const classData = {
     HonorID: form.classHonor?.value,
-    TeacherID: form.classTeacher?.value,
+    TeacherID: form.classTeacher?.value || null, // Teacher is optional
     LocationID: form.classLocation?.value,
     TeacherMaxStudents: parseInt(form.classMaxCapacity?.value) || 0
   };
   
-  if (!classData.HonorID || !classData.TeacherID || !classData.LocationID || !classData.TeacherMaxStudents) {
+  if (!classData.HonorID || !classData.LocationID || !classData.TeacherMaxStudents) {
     showNotification('Please fill in all required fields', 'error');
     return;
   }

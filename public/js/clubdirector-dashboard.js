@@ -740,11 +740,12 @@ async function showCreateClassFormClubDirector() {
           </select>
         </div>
         <div class="form-group">
-          <label for="classTeacher">Teacher * (Only teachers from your club)</label>
-          <select id="classTeacher" name="classTeacher" class="form-control" required>
-            <option value="">Select Teacher</option>
+          <label for="classTeacher">Teacher</label>
+          <select id="classTeacher" name="classTeacher" class="form-control">
+            <option value="">No Teacher (Unassigned)</option>
             ${teachers.map(t => `<option value="${t.ID}">${t.FirstName} ${t.LastName}</option>`).join('')}
           </select>
+          <small style="color: var(--text-light);">Optional - Teacher can be assigned later (Only teachers from your club)</small>
         </div>
         <div class="form-group">
           <label for="classMaxCapacity">Max Capacity *</label>

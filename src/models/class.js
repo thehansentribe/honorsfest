@@ -4,14 +4,29 @@ class Class {
   static create(classData) {
     const { EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents, CreatedBy } = classData;
     
-    // Validate no duplicate honor by same teacher in same timeslot
-    const duplicate = db.prepare(`
-      SELECT ID FROM Classes 
-      WHERE EventID = ? AND HonorID = ? AND TeacherID = ? AND TimeslotID = ? AND Active = 1
-    `).get(EventID, HonorID, TeacherID, TimeslotID);
-
-    if (duplicate) {
-      throw new Error('This honor is already being taught by this teacher in this timeslot.');
+    // Validate no duplicate honor in same timeslot
+    // If TeacherID is provided, check for duplicate with same teacher
+    // If TeacherID is null, check for duplicate without teacher (same honor, same timeslot, no teacher)
+    let duplicate;
+    if (TeacherID) {
+      duplicate = db.prepare(`
+        SELECT ID FROM Classes 
+        WHERE EventID = ? AND HonorID = ? AND TeacherID = ? AND TimeslotID = ? AND Active = 1
+      `).get(EventID, HonorID, TeacherID, TimeslotID);
+      
+      if (duplicate) {
+        throw new Error('This honor is already being taught by this teacher in this timeslot.');
+      }
+    } else {
+      // Check for duplicate honor without teacher in same timeslot
+      duplicate = db.prepare(`
+        SELECT ID FROM Classes 
+        WHERE EventID = ? AND HonorID = ? AND TeacherID IS NULL AND TimeslotID = ? AND Active = 1
+      `).get(EventID, HonorID, TimeslotID);
+      
+      if (duplicate) {
+        throw new Error('This honor is already being offered without a teacher in this timeslot.');
+      }
     }
 
     // Get location capacity (if location is assigned)
