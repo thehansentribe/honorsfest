@@ -30,25 +30,6 @@ function getCheckInTab(config) {
     </div>
   ` : '';
 
-  // Show Confirm Attendance button only for ClubDirector
-  const confirmAttendanceButton = config.userRole === 'ClubDirector' && config.eventId ? `
-    <div style="margin-bottom: 20px; padding: 15px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px;">
-      <h3 style="margin-top: 0; color: #856404;">Confirm Attendance</h3>
-      <p style="margin-bottom: 10px; color: #856404;">
-        Click the button below to remove all students who are not checked in from their registered classes. 
-        This will update waitlists for all affected classes.
-      </p>
-      <button onclick="checkInConfirmAttendance(${config.eventId}, ${config.userClubId || 'null'})" 
-              class="btn btn-warning" 
-              style="background: #ffc107; color: #000; border: none; font-weight: bold;">
-        Confirm Attendance & Remove Unchecked-In Students
-      </button>
-      <small style="display: block; margin-top: 5px; color: #856404;">
-        ⚠️ This action cannot be undone. Only students who are NOT checked in will be removed from classes.
-      </small>
-    </div>
-  ` : '';
-
   return `
     <div class="card">
       <div class="card-header">
@@ -56,8 +37,6 @@ function getCheckInTab(config) {
       </div>
       <div style="padding: 20px;">
         ${eventSelectorHtml}
-        
-        ${confirmAttendanceButton}
         
         <div class="form-group" style="margin-bottom: 20px;">
           <label for="checkInNumberFilter"><strong>Filter by Check-In Number</strong></label>
