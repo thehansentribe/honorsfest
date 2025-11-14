@@ -118,16 +118,19 @@ function updateConfirmAttendanceButton(eventId, clubId) {
     <div style="margin-bottom: 20px; padding: 15px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px;">
       <h3 style="margin-top: 0; color: #856404;">Confirm Attendance</h3>
       <p style="margin-bottom: 10px; color: #856404;">
-        Click the button below to remove all students who are not checked in from their registered classes. 
+        <strong>This will ONLY affect members of your club.</strong> Click the button below to remove all students from your club who are not checked in from their registered classes. 
         This will update waitlists for all affected classes.
+      </p>
+      <p style="margin-bottom: 10px; color: #856404;">
+        <strong>Important:</strong> If someone arrives that was not checked in, they will need to re-register for classes after being checked in.
       </p>
       <button onclick="checkInConfirmAttendance(${eventId}, ${clubId || 'null'})" 
               class="btn btn-warning" 
               style="background: #ffc107; color: #000; border: none; font-weight: bold;">
-        Confirm Attendance & Remove Unchecked-In Students
+        Confirm Attendance & Remove Unchecked-In Students from Your Club
       </button>
       <small style="display: block; margin-top: 5px; color: #856404;">
-        ⚠️ This action cannot be undone. Only students who are NOT checked in will be removed from classes.
+        ⚠️ This action cannot be undone. Only students from your club who are NOT checked in will be removed from classes. Students from other clubs are not affected.
       </small>
     </div>
   `;
@@ -512,9 +515,11 @@ async function checkInConfirmAttendance(eventId, clubId) {
 
   // Confirm action
   const confirmed = confirm(
-    '⚠️ WARNING: This will remove ALL students who are NOT checked in from their registered classes.\n\n' +
-    'Students who are checked in will keep their registrations.\n' +
-    'Students who are NOT checked in will be removed from all classes.\n\n' +
+    '⚠️ WARNING: This will remove students from YOUR CLUB who are NOT checked in from their registered classes.\n\n' +
+    'ONLY members of your club will be affected. Students from other clubs are not affected.\n\n' +
+    'Students from your club who are checked in will keep their registrations.\n' +
+    'Students from your club who are NOT checked in will be removed from all classes.\n\n' +
+    'If someone arrives that was not checked in, they will need to re-register for classes after being checked in.\n\n' +
     'Waitlists will be automatically updated.\n\n' +
     'This action cannot be undone. Are you sure you want to continue?'
   );
@@ -535,10 +540,9 @@ async function checkInConfirmAttendance(eventId, clubId) {
     const result = await response.json();
 
     if (response.ok) {
-      showNotification(
-        `Attendance confirmed! Removed ${result.removedCount || 0} student(s) from classes. Waitlists updated.`,
-        'success'
-      );
+      // Use the backend message if available, otherwise use a generic one
+      const message = result.message || `Attendance confirmed! Removed ${result.removedCount || 0} student(s) from your club from classes. Waitlists updated. If someone arrives that was not checked in, they will need to re-register for classes.`;
+      showNotification(message, 'success');
       // Reload participants to reflect changes
       await checkInLoadParticipants();
     } else {

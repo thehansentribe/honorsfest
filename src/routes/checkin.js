@@ -189,8 +189,17 @@ router.post('/confirm-attendance/:eventId', requireRole('Admin', 'EventAdmin', '
       }
     }
     
+    // Build response message that clarifies club scope
+    let message = `Successfully removed ${removedCount} registration(s) for unchecked-in students`;
+    if (targetClubId) {
+      // Get club name for better context
+      const club = db.prepare('SELECT Name FROM Clubs WHERE ID = ?').get(targetClubId);
+      const clubName = club ? club.Name : 'your club';
+      message = `Successfully removed ${removedCount} registration(s) for unchecked-in students from ${clubName}. Students from other clubs were not affected.`;
+    }
+    
     res.json({
-      message: `Successfully removed ${removedCount} registration(s) for unchecked-in students`,
+      message: message,
       removedCount: removedCount,
       affectedClasses: classArray,
       studentsRemoved: uncheckedInStudents.length,
