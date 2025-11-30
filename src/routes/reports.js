@@ -314,6 +314,252 @@ router.get('/event/:eventId', requireRole('Admin', 'EventAdmin', 'ClubDirector')
   }
 });
 
+// GET /api/reports/event/:eventId/timeslot-roster - Generate HTML timeslot roster report (Admin, EventAdmin)
+router.get('/event/:eventId/timeslot-roster', requireRole('Admin', 'EventAdmin'), (req, res) => {
+  try {
+    const eventId = parseInt(req.params.eventId);
+    const userRole = req.user.role;
+    
+    // EventAdmin can only access their assigned event
+    if (userRole === 'EventAdmin' && req.user.eventId !== eventId) {
+      return res.status(403).json({ error: 'You can only access reports for your assigned event' });
+    }
+    
+    const Event = require('../models/event');
+    const event = Event.findById(eventId);
+    
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    // Get all timeslots for this event, ordered by date and start time
+    const timeslots = db.prepare(`
+      SELECT * FROM Timeslots
+      WHERE EventID = ?
+      ORDER BY Date, StartTime
+    `).all(eventId);
+
+    // Get all classes with their timeslot, honor, teacher, location info
+    const classes = db.prepare(`
+      SELECT 
+        c.ID as ClassID,
+        c.TimeslotID,
+        h.Name as HonorName,
+        t.FirstName || ' ' || t.LastName as TeacherName,
+        l.Name as LocationName,
+        ts.Date as TimeslotDate,
+        ts.StartTime as TimeslotStartTime,
+        ts.EndTime as TimeslotEndTime
+      FROM Classes c
+      JOIN Honors h ON c.HonorID = h.ID
+      LEFT JOIN Users t ON c.TeacherID = t.ID
+      LEFT JOIN Locations l ON c.LocationID = l.ID
+      JOIN Timeslots ts ON c.TimeslotID = ts.ID
+      WHERE c.EventID = ? AND c.Active = 1
+      ORDER BY ts.Date, ts.StartTime, h.Name
+    `).all(eventId);
+
+    // Get all enrolled students for classes in this event
+    const registrations = db.prepare(`
+      SELECT 
+        r.ClassID,
+        u.FirstName || ' ' || u.LastName as StudentName,
+        clb.Name as ClubName
+      FROM Registrations r
+      JOIN Users u ON r.UserID = u.ID
+      LEFT JOIN Clubs clb ON u.ClubID = clb.ID
+      JOIN Classes c ON r.ClassID = c.ID
+      WHERE r.Status = 'Enrolled' AND c.EventID = ?
+      ORDER BY u.LastName, u.FirstName
+    `).all(eventId);
+
+    // Group registrations by class
+    const classRosters = {};
+    registrations.forEach(reg => {
+      if (!classRosters[reg.ClassID]) {
+        classRosters[reg.ClassID] = [];
+      }
+      classRosters[reg.ClassID].push({
+        name: reg.StudentName,
+        club: reg.ClubName || 'No Club'
+      });
+    });
+
+    // Group classes by timeslot
+    const timeslotClasses = {};
+    classes.forEach(cls => {
+      if (!timeslotClasses[cls.TimeslotID]) {
+        timeslotClasses[cls.TimeslotID] = [];
+      }
+      timeslotClasses[cls.TimeslotID].push(cls);
+    });
+
+    // Helper function to format time
+    function formatTime(timeStr) {
+      if (!timeStr) return '';
+      const [hours, minutes] = timeStr.split(':');
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+      return `${displayHour}:${minutes} ${ampm}`;
+    }
+
+    // Helper function to split students into two columns
+    function splitIntoColumns(students) {
+      const mid = Math.ceil(students.length / 2);
+      return {
+        left: students.slice(0, mid),
+        right: students.slice(mid)
+      };
+    }
+
+    // Build HTML
+    let html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timeslot Roster Report - ${event.Name}</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 12pt;
+      line-height: 1.4;
+      padding: 20px;
+      color: #000;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+      border-bottom: 2px solid #000;
+      padding-bottom: 15px;
+    }
+    .header h1 {
+      font-size: 24pt;
+      margin-bottom: 10px;
+    }
+    .header p {
+      font-size: 14pt;
+    }
+    .timeslot-section {
+      margin-bottom: 30px;
+      page-break-inside: avoid;
+    }
+    .timeslot-header {
+      background-color: #f0f0f0;
+      padding: 10px;
+      margin-bottom: 15px;
+      border: 1px solid #000;
+      font-weight: bold;
+      font-size: 14pt;
+    }
+    .class-block {
+      margin-bottom: 20px;
+      page-break-inside: avoid;
+      border: 1px solid #ccc;
+      padding: 10px;
+    }
+    .class-info {
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #ccc;
+    }
+    .class-info strong {
+      font-size: 13pt;
+    }
+    .class-info p {
+      margin: 3px 0;
+      font-size: 11pt;
+    }
+    .students-container {
+      display: flex;
+      gap: 20px;
+    }
+    .student-column {
+      flex: 1;
+    }
+    .student-item {
+      padding: 3px 0;
+      font-size: 11pt;
+      border-bottom: 1px dotted #ccc;
+    }
+    .student-item:last-child {
+      border-bottom: none;
+    }
+    @media print {
+      body {
+        padding: 10px;
+      }
+      .timeslot-section {
+        page-break-inside: avoid;
+      }
+      .class-block {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>${event.Name}</h1>
+    <p>Class Roster by Timeslot</p>
+    <p>${event.StartDate} to ${event.EndDate}</p>
+  </div>`;
+
+    // Iterate through timeslots
+    timeslots.forEach(timeslot => {
+      const classesInTimeslot = timeslotClasses[timeslot.ID] || [];
+      
+      if (classesInTimeslot.length === 0) return;
+
+      html += `
+  <div class="timeslot-section">
+    <div class="timeslot-header">
+      ${timeslot.Date} - ${formatTime(timeslot.StartTime)} to ${formatTime(timeslot.EndTime)}
+    </div>`;
+
+      classesInTimeslot.forEach(cls => {
+        const students = classRosters[cls.ClassID] || [];
+        const columns = splitIntoColumns(students);
+
+        html += `
+    <div class="class-block">
+      <div class="class-info">
+        <strong>${cls.HonorName}</strong>
+        ${cls.TeacherName ? `<p>Teacher: ${cls.TeacherName}</p>` : '<p>Teacher: TBA</p>'}
+        ${cls.LocationName ? `<p>Location: ${cls.LocationName}</p>` : '<p>Location: TBA</p>'}
+      </div>
+      <div class="students-container">
+        <div class="student-column">
+          ${columns.left.map(s => `<div class="student-item">${s.name} | ${s.club}</div>`).join('')}
+        </div>
+        <div class="student-column">
+          ${columns.right.map(s => `<div class="student-item">${s.name} | ${s.club}</div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+      });
+
+      html += `
+  </div>`;
+    });
+
+    html += `
+</body>
+</html>`;
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
 
 

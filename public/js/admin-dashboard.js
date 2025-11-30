@@ -667,7 +667,10 @@ function getReportsTab() {
       <select id="reportEventFilter" class="form-control mb-2" onchange="updateReportButton()">
         <option value="">Select Event</option>
       </select>
-      <button id="generateReportBtn" onclick="generateReport()" class="btn btn-primary" disabled>Generate CSV Report</button>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button id="generateReportBtn" onclick="generateReport()" class="btn btn-primary" disabled>Generate CSV Report</button>
+        <button id="generateTimeslotRosterBtn" onclick="generateTimeslotRosterReport()" class="btn btn-primary" disabled>Generate Timeslot Roster Report</button>
+      </div>
     </div>
   `;
 }
@@ -2320,7 +2323,10 @@ window.removeClubFromEvent = removeClubFromEvent;
 function updateReportButton() {
   const select = document.getElementById('reportEventFilter');
   const btn = document.getElementById('generateReportBtn');
-  btn.disabled = !select || !select.value;
+  const timeslotBtn = document.getElementById('generateTimeslotRosterBtn');
+  const isEnabled = select && select.value;
+  if (btn) btn.disabled = !isEnabled;
+  if (timeslotBtn) timeslotBtn.disabled = !isEnabled;
 }
 
 async function generateReport() {
@@ -2343,6 +2349,29 @@ async function generateReport() {
     showNotification('Report generated successfully', 'success');
   } catch (error) {
     showNotification('Error generating report', 'error');
+  }
+}
+
+async function generateTimeslotRosterReport() {
+  const select = document.getElementById('reportEventFilter');
+  const eventId = select.value;
+  
+  if (!eventId) return;
+  
+  try {
+    const response = await fetchWithAuth(`/api/reports/event/${eventId}/timeslot-roster`);
+    if (!response.ok) {
+      const error = await response.json();
+      showNotification(error.error || 'Error generating report', 'error');
+      return;
+    }
+    const html = await response.text();
+    const newWindow = window.open('', '_blank');
+    newWindow.document.write(html);
+    newWindow.document.close();
+    showNotification('Report opened in new window. Use browser print function to print.', 'success');
+  } catch (error) {
+    showNotification('Error generating report: ' + error.message, 'error');
   }
 }
 
@@ -2775,6 +2804,11 @@ async function editUser(userId) {
   const user = allUsers.find(u => u.ID === userId);
   if (!user) return;
   
+  // Determine auth method
+  const authMethod = user.auth_method || 'local';
+  const isLocal = authMethod === 'local';
+  const isStytch = authMethod === 'stytch';
+  
   const modal = document.createElement('div');
   modal.id = 'editUserModal';
   modal.className = 'modal';
@@ -2782,7 +2816,7 @@ async function editUser(userId) {
   modal.innerHTML = `
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Edit User</h2>
+        <h2>Edit User${isLocal ? ' <span style="font-size: 0.8em; font-weight: normal; color: #666;">(Local)</span>' : ''}</h2>
         <button onclick="closeModal('editUserModal')" class="btn btn-outline">×</button>
       </div>
       <form id="editUserForm" data-user-id="${userId}" onsubmit="handleEditUser(event, ${userId})">
@@ -2816,6 +2850,7 @@ async function editUser(userId) {
           <label for="editEmail" id="editEmailLabel">Email${['Admin', 'EventAdmin', 'ClubDirector'].includes(user.Role) ? ' *' : ''}</label>
           <input type="email" id="editEmail" name="editEmail" class="form-control" value="${user.Email || ''}" ${['Admin', 'EventAdmin', 'ClubDirector'].includes(user.Role) ? 'required' : ''}>
           <small id="editEmailHelp" style="color: var(--text-light);">${['Admin', 'EventAdmin', 'ClubDirector'].includes(user.Role) ? 'Required for Admin, Event Admin, and Club Director' : 'Optional - Not required for Teachers, Staff, and Students'}</small>
+          ${isStytch ? `<small style="color: #856404; display: block; margin-top: 5px;">⚠️ For Stytch users, changing email will send a verification email to the new address. The user must verify the new email to complete the update.</small>` : ''}
         </div>
         <div class="form-group">
           <label for="editPhone">Phone</label>
@@ -2860,9 +2895,16 @@ async function editUser(userId) {
           </select>
         </div>
         <div class="form-group">
-          <label for="editPassword">New Password</label>
-          <input type="password" id="editPassword" name="editPassword" class="form-control">
-          <small style="color: var(--text-light); display: block; margin-top: 5px;">Leave blank to keep current password</small>
+          <label>Password Reset</label>
+          ${isStytch ? `
+            <div style="padding: 10px; background: #f5f5f5; border-radius: 5px; margin-bottom: 10px;">
+              <small style="color: var(--text-light); display: block; margin-bottom: 5px;">This user's account uses Stytch authentication. Password changes must be done through Stytch's password reset feature.</small>
+              <small style="color: #856404; display: block;">The user can reset their password using the "Forgot Password" feature on the login page.</small>
+            </div>
+          ` : `
+            <input type="password" id="editPassword" name="editPassword" class="form-control" placeholder="Leave blank to keep current password">
+            <small style="color: var(--text-light);">Enter new password to change it, or leave blank to keep current password</small>
+          `}
         </div>
         <div class="form-actions">
           <button type="submit" class="btn btn-primary">Update User</button>
@@ -3210,7 +3252,7 @@ async function handleEditUser(e, userId) {
     userData.BackgroundCheck = form.editBackgroundCheck?.checked || false;
   }
   
-  // Add password if provided
+  // Add password if provided (only for local users - Stytch users don't have this field)
   const newPassword = form.editPassword?.value?.trim();
   if (newPassword) {
     userData.Password = newPassword;
@@ -3241,13 +3283,19 @@ async function handleEditUser(e, userId) {
   try {
     const response = await fetchWithAuth(`/api/users/${userId}`, {
       method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(userData)
     });
 
     const result = await response.json();
 
     if (response.ok) {
-      showNotification('User updated successfully', 'success');
+      // Show email verification message if Stytch user email was updated
+      if (result.emailVerificationSent && result.emailVerificationMessage) {
+        showNotification(result.emailVerificationMessage, 'success');
+      } else {
+        showNotification('User updated successfully', 'success');
+      }
       closeModal('editUserModal');
       await loadUsers();
       // Reload events if EventAdmin was updated to refresh dropdowns
@@ -3457,6 +3505,7 @@ window.removeStudentFromClass = removeStudentFromClass;
 window.showConflictModal = showConflictModal;
 window.resolveConflict = resolveConflict;
 window.generateReport = generateReport;
+window.generateTimeslotRosterReport = generateTimeslotRosterReport;
 window.reseedDatabase = reseedDatabase;
 window.clearDatabaseForLaunch = clearDatabaseForLaunch;
 window.updateReportButton = updateReportButton;
