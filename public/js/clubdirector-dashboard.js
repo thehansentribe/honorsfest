@@ -1409,10 +1409,6 @@ Thank you!`;
     }
   }
 
-  // Expose functions globally
-  window.renderCodes = renderCodes;
-  window.generateRegistrationCode = generateRegistrationCode;
-  
   // Create copyCode wrapper that can be called from HTML onclick
   window.copyRegistrationCode = function(code) {
     navigator.clipboard.writeText(code).then(() => {
@@ -1450,6 +1446,12 @@ Thank you!`;
       showNotification('Error deleting code: ' + error.message, 'error');
     }
   }
+  
+  // Expose registration code functions globally - must be after function definitions
+  window.renderCodes = renderCodes;
+  window.generateRegistrationCode = generateRegistrationCode;
+  window.shareRegistrationCode = shareRegistrationCode;
+  window.deleteRegistrationCode = deleteRegistrationCode;
   
   // Manage students functions (copied from admin-dashboard.js with conflict handling)
   async function viewClassStudents(classId) {
@@ -1734,8 +1736,6 @@ Thank you!`;
   window.copyRegistrationLink = copyRegistrationLink;
   window.closeClubDirectorModal = closeClubDirectorModal;
   window.closeModal = closeModal;
-  window.shareRegistrationCode = shareRegistrationCode;
-  window.deleteRegistrationCode = deleteRegistrationCode;
   window.generateClubDirectorReport = generateClubDirectorReport;
   
   // Manage students functions

@@ -127,7 +127,7 @@ function updateConfirmAttendanceButton(eventId, clubId) {
       <button onclick="checkInConfirmAttendance(${eventId}, ${clubId || 'null'})" 
               class="btn btn-warning" 
               style="background: #ffc107; color: #000; border: none; font-weight: bold;">
-        Confirm Attendance & Remove Unchecked-In Students from Your Club
+        Remove Unchecked-in Students from the Classes They Were Registered For
       </button>
       <small style="display: block; margin-top: 5px; color: #856404;">
         ⚠️ This action cannot be undone. Only students from your club who are NOT checked in will be removed from classes. Students from other clubs are not affected.
