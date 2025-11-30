@@ -1133,13 +1133,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Registration code functions
   async function renderCodes() {
+    // Expose immediately so it's available
+    window.renderCodes = renderCodes;
+    
     const container = document.getElementById('codesList');
     if (!container) {
       console.error('Codes list container not found');
       return;
     }
     
-    console.log('[ClubDirector] renderCodes for event', clubDirectorSelectedEventId);
+    console.log('[ClubDirector] renderCodes for event', clubDirectorSelectedEventId, 'clubId:', clubDirectorClubId);
     
     container.innerHTML = '<p class="text-center">Loading codes...</p>';
     
@@ -1163,25 +1166,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     try {
+      console.log('[ClubDirector] Fetching codes from:', `/api/codes/club/${clubDirectorClubId}?eventId=${clubDirectorSelectedEventId}`);
       const response = await fetchWithAuth(`/api/codes/club/${clubDirectorClubId}?eventId=${clubDirectorSelectedEventId}`);
+      
+      console.log('[ClubDirector] Response status:', response.status, response.statusText);
       
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('[ClubDirector] Error response:', errorText);
         let errorData;
         try {
           errorData = JSON.parse(errorText);
         } catch {
           errorData = { error: errorText || 'Failed to load codes' };
         }
-        throw new Error(errorData.error || `Server error: ${response.status}`);
+        const errorMsg = errorData.error || `Server error: ${response.status}`;
+        container.innerHTML = `<p class="text-center" style="color: red;">Error loading codes: ${errorMsg}</p>`;
+        showNotification('Error loading codes: ' + errorMsg, 'error');
+        return;
       }
       
       const codes = await response.json();
       console.log('[ClubDirector] Codes response:', codes);
       
       if (!Array.isArray(codes)) {
-        console.error('Invalid response format:', codes);
-        throw new Error('Invalid response format from server');
+        console.error('[ClubDirector] Invalid response format:', codes);
+        container.innerHTML = '<p class="text-center" style="color: red;">Invalid response format from server</p>';
+        showNotification('Invalid response format from server', 'error');
+        return;
       }
       
       if (codes.length === 0) {
@@ -1239,13 +1251,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       
       container.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
     } catch (error) {
-      console.error('Error loading codes:', error);
-      container.innerHTML = `<p class="text-center" style="color: red;">Error loading codes: ${error.message}</p>`;
-      showNotification('Error loading codes: ' + error.message, 'error');
+      console.error('[ClubDirector] Error loading codes:', error);
+      const errorMsg = error.message || 'Unknown error occurred';
+      container.innerHTML = `<p class="text-center" style="color: red;">Error loading codes: ${errorMsg}</p><p class="text-center" style="margin-top: 10px;"><button onclick="window.generateRegistrationCode && window.generateRegistrationCode()" class="btn btn-primary">Generate New Code</button></p>`;
+      showNotification('Error loading codes: ' + errorMsg, 'error');
     }
   }
 
   async function generateRegistrationCode() {
+    // Expose immediately so it's available
+    window.generateRegistrationCode = generateRegistrationCode;
+    
+    console.log('[ClubDirector] generateRegistrationCode called');
+    console.log('[ClubDirector] clubDirectorEvents:', clubDirectorEvents.length);
+    console.log('[ClubDirector] clubDirectorSelectedEventId:', clubDirectorSelectedEventId);
+    console.log('[ClubDirector] clubDirectorClubId:', clubDirectorClubId);
+    
     // Check if events are available
     if (clubDirectorEvents.length === 0) {
       showNotification('No events assigned to your club. Please contact an administrator.', 'error');
@@ -1420,11 +1441,13 @@ Thank you!`;
   
   // Share registration code (opens email modal)
   function shareRegistrationCode(code) {
+    window.shareRegistrationCode = shareRegistrationCode;
     showCodeEmailModal(code);
   }
   
   // Delete registration code
   async function deleteRegistrationCode(code) {
+    window.deleteRegistrationCode = deleteRegistrationCode;
     if (!confirm('Are you sure you want to delete this registration code? This action cannot be undone.')) {
       return;
     }
