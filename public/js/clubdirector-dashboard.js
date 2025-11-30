@@ -1317,8 +1317,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   
   function showCodeEmailModal(code, expiresInDays = 30) {
-    // Get current site URL
-    const registrationUrl = window.location.origin + '/register.html';
+    // Get current site URL with code parameter
+    const registrationUrl = window.location.origin + '/register.html?code=' + encodeURIComponent(code);
     
     // Get event info for the email
     const currentEvent = clubDirectorEvents.find(e => e.ID === parseInt(clubDirectorSelectedEventId));
@@ -1334,9 +1334,9 @@ REGISTRATION CODE: ${code}
 
 TO REGISTER:
 1. Click this link: ${registrationUrl}
-2. Enter your registration code: ${code}
-3. Fill out the registration form
-4. Submit your registration
+   (The registration code will be automatically filled in)
+2. Fill out the registration form
+3. Submit your registration
 
 This code will expire in ${expiresInDays} day${expiresInDays !== 1 ? 's' : ''}. Please register as soon as possible.
 
@@ -1374,7 +1374,7 @@ Thank you!`;
               📋 Copy Full Email to Clipboard
             </button>
             <button onclick="copyRegistrationLink('${registrationUrl}')" class="btn btn-secondary" style="flex: 1; min-width: 200px;">
-              🔗 Copy Registration Link
+              🔗 Copy Registration Link (with code)
             </button>
             <button onclick="closeClubDirectorModal('codeEmailModal')" class="btn btn-outline" style="flex: 1; min-width: 200px;">
               Close

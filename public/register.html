@@ -130,6 +130,24 @@
     let currentCode = null;
     let codeData = null;
 
+    // Check for code in URL parameter on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const codeFromUrl = urlParams.get('code');
+      
+      if (codeFromUrl) {
+        // Pre-populate the code field
+        const codeInput = document.getElementById('registrationCode');
+        if (codeInput) {
+          codeInput.value = codeFromUrl.toUpperCase();
+          // Automatically validate the code
+          setTimeout(() => {
+            validateCode();
+          }, 100);
+        }
+      }
+    });
+
     async function validateCode() {
       const code = document.getElementById('registrationCode').value.trim().toUpperCase();
       
