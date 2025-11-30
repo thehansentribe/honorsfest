@@ -1348,11 +1348,14 @@ Thank you!`;
             <textarea id="emailBody" class="form-control" rows="15" readonly style="background: #f5f5f5; cursor: pointer; font-family: monospace; font-size: 13px;" onclick="this.select(); document.execCommand('copy'); showNotification('Email copied to clipboard!', 'success');">${emailBody}</textarea>
           </div>
           
-          <div style="display: flex; gap: 10px; margin-top: 20px;">
-            <button onclick="copyCodeEmail('${code}', '${registrationUrl}')" class="btn btn-primary" style="flex: 1;">
+          <div style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+            <button onclick="copyCodeEmail('${code}', '${registrationUrl}')" class="btn btn-primary" style="flex: 1; min-width: 200px;">
               📋 Copy Full Email to Clipboard
             </button>
-            <button onclick="closeClubDirectorModal('codeEmailModal')" class="btn btn-outline" style="flex: 1;">
+            <button onclick="copyRegistrationLink('${registrationUrl}')" class="btn btn-secondary" style="flex: 1; min-width: 200px;">
+              🔗 Copy Registration Link
+            </button>
+            <button onclick="closeClubDirectorModal('codeEmailModal')" class="btn btn-outline" style="flex: 1; min-width: 200px;">
               Close
             </button>
           </div>
@@ -1372,6 +1375,14 @@ Thank you!`;
       showNotification('Full email copied to clipboard!', 'success');
     }).catch(() => {
       showNotification('Failed to copy email', 'error');
+    });
+  }
+  
+  function copyRegistrationLink(registrationUrl) {
+    navigator.clipboard.writeText(registrationUrl).then(() => {
+      showNotification('Registration link copied to clipboard!', 'success');
+    }).catch(() => {
+      showNotification('Failed to copy link', 'error');
     });
   }
   
@@ -1720,6 +1731,7 @@ Thank you!`;
   window.updateClubDirectorFilter = updateClubDirectorFilter;
   window.renderUsers = renderUsers;
   window.copyCodeEmail = copyCodeEmail;
+  window.copyRegistrationLink = copyRegistrationLink;
   window.closeClubDirectorModal = closeClubDirectorModal;
   window.closeModal = closeModal;
   window.shareRegistrationCode = shareRegistrationCode;
