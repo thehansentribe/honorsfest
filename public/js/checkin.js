@@ -8,6 +8,8 @@
 let checkInEventId = null;
 let checkInParticipants = [];
 let checkInFilter = '';
+let checkInSortColumn = null;
+let checkInSortDirection = 'asc';
 
 /**
  * Initialize check-in module
@@ -149,6 +151,19 @@ function checkInFilterByNumber(checkInNumber) {
 }
 
 /**
+ * Sort check-in participants by column
+ */
+function checkInSortByColumn(column) {
+  if (checkInSortColumn === column) {
+    checkInSortDirection = checkInSortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    checkInSortColumn = column;
+    checkInSortDirection = 'asc';
+  }
+  checkInRenderParticipants();
+}
+
+/**
  * Render the participants list with checkboxes
  */
 function checkInRenderParticipants() {
@@ -160,6 +175,75 @@ function checkInRenderParticipants() {
   if (checkInFilter) {
     const filterNum = parseInt(checkInFilter);
     filtered = filtered.filter(p => p.CheckInNumber === filterNum);
+  }
+  
+  // Apply sorting
+  if (checkInSortColumn) {
+    filtered.sort((a, b) => {
+      let aVal, bVal;
+      
+      switch(checkInSortColumn) {
+        case 'checkInNumber':
+          aVal = a.CheckInNumber || 0;
+          bVal = b.CheckInNumber || 0;
+          break;
+        case 'name':
+          aVal = `${a.FirstName} ${a.LastName}`;
+          bVal = `${b.FirstName} ${b.LastName}`;
+          break;
+        case 'role':
+          aVal = a.Role || '';
+          bVal = b.Role || '';
+          break;
+        case 'club':
+          aVal = a.ClubName || '';
+          bVal = b.ClubName || '';
+          break;
+        case 'age':
+          // Calculate age for sorting
+          const ageA = a.DateOfBirth ? (() => {
+            const today = new Date();
+            const birthDate = new Date(a.DateOfBirth);
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+              age--;
+            }
+            return age;
+          })() : null;
+          const ageB = b.DateOfBirth ? (() => {
+            const today = new Date();
+            const birthDate = new Date(b.DateOfBirth);
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+              age--;
+            }
+            return age;
+          })() : null;
+          aVal = ageA !== null ? ageA : 0;
+          bVal = ageB !== null ? ageB : 0;
+          break;
+        case 'checkedIn':
+          aVal = a.CheckedIn ? 1 : 0;
+          bVal = b.CheckedIn ? 1 : 0;
+          break;
+        case 'bgCheck':
+          aVal = a.BackgroundCheck ? 1 : 0;
+          bVal = b.BackgroundCheck ? 1 : 0;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (typeof aVal === 'string') {
+        return checkInSortDirection === 'asc' 
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      } else {
+        return checkInSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+    });
   }
   
   if (filtered.length === 0) {
@@ -192,13 +276,27 @@ function checkInRenderParticipants() {
     <table class="table">
       <thead>
         <tr>
-          <th>Check-In #</th>
-          <th>Name</th>
-          <th>Role</th>
-          <th>Club</th>
-          <th>Age</th>
-          <th>Checked In</th>
-          <th>BG Check</th>
+          <th style="cursor: pointer;" onclick="checkInSortByColumn('checkInNumber')" title="Click to sort">
+            Check-In # ${checkInSortColumn === 'checkInNumber' ? (checkInSortDirection === 'asc' ? '↑' : '↓') : ''}
+          </th>
+          <th style="cursor: pointer;" onclick="checkInSortByColumn('name')" title="Click to sort">
+            Name ${checkInSortColumn === 'name' ? (checkInSortDirection === 'asc' ? '↑' : '↓') : ''}
+          </th>
+          <th style="cursor: pointer;" onclick="checkInSortByColumn('role')" title="Click to sort">
+            Role ${checkInSortColumn === 'role' ? (checkInSortDirection === 'asc' ? '↑' : '↓') : ''}
+          </th>
+          <th style="cursor: pointer;" onclick="checkInSortByColumn('club')" title="Click to sort">
+            Club ${checkInSortColumn === 'club' ? (checkInSortDirection === 'asc' ? '↑' : '↓') : ''}
+          </th>
+          <th style="cursor: pointer;" onclick="checkInSortByColumn('age')" title="Click to sort">
+            Age ${checkInSortColumn === 'age' ? (checkInSortDirection === 'asc' ? '↑' : '↓') : ''}
+          </th>
+          <th style="cursor: pointer;" onclick="checkInSortByColumn('checkedIn')" title="Click to sort">
+            Checked In ${checkInSortColumn === 'checkedIn' ? (checkInSortDirection === 'asc' ? '↑' : '↓') : ''}
+          </th>
+          <th style="cursor: pointer;" onclick="checkInSortByColumn('bgCheck')" title="Click to sort">
+            BG Check ${checkInSortColumn === 'bgCheck' ? (checkInSortDirection === 'asc' ? '↑' : '↓') : ''}
+          </th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -557,6 +655,7 @@ async function checkInConfirmAttendance(eventId, clubId) {
 window.getCheckInTab = getCheckInTab;
 window.checkInLoadParticipants = checkInLoadParticipants;
 window.checkInFilterByNumber = checkInFilterByNumber;
+window.checkInSortByColumn = checkInSortByColumn;
 window.checkInToggleCheckedIn = checkInToggleCheckedIn;
 window.checkInToggleBackgroundCheck = checkInToggleBackgroundCheck;
 window.checkInViewDetails = checkInViewDetails;
