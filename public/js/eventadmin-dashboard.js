@@ -478,10 +478,6 @@ window.loadClubsForCreateUser = loadClubsForCreateUser;
 window.loadClubsForEditUser = loadClubsForEditUser;
 
 async function switchTab(tabName, clickedElement = null) {
-  if (tabName === 'locations') {
-    tabName = 'clubs';
-  }
-
   currentTab = tabName;
   try { localStorage.setItem('eventadminCurrentTab', tabName); } catch (e) {}
   
@@ -514,6 +510,10 @@ async function switchTab(tabName, clickedElement = null) {
     case 'timeslots':
       content.innerHTML = await getTimeslotsTab();
       await renderTimeslots();
+      break;
+    case 'locations':
+      content.innerHTML = getLocationsTab();
+      await renderLocations();
       break;
     case 'clubs':
       content.innerHTML = await getClubsTab();
@@ -3291,11 +3291,11 @@ async function handleEditUser(e, userId) {
 
 // Location management functions
 function showCreateLocationForm() {
-  const select = document.getElementById('locationEventFilter');
-  const eventId = select?.value;
+  // Event admins have a fixed assigned event
+  const eventId = assignedEventId;
   
   if (!eventId) {
-    showNotification('Please select an event first', 'error');
+    showNotification('No event assigned. Please contact an administrator.', 'error');
     return;
   }
   
