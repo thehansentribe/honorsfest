@@ -99,9 +99,19 @@ router.get('/club/:clubId', requireRole('ClubDirector', 'Admin'), (req, res) => 
     // Get role label for students
     const studentLabel = event.RoleLabelStudent || 'Student';
     
+    // Helper function to convert 24-hour time to 12-hour format
+    const formatTime = (timeStr) => {
+      if (!timeStr) return '';
+      const [hours, minutes] = timeStr.split(':');
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+      return `${displayHour}:${minutes} ${ampm}`;
+    };
+    
     // Create header row: Student Name, Attendee, Club, then all class names
     const classHeaders = classes.map(cls => {
-      const timeStr = cls.StartTime ? cls.StartTime.substring(0, 5) : '';
+      const timeStr = cls.StartTime ? formatTime(cls.StartTime) : '';
       return `"${cls.HonorName} (${cls.Date} ${timeStr})"`;
     });
     const headerRow = [`"${studentLabel} Name"`, '"Attendee"', '"Club"', ...classHeaders];
@@ -270,9 +280,19 @@ router.get('/event/:eventId', requireRole('Admin', 'EventAdmin', 'ClubDirector')
       `""` // Empty line
     ];
 
+    // Helper function to convert 24-hour time to 12-hour format
+    const formatTime = (timeStr) => {
+      if (!timeStr) return '';
+      const [hours, minutes] = timeStr.split(':');
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+      return `${displayHour}:${minutes} ${ampm}`;
+    };
+    
     // Create header row: Student Name, Attendee, Club, then all class names
     const classHeaders = classes.map(cls => {
-      const timeStr = cls.StartTime ? cls.StartTime.substring(0, 5) : '';
+      const timeStr = cls.StartTime ? formatTime(cls.StartTime) : '';
       return `"${cls.HonorName} (${cls.Date} ${timeStr})"`;
     });
     const headerRow = [`"${studentLabel} Name"`, '"Attendee"', '"Club"', ...classHeaders];
