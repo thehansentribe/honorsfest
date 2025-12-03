@@ -182,6 +182,19 @@ class StytchService {
       return response;
     } catch (error) {
       console.error('Stytch resetPassword error:', error.message || error);
+      
+      // Provide more specific error messages
+      if (error.status_code === 400 && error.error_type === 'weak_password') {
+        throw new Error('Password does not meet strength requirements. Please choose a stronger password that meets all requirements.');
+      } else if (error.status_code === 400 && error.error_message) {
+        // Check if error message contains password-related information
+        if (error.error_message.toLowerCase().includes('password') || 
+            error.error_message.toLowerCase().includes('weak') ||
+            error.error_message.toLowerCase().includes('strength')) {
+          throw new Error(`Password does not meet requirements: ${error.error_message}`);
+        }
+      }
+      
       throw new Error(`Failed to reset password: ${error.message}`);
     }
   }
@@ -251,6 +264,46 @@ class StytchService {
     } catch (error) {
       console.error('Stytch authenticateMagicLink error:', error.message || error);
       throw new Error(`Failed to authenticate magic link: ${error.message}`);
+    }
+  }
+
+  /**
+   * Send email update verification to new email address
+   * This sends a magic link to the new email that, when verified, will add it to the existing user
+   * @param {string} userId - Stytch user ID
+   * @param {string} newEmail - New email address to add
+   * @param {string} redirectUrl - URL to redirect after email verification
+   * @returns {Promise<Object>} Response with email_id
+   */
+  static async sendEmailUpdateVerification(userId, newEmail, redirectUrl) {
+    try {
+      const params = {
+        user_id: userId,
+        email: newEmail.toLowerCase().trim(),
+        login_magic_link_url: redirectUrl,
+        login_expiration_minutes: 60,
+      };
+
+      // Use magicLinks.email.loginOrCreate with user_id to add email to existing user
+      const response = await client.magicLinks.email.loginOrCreate(params);
+      
+      return {
+        emailId: response.email_id,
+        statusCode: response.status_code,
+      };
+    } catch (error) {
+      console.error('Stytch sendEmailUpdateVerification error:', error.message || error);
+      
+      // Provide more specific error messages
+      if (error.status_code === 404) {
+        throw new Error('User not found in Stytch. Please contact support.');
+      } else if (error.status_code === 409 && error.error_type === 'duplicate_email') {
+        throw new Error('This email address is already associated with another account.');
+      } else if (error.status_code === 400 && error.error_message && error.error_message.includes('did not match any redirect URLs')) {
+        throw new Error(`Redirect URL mismatch. The URL "${redirectUrl}" is not registered in the Stytch dashboard.`);
+      }
+      
+      throw new Error(`Failed to send email update verification: ${error.message || JSON.stringify(error)}`);
     }
   }
 }

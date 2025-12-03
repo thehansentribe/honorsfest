@@ -171,11 +171,27 @@ function formatAddress(location) {
   return parts.join(', ');
 }
 
+/**
+ * Convert 24-hour time format (HH:MM) to 12-hour format with AM/PM
+ * @param {string} time24 - Time in 24-hour format (e.g., "14:30")
+ * @returns {string} Time in 12-hour format (e.g., "2:30 PM")
+ */
+function convertTo12Hour(time24) {
+  if (!time24) return '';
+  const [hours, minutes] = time24.split(':');
+  const hour = parseInt(hours);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minutes} ${ampm}`;
+}
+
 function formatDateTime(dateStr, startTime, endTime) {
   if (!dateStr || !startTime) return '';
   const date = new Date(dateStr);
   const formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  return `${formattedDate} ${startTime} - ${endTime}`;
+  const startTime12 = convertTo12Hour(startTime);
+  const endTime12 = endTime ? convertTo12Hour(endTime) : '';
+  return `${formattedDate} ${startTime12}${endTime12 ? ' - ' + endTime12 : ''}`;
 }
 
 function showNotification(message, type = 'info') {
@@ -433,6 +449,7 @@ async function showEditMyProfile() {
           <label for="editMyEmail">Email ${['Admin', 'EventAdmin', 'ClubDirector'].includes(userData.Role) ? '*' : ''}</label>
           <input type="email" id="editMyEmail" name="editMyEmail" class="form-control" value="${userData.Email || ''}" ${['Admin', 'EventAdmin', 'ClubDirector'].includes(userData.Role) ? 'required' : ''}>
           <small style="color: var(--text-light);">${['Admin', 'EventAdmin', 'ClubDirector'].includes(userData.Role) ? 'Required for ' + userData.Role : 'Optional'}</small>
+          ${authMethod === 'stytch' ? `<small style="color: #856404; display: block; margin-top: 5px;">⚠️ For Stytch users, changing email will send a verification email to the new address. You must verify the new email to complete the update.</small>` : ''}
         </div>
         <div class="form-group">
           <label for="editMyPhone">Phone</label>
@@ -510,7 +527,12 @@ async function handleUpdateMyProfile(e) {
     const result = await response.json();
 
     if (response.ok) {
-      showNotification('Profile updated successfully', 'success');
+      // Show email verification message if Stytch user email was updated
+      if (result.emailVerificationSent && result.emailVerificationMessage) {
+        showNotification(result.emailVerificationMessage, 'success');
+      } else {
+        showNotification('Profile updated successfully', 'success');
+      }
       
       // If token was refreshed, update it
       if (result.token) {
@@ -545,3 +567,4 @@ window.verifyAuth = verifyAuth;
 window.closeModal = closeModal;
 window.showEditMyProfile = showEditMyProfile;
 window.handleUpdateMyProfile = handleUpdateMyProfile;
+window.convertTo12Hour = convertTo12Hour;

@@ -287,6 +287,21 @@ router.post('/password-reset/confirm', async (req, res) => {
     });
   } catch (error) {
     console.error('Password reset confirm error:', error.message || error);
+    
+    // Extract error message - check if it's a password strength error
+    const errorMsg = error?.message || error?.toString() || 'Unknown error';
+    
+    // If it's a password strength error, pass it through directly
+    if (errorMsg.includes('Password does not meet') || 
+        errorMsg.includes('strength requirements') ||
+        errorMsg.includes('weak password') ||
+        (errorMsg.toLowerCase().includes('password') && errorMsg.toLowerCase().includes('requirement'))) {
+      return res.status(400).json({ 
+        error: errorMsg
+      });
+    }
+    
+    // For other errors (expired token, invalid token, etc.), use generic message
     res.status(400).json({ 
       error: 'Failed to reset password. The reset link may have expired or is invalid. Please request a new password reset link.' 
     });

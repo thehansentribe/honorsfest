@@ -265,15 +265,7 @@
         timeslots.forEach(ts => {
           const option = document.createElement('option');
           option.value = ts.ID;
-          // Format timeslot for display
-          function convertTo12Hour(time24) {
-            if (!time24) return '';
-            const [hours, minutes] = time24.split(':');
-            const hour = parseInt(hours);
-            const ampm = hour >= 12 ? 'PM' : 'AM';
-            const hour12 = hour % 12 || 12;
-            return `${hour12}:${minutes} ${ampm}`;
-          }
+          // Format timeslot for display (using global convertTo12Hour from utils.js)
           option.textContent = `${ts.Date} - ${convertTo12Hour(ts.StartTime)} to ${convertTo12Hour(ts.EndTime)}`;
           timeslotSelect.appendChild(option);
         });

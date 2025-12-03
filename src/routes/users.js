@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const User = require('../models/user');
+const StytchService = require('../services/stytch');
 const { allowMultipleClubDirectors } = require('../config/features');
 
 const router = express.Router();
@@ -190,16 +191,46 @@ router.put('/me', verifyToken, async (req, res) => {
     // Email validation for roles that require it
     const emailRequiredRoles = ['Admin', 'EventAdmin', 'ClubDirector'];
     const newEmail = filteredUpdates.Email !== undefined ? filteredUpdates.Email : currentUser.Email;
+    const oldEmail = currentUser.Email;
+    const emailChanged = filteredUpdates.Email && filteredUpdates.Email !== oldEmail;
     const newRole = currentUser.Role; // Role shouldn't change, but use current role
     
     if (emailRequiredRoles.includes(newRole) && !newEmail) {
       return res.status(400).json({ error: 'Email is required for ' + newRole });
     }
 
+    // Handle email update for Stytch users
+    const authMethod = currentUser.auth_method || 'local';
+    let emailUpdateVerificationSent = false;
+    
+    if (emailChanged && authMethod === 'stytch' && currentUser.stytch_user_id) {
+      try {
+        // For Stytch users, we need to send a verification email to the new address
+        // The email will be updated in Stytch when the user verifies it via magic link
+        const baseUrl = process.env.BASE_URL || req.protocol + '://' + req.get('host');
+        const redirectUrl = `${baseUrl}/login?emailVerified=true`;
+        
+        await StytchService.sendEmailUpdateVerification(
+          currentUser.stytch_user_id,
+          filteredUpdates.Email,
+          redirectUrl
+        );
+        
+        emailUpdateVerificationSent = true;
+        // Note: We'll update the local DB email, but Stytch email won't update until verification
+        // The user will receive a magic link at the new email to verify it
+      } catch (stytchError) {
+        console.error('Error sending Stytch email update verification:', stytchError);
+        // If Stytch verification fails, don't update the email in local DB
+        delete filteredUpdates.Email;
+        return res.status(400).json({ 
+          error: `Failed to send email verification: ${stytchError.message}. Your email has not been updated.` 
+        });
+      }
+    }
+
     // Handle password update - check auth method
     if (filteredUpdates.Password) {
-      const authMethod = currentUser.auth_method || 'local';
-      
       if (authMethod === 'stytch') {
         // For Stytch users, password must be changed via Stytch
         return res.status(400).json({ 
@@ -222,6 +253,12 @@ router.put('/me', verifyToken, async (req, res) => {
     const updatedUser = User.update(userId, filteredUpdates);
     if (!updatedUser) {
       return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Add message about email verification if Stytch user
+    if (emailUpdateVerificationSent) {
+      updatedUser.emailVerificationSent = true;
+      updatedUser.emailVerificationMessage = 'A verification email has been sent to your new email address. Please check your email and click the verification link to complete the email update in Stytch.';
     }
 
     // Refresh JWT token if name changed (so it reflects in the token)
@@ -260,10 +297,19 @@ router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res
     // Remove fields that shouldn't be updated via API
     delete updates.Username;
     
-    // Handle password update if provided
+    // Handle password update - check auth method
     if (updates.Password) {
-      updates.PasswordHash = bcrypt.hashSync(updates.Password, 10);
-      delete updates.Password;
+      const authMethod = currentRecord.auth_method || 'local';
+      if (authMethod === 'stytch') {
+        // For Stytch users, password must be changed via Stytch
+        return res.status(400).json({ 
+          error: 'Password must be changed through Stytch. Please use the "Forgot Password" feature or contact an administrator.' 
+        });
+      } else {
+        // For local users, hash the password
+        updates.PasswordHash = bcrypt.hashSync(updates.Password, 10);
+        delete updates.Password;
+      }
     }
     
     // Validate only Admin or EventAdmin can update background check
@@ -290,6 +336,8 @@ router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res
     const resolvedRole = updates.Role || currentRecord.Role;
     const resolvedClubId = updates.ClubID !== undefined ? updates.ClubID : currentRecord.ClubID;
     const resolvedEmail = updates.Email !== undefined ? updates.Email : currentRecord.Email;
+    const oldEmail = currentRecord.Email;
+    const emailChanged = updates.Email && updates.Email !== oldEmail;
 
     // Validate email requirement based on role
     // Email is required for Admin, EventAdmin, and ClubDirector
@@ -297,6 +345,36 @@ router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res
     const emailRequiredRoles = ['Admin', 'EventAdmin', 'ClubDirector'];
     if (emailRequiredRoles.includes(resolvedRole) && !resolvedEmail) {
       return res.status(400).json({ error: 'Email is required for ' + resolvedRole });
+    }
+
+    // Handle email update for Stytch users
+    const authMethod = currentRecord.auth_method || 'local';
+    let emailUpdateVerificationSent = false;
+    
+    if (emailChanged && authMethod === 'stytch' && currentRecord.stytch_user_id) {
+      try {
+        // For Stytch users, we need to send a verification email to the new address
+        // The email will be updated in Stytch when the user verifies it via magic link
+        const baseUrl = process.env.BASE_URL || req.protocol + '://' + req.get('host');
+        const redirectUrl = `${baseUrl}/login?emailVerified=true`;
+        
+        await StytchService.sendEmailUpdateVerification(
+          currentRecord.stytch_user_id,
+          updates.Email,
+          redirectUrl
+        );
+        
+        emailUpdateVerificationSent = true;
+        // Note: We'll update the local DB email, but Stytch email won't update until verification
+        // The user will receive a magic link at the new email to verify it
+      } catch (stytchError) {
+        console.error('Error sending Stytch email update verification:', stytchError);
+        // If Stytch verification fails, don't update the email in local DB
+        delete updates.Email;
+        return res.status(400).json({ 
+          error: `Failed to send email verification: ${stytchError.message}. Email has not been updated.` 
+        });
+      }
     }
 
     if (!allowMultipleClubDirectors && resolvedRole === 'ClubDirector' && resolvedClubId) {
@@ -309,6 +387,13 @@ router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
+    
+    // Add message about email verification if Stytch user
+    if (emailUpdateVerificationSent) {
+      user.emailVerificationSent = true;
+      user.emailVerificationMessage = 'A verification email has been sent to the new email address. The user must check their email and click the verification link to complete the email update in Stytch.';
+    }
+    
     res.json(user);
   } catch (error) {
     console.error('Error updating user:', error);

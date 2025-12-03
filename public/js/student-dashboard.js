@@ -110,7 +110,7 @@ function renderRegistrations() {
             <td>${reg.HonorName || 'N/A'}</td>
             <td>${reg.TeacherFirstName ? `${reg.TeacherFirstName} ${reg.TeacherLastName}` : 'N/A'}</td>
             <td>${reg.LocationName || 'N/A'}</td>
-            <td>${reg.TimeslotDate || 'N/A'} ${reg.TimeslotStartTime || ''} - ${reg.TimeslotEndTime || ''}</td>
+            <td>${reg.TimeslotDate || 'N/A'} ${reg.TimeslotStartTime ? convertTo12Hour(reg.TimeslotStartTime) : ''}${reg.TimeslotEndTime ? ' - ' + convertTo12Hour(reg.TimeslotEndTime) : ''}</td>
             <td>${reg.status === 'enrolled' ? '<span class="badge bg-success">Enrolled</span>' : '<span class="badge bg-warning">Waitlisted</span>'}</td>
           </tr>
         `).join('')}

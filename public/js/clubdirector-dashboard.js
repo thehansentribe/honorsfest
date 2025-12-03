@@ -366,15 +366,7 @@ function updateClubDirectorFilter(column, value) {
   renderUsers();
 }
 
-// Helper function for time conversion
-function convertTo12Hour(time24) {
-  if (!time24) return '';
-  const [hours, minutes] = time24.split(':');
-  const hour = parseInt(hours);
-  const period = hour >= 12 ? 'PM' : 'AM';
-  const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-  return `${hour12}:${minutes} ${period}`;
-}
+// convertTo12Hour is now in utils.js and available globally
 
 // Override renderClasses to filter by their club's event
 async function renderClasses() {
@@ -1504,15 +1496,7 @@ Thank you!`;
       const eventResponse = await fetchWithAuth(`/api/events/${classData.EventID}`);
       const event = await eventResponse.json();
       
-      // Format timeslot for display
-      function convertTo12Hour(time24) {
-        if (!time24) return '';
-        const [hours, minutes] = time24.split(':');
-        const hour = parseInt(hours);
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        const hour12 = hour % 12 || 12;
-        return `${hour12}:${minutes} ${ampm}`;
-      }
+      // Format timeslot for display (using global convertTo12Hour from utils.js)
       
       const timeslotText = classData.TimeslotDate && classData.TimeslotStartTime && classData.TimeslotEndTime
         ? `${classData.TimeslotDate} from ${convertTo12Hour(classData.TimeslotStartTime)} - ${convertTo12Hour(classData.TimeslotEndTime)}`
