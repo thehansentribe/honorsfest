@@ -284,7 +284,7 @@ router.put('/me', verifyToken, async (req, res) => {
 });
 
 // PUT /api/users/:id - Update user
-router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) => {
+router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), async (req, res) => {
   try {
     const updates = req.body;
     const userId = parseInt(req.params.id);
