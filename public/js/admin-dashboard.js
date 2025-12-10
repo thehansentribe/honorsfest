@@ -2670,6 +2670,7 @@ function showCreateUserForm() {
           <select id="role" name="role" class="form-control" required>
             <option value="">Select Role</option>
             <option value="Admin">Admin</option>
+            <option value="AdminViewOnly">Admin View Only</option>
             <option value="EventAdmin">Event Admin</option>
             <option value="ClubDirector">Club Director</option>
             <option value="Teacher">Teacher</option>
@@ -2694,7 +2695,7 @@ function showCreateUserForm() {
         <div class="form-group">
           <label for="email" id="emailLabel">Email *</label>
           <input type="email" id="email" name="email" class="form-control" required>
-          <small id="emailHelp" style="color: var(--text-light);">Required for Admin, Event Admin, and Club Director invitations</small>
+          <small id="emailHelp" style="color: var(--text-light);">Required for Admin, Admin View Only, Event Admin, and Club Director invitations</small>
         </div>
         <div class="form-group" id="phoneContainer">
           <label for="phone">Phone</label>
@@ -2779,7 +2780,7 @@ function showCreateUserForm() {
     if (!roleSelect) return;
     
     const role = roleSelect.value;
-    const emailRequiredRoles = ['Admin', 'EventAdmin', 'ClubDirector'];
+    const emailRequiredRoles = ['Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector'];
     const emailOptionalRoles = ['Teacher', 'Student', 'Staff'];
     
     if (emailRequiredRoles.includes(role)) {
@@ -2817,7 +2818,7 @@ function showCreateUserForm() {
       }
     }
     
-    if (['Admin', 'EventAdmin', 'ClubDirector'].includes(role)) {
+    if (['Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector'].includes(role)) {
       // Invite roles: hide password, date of birth, and phone, change button text
       if (passwordContainer) passwordContainer.style.display = 'none';
       if (passwordInput) {
@@ -2919,7 +2920,7 @@ async function editUser(userId) {
         <div class="form-group">
           <label for="editEmail" id="editEmailLabel">Email${['Admin', 'EventAdmin', 'ClubDirector'].includes(user.Role) ? ' *' : ''}</label>
           <input type="email" id="editEmail" name="editEmail" class="form-control" value="${user.Email || ''}" ${['Admin', 'EventAdmin', 'ClubDirector'].includes(user.Role) ? 'required' : ''}>
-          <small id="editEmailHelp" style="color: var(--text-light);">${['Admin', 'EventAdmin', 'ClubDirector'].includes(user.Role) ? 'Required for Admin, Event Admin, and Club Director' : 'Optional - Not required for Teachers, Staff, and Students'}</small>
+          <small id="editEmailHelp" style="color: var(--text-light);">${['Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector'].includes(user.Role) ? 'Required for Admin, Admin View Only, Event Admin, and Club Director' : 'Optional - Not required for Teachers, Staff, and Students'}</small>
           ${isStytch ? `<small style="color: #856404; display: block; margin-top: 5px;">⚠️ For Stytch users, changing email will send a verification email to the new address. The user must verify the new email to complete the update.</small>` : ''}
         </div>
         <div class="form-group">
@@ -2930,6 +2931,7 @@ async function editUser(userId) {
           <label for="editRole">Role *</label>
           <select id="editRole" name="editRole" class="form-control" required onchange="toggleEditEventDropdown(this.value)">
             <option value="Admin" ${user.Role === 'Admin' ? 'selected' : ''}>Admin</option>
+            <option value="AdminViewOnly" ${user.Role === 'AdminViewOnly' ? 'selected' : ''}>Admin View Only</option>
             <option value="EventAdmin" ${user.Role === 'EventAdmin' ? 'selected' : ''}>Event Admin</option>
             <option value="ClubDirector" ${user.Role === 'ClubDirector' ? 'selected' : ''}>Club Director</option>
             <option value="Teacher" ${user.Role === 'Teacher' ? 'selected' : ''}>Teacher</option>
@@ -3020,7 +3022,7 @@ async function editUser(userId) {
     const emailInput = document.getElementById('editEmail');
     const emailLabel = document.getElementById('editEmailLabel');
     const emailHelp = document.getElementById('editEmailHelp');
-    const emailRequiredRoles = ['Admin', 'EventAdmin', 'ClubDirector'];
+    const emailRequiredRoles = ['Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector'];
     const emailOptionalRoles = ['Teacher', 'Student', 'Staff'];
     
     if (emailRequiredRoles.includes(role)) {
@@ -3080,8 +3082,8 @@ async function handleCreateUser(e) {
   const lastName = form.lastName?.value?.trim() || '';
   const email = form.email?.value?.trim() || null;
   
-  // For Admin, EventAdmin, and ClubDirector - generate invite code
-  if (['Admin', 'EventAdmin', 'ClubDirector'].includes(role)) {
+  // For Admin, AdminViewOnly, EventAdmin, and ClubDirector - generate invite code
+  if (['Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector'].includes(role)) {
     if (!firstName || !lastName || !email || !role) {
       showNotification('First Name, Last Name, Email, and Role are required', 'error');
       return;

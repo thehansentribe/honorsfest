@@ -93,9 +93,9 @@ router.post('/', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) 
     }
 
     // Validate email requirement based on role
-    // Email is required for Admin, EventAdmin, and ClubDirector
+    // Email is required for Admin, AdminViewOnly, EventAdmin, and ClubDirector
     // Email is optional for Teacher, Student, and Staff
-    const emailRequiredRoles = ['Admin', 'EventAdmin', 'ClubDirector'];
+    const emailRequiredRoles = ['Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector'];
     if (emailRequiredRoles.includes(Role) && !Email) {
       return res.status(400).json({ error: 'Email is required for ' + Role });
     }
@@ -189,7 +189,7 @@ router.put('/me', verifyToken, async (req, res) => {
     }
 
     // Email validation for roles that require it
-    const emailRequiredRoles = ['Admin', 'EventAdmin', 'ClubDirector'];
+    const emailRequiredRoles = ['Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector'];
     const newEmail = filteredUpdates.Email !== undefined ? filteredUpdates.Email : currentUser.Email;
     const oldEmail = currentUser.Email;
     const emailChanged = filteredUpdates.Email && filteredUpdates.Email !== oldEmail;
@@ -340,9 +340,9 @@ router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), async (re
     const emailChanged = updates.Email && updates.Email !== oldEmail;
 
     // Validate email requirement based on role
-    // Email is required for Admin, EventAdmin, and ClubDirector
+    // Email is required for Admin, AdminViewOnly, EventAdmin, and ClubDirector
     // Email is optional for Teacher, Student, and Staff
-    const emailRequiredRoles = ['Admin', 'EventAdmin', 'ClubDirector'];
+    const emailRequiredRoles = ['Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector'];
     if (emailRequiredRoles.includes(resolvedRole) && !resolvedEmail) {
       return res.status(400).json({ error: 'Email is required for ' + resolvedRole });
     }

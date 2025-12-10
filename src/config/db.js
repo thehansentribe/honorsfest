@@ -155,7 +155,7 @@ function initializeDatabase() {
         FirstName TEXT NOT NULL,
         LastName TEXT NOT NULL,
         Email TEXT NOT NULL,
-        Role TEXT NOT NULL CHECK(Role IN ('Admin', 'EventAdmin', 'ClubDirector')),
+        Role TEXT NOT NULL CHECK(Role IN ('Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector')),
         ClubID INTEGER,
         EventID INTEGER,
         CreatedBy INTEGER NOT NULL,
