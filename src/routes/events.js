@@ -32,9 +32,9 @@ router.use(verifyToken);
 // GET /api/events - List all events (admins see all, others see only active)
 router.get('/', (req, res) => {
   try {
-    // Admins and EventAdmins see all events, others only see active ones
+    // Admins, AdminViewOnly, and EventAdmins see all events, others only see active ones
     const userRole = req.user?.role;
-    const showAll = userRole === 'Admin' || userRole === 'EventAdmin';
+    const showAll = userRole === 'Admin' || userRole === 'AdminViewOnly' || userRole === 'EventAdmin';
     
     const events = showAll ? Event.getAll() : Event.getAll({ active: true });
     res.json(events);

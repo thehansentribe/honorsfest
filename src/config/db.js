@@ -28,7 +28,7 @@ function initializeDatabase() {
         Email TEXT,
         Phone TEXT,
         PasswordHash TEXT NOT NULL,
-        Role TEXT NOT NULL CHECK(Role IN ('Admin', 'EventAdmin', 'ClubDirector', 'Teacher', 'Student', 'Staff')),
+        Role TEXT NOT NULL CHECK(Role IN ('Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector', 'Teacher', 'Student', 'Staff')),
         InvestitureLevel TEXT CHECK(InvestitureLevel IN ('Friend', 'Companion', 'Explorer', 'Ranger', 'Voyager', 'Guide', 'MasterGuide', 'None')),
         ClubID INTEGER,
         EventID INTEGER,

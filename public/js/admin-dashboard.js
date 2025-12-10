@@ -9,6 +9,7 @@ let allClubs = [];
 let allClasses = [];
 let currentUser = null;
 let isSuperAdmin = false;
+let isViewOnly = false;
 let brandingFormState = { logoData: null };
 
 function populateEventOptions(selectEl, events, placeholderText = 'Select Event') {
@@ -132,8 +133,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
   
-  // Only Admin should access this dashboard
-  if (user.role !== 'Admin') {
+  // Only Admin and AdminViewOnly should access this dashboard
+  if (user.role !== 'Admin' && user.role !== 'AdminViewOnly') {
     // Redirect to appropriate dashboard
     if (user.role === 'EventAdmin') {
       window.location.href = '/eventadmin-dashboard.html';
@@ -157,6 +158,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const usernameLower = (user.username || '').toLowerCase();
   isSuperAdmin = usernameLower === 'admin' || usernameLower === 'jason.hansen';
+  isViewOnly = user.role === 'AdminViewOnly';
+
+  // Show view-only badge if applicable
+  const viewOnlyBadge = document.getElementById('viewOnlyBadge');
+  if (viewOnlyBadge) {
+    viewOnlyBadge.style.display = isViewOnly ? 'inline-block' : 'none';
+  }
 
   const systemTabButton = document.getElementById('systemTabButton');
   if (!isSuperAdmin && systemTabButton) {
@@ -190,7 +198,63 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.warn('Unable to load saved admin tab:', error);
   }
   switchTab(savedTab);
+  
+  // Disable write operations if view-only
+  if (isViewOnly) {
+    disableWriteOperations();
+  }
 });
+
+// Function to disable all write operations for view-only users
+function disableWriteOperations() {
+  // Disable all create buttons
+  const createButtons = document.querySelectorAll('button[onclick*="Create"], button[onclick*="create"]');
+  createButtons.forEach(btn => {
+    btn.disabled = true;
+    btn.classList.add('view-only-disabled');
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'not-allowed';
+  });
+  
+  // Disable all edit buttons
+  const editButtons = document.querySelectorAll('button[onclick*="edit"], button[onclick*="Edit"]');
+  editButtons.forEach(btn => {
+    btn.disabled = true;
+    btn.classList.add('view-only-disabled');
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'not-allowed';
+  });
+  
+  // Disable all delete buttons
+  const deleteButtons = document.querySelectorAll('button[onclick*="delete"], button[onclick*="Delete"]');
+  deleteButtons.forEach(btn => {
+    btn.disabled = true;
+    btn.classList.add('view-only-disabled');
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'not-allowed';
+  });
+  
+  // Disable all form inputs and selects in modals
+  const forms = document.querySelectorAll('form');
+  forms.forEach(form => {
+    const inputs = form.querySelectorAll('input, select, textarea, button[type="submit"]');
+    inputs.forEach(input => {
+      if (input.type !== 'button' && !input.onclick?.toString().includes('closeModal')) {
+        input.disabled = true;
+        input.classList.add('view-only-disabled');
+      }
+    });
+  });
+}
+
+// Helper function to check if operation should be blocked
+function blockWriteOperation(operationName) {
+  if (isViewOnly) {
+    showNotification(`View-only accounts cannot ${operationName}.`, 'error');
+    return true;
+  }
+  return false;
+}
 
 // Helper function to get role label from event
 function getRoleLabel(role, eventId) {
@@ -569,6 +633,11 @@ async function switchTab(tabName, clickedElement = null) {
       content.innerHTML = await getEventsTab();
       await renderEvents();
       break;
+  }
+  
+  // Disable write operations if view-only (after content is loaded)
+  if (isViewOnly) {
+    setTimeout(() => disableWriteOperations(), 100); // Small delay to ensure DOM is ready
   }
 }
 
@@ -1471,6 +1540,7 @@ function renderLocationsList() {
 
 // Actions
 async function editEvent(eventId) {
+  if (blockWriteOperation('edit events')) return;
   const event = allEvents.find(e => e.ID === eventId);
   if (!event) return;
 
@@ -1578,6 +1648,7 @@ async function editEvent(eventId) {
 }
 
 async function handleEditEvent(event, eventId) {
+  if (blockWriteOperation('edit events')) return;
   event.preventDefault();
   
   const form = event.target;
@@ -1622,6 +1693,7 @@ async function handleEditEvent(event, eventId) {
 }
 
 async function toggleEventActive(eventId, currentActiveStr) {
+  if (blockWriteOperation('toggle event status')) return;
   try {
     // Handle string 'true'/'false' from onclick, or boolean/number from API
     const isCurrentlyActive = currentActiveStr === 'true' || currentActiveStr === true || currentActiveStr === 1 || currentActiveStr === '1';
@@ -1734,6 +1806,7 @@ async function toggleUserStatus(userId, currentActive) {
 }
 
 async function editClass(classId) {
+  if (blockWriteOperation('edit classes')) return;
   const cls = allClasses.find(c => c.ID === classId);
   if (!cls) return;
   
@@ -1797,6 +1870,7 @@ async function editClass(classId) {
 }
 
 async function handleEditClass(e, classId) {
+  if (blockWriteOperation('edit classes')) return;
   e.preventDefault();
   const form = e.target;
   
@@ -2369,6 +2443,7 @@ async function generateTimeslotRosterReport() {
 
 // Modal functions
 function showCreateEventForm() {
+  if (blockWriteOperation('create events')) return;
   const modal = document.createElement('div');
   modal.id = 'createEventModal';
   modal.className = 'modal';
@@ -2494,6 +2569,7 @@ function closeModal(modalId) {
 
 async function handleCreateEvent(e) {
   e.preventDefault();
+  if (blockWriteOperation('create events')) return;
   
   // Get form element
   const form = e.target;
@@ -2577,6 +2653,7 @@ function calculateAge(dateOfBirth) {
 
 // User management functions
 function showCreateUserForm() {
+  if (blockWriteOperation('create users')) return;
   const modal = document.createElement('div');
   modal.id = 'createUserModal';
   modal.className = 'modal';
@@ -2793,6 +2870,7 @@ function showCreateUserForm() {
 }
 
 async function editUser(userId) {
+  if (blockWriteOperation('edit users')) return;
   const user = allUsers.find(u => u.ID === userId);
   if (!user) return;
   
@@ -2993,6 +3071,7 @@ async function editUser(userId) {
 }
 
 async function handleCreateUser(e) {
+  if (blockWriteOperation('create users')) return;
   e.preventDefault();
   const form = e.target;
   
@@ -3212,6 +3291,7 @@ ${emailBody}</textarea>
 }
 
 async function handleEditUser(e, userId) {
+  if (blockWriteOperation('edit users')) return;
   e.preventDefault();
   const form = e.target;
   
@@ -3310,6 +3390,7 @@ async function handleEditUser(e, userId) {
 
 // Location management functions
 function showCreateLocationForm() {
+  if (blockWriteOperation('create locations')) return;
   const select = document.getElementById('locationEventFilter');
   const eventId = select?.value;
   
@@ -3353,6 +3434,7 @@ function showCreateLocationForm() {
 }
 
 async function editLocation(locationId) {
+  if (blockWriteOperation('edit locations')) return;
   const location = allLocations.find(l => l.ID === locationId);
   if (!location) return;
   
@@ -3390,6 +3472,7 @@ async function editLocation(locationId) {
 }
 
 async function deleteLocation(locationId) {
+  if (blockWriteOperation('delete locations')) return;
   if (!confirm('Are you sure you want to delete this location? This will also delete all classes at this location.')) return;
   
   try {
@@ -3410,6 +3493,7 @@ async function deleteLocation(locationId) {
 }
 
 async function handleCreateLocation(e) {
+  if (blockWriteOperation('create locations')) return;
   e.preventDefault();
   const form = e.target;
   const eventId = form.locationEventId.value;
@@ -3447,6 +3531,7 @@ async function handleCreateLocation(e) {
 }
 
 async function handleEditLocation(e, locationId) {
+  if (blockWriteOperation('edit locations')) return;
   e.preventDefault();
   const form = e.target;
   
@@ -3570,6 +3655,7 @@ function calculateDuration(startTime, endTime) {
 // convertTo12Hour is now in utils.js and available globally
 
 function showCreateTimeslotForm() {
+  if (blockWriteOperation('create timeslots')) return;
   const select = document.getElementById('timeslotEventFilter');
   const eventId = select?.value;
   
@@ -3612,6 +3698,7 @@ function showCreateTimeslotForm() {
 }
 
 async function handleCreateTimeslot(e) {
+  if (blockWriteOperation('create timeslots')) return;
   e.preventDefault();
   const form = e.target;
   const select = document.getElementById('timeslotEventFilter');
@@ -3649,6 +3736,7 @@ async function handleCreateTimeslot(e) {
 }
 
 async function editTimeslot(timeslotId) {
+  if (blockWriteOperation('edit timeslots')) return;
   const slot = allTimeslots.find(s => s.ID === timeslotId);
   if (!slot) return;
   
@@ -3691,6 +3779,7 @@ async function editTimeslot(timeslotId) {
 }
 
 async function handleEditTimeslot(e, timeslotId) {
+  if (blockWriteOperation('edit timeslots')) return;
   e.preventDefault();
   const form = e.target;
   
@@ -3726,6 +3815,7 @@ async function handleEditTimeslot(e, timeslotId) {
 }
 
 async function deleteTimeslot(timeslotId) {
+  if (blockWriteOperation('delete timeslots')) return;
   if (!confirm('Are you sure you want to delete this timeslot? This will also remove all classes and registrations for this timeslot.')) return;
   
   try {
@@ -3747,6 +3837,7 @@ async function deleteTimeslot(timeslotId) {
 
 // Class management functions
 async function showCreateClassForm() {
+  if (blockWriteOperation('create classes')) return;
   const select = document.getElementById('classEventFilter');
   const eventId = select?.value;
   
@@ -3830,6 +3921,7 @@ async function showCreateClassForm() {
 }
 
 async function handleCreateClass(e) {
+  if (blockWriteOperation('create classes')) return;
   e.preventDefault();
   const form = e.target;
   const select = document.getElementById('classEventFilter');
@@ -4090,6 +4182,7 @@ async function renderClubs() {
 }
 
 async function showCreateClubForm() {
+  if (blockWriteOperation('create clubs')) return;
   // For Admin, clubs can be created without an event
   // They can be linked to events later via Events > Manage Clubs
   
@@ -4134,6 +4227,7 @@ async function showCreateClubForm() {
 }
 
 async function handleCreateClub(e) {
+  if (blockWriteOperation('create clubs')) return;
   e.preventDefault();
   const form = e.target;
   
@@ -4170,6 +4264,7 @@ async function handleCreateClub(e) {
 }
 
 async function editClub(clubId) {
+  if (blockWriteOperation('edit clubs')) return;
   const club = allClubs.find(c => c.ID === clubId);
   if (!club) return;
   
@@ -4214,6 +4309,7 @@ async function editClub(clubId) {
 }
 
 async function handleEditClub(e, clubId) {
+  if (blockWriteOperation('edit clubs')) return;
   e.preventDefault();
   const form = e.target;
   

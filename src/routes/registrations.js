@@ -150,8 +150,8 @@ router.delete('/:id', (req, res) => {
   }
 });
 
-// GET /api/registrations/class/:classId/roster - Get class roster (Teacher, Admin, ClubDirector)
-router.get('/class/:classId/roster', requireRole('Teacher', 'Admin', 'EventAdmin', 'ClubDirector'), (req, res) => {
+// GET /api/registrations/class/:classId/roster - Get class roster (Teacher, Admin, AdminViewOnly, ClubDirector)
+router.get('/class/:classId/roster', requireRole('Teacher', 'Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector'), (req, res) => {
   try {
     const roster = Registration.getClassRoster(parseInt(req.params.classId));
     res.json(roster);
@@ -292,7 +292,7 @@ router.post('/admin', requireRole('Admin', 'EventAdmin', 'ClubDirector'), async 
 });
 
 // GET /api/registrations/available/:classId - Get students available to add to class
-router.get('/available/:classId', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) => {
+router.get('/available/:classId', requireRole('Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector'), (req, res) => {
   try {
     const { db } = require('../config/db');
     const Class = require('../models/class');

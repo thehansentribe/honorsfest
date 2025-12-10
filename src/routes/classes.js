@@ -46,7 +46,7 @@ router.get('/:eventId', (req, res) => {
     }
     
     // Non-admins can only see active events
-    if (user.role !== 'Admin' && user.role !== 'EventAdmin') {
+    if (user.role !== 'Admin' && user.role !== 'AdminViewOnly' && user.role !== 'EventAdmin') {
       if (!event.Active && user.role !== 'ClubDirector') {
         return res.status(403).json({ error: 'This event is not currently active.' });
       }
@@ -168,7 +168,7 @@ router.post('/:id/activate', requireRole('Admin', 'EventAdmin'), (req, res) => {
 });
 
 // GET /api/classes/teacherless/:eventId - Get teacherless classes
-router.get('/teacherless/:eventId', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) => {
+router.get('/teacherless/:eventId', requireRole('Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector'), (req, res) => {
   try {
     const classes = Class.getTeacherlessClasses(parseInt(req.params.eventId));
     res.json(classes);

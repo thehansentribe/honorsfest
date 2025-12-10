@@ -6,7 +6,7 @@ const router = express.Router();
 router.use(verifyToken);
 
 // GET /api/reports/club/:clubId - Generate CSV report for club
-router.get('/club/:clubId', requireRole('ClubDirector', 'Admin'), (req, res) => {
+router.get('/club/:clubId', requireRole('ClubDirector', 'Admin', 'AdminViewOnly'), (req, res) => {
   try {
     const clubId = parseInt(req.params.clubId);
 
@@ -153,8 +153,8 @@ router.get('/club/:clubId', requireRole('ClubDirector', 'Admin'), (req, res) => 
   }
 });
 
-// GET /api/reports/event/:eventId - Generate CSV report for all clubs (Admin, EventAdmin, and ClubDirector)
-router.get('/event/:eventId', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) => {
+// GET /api/reports/event/:eventId - Generate CSV report for all clubs (Admin, AdminViewOnly, EventAdmin, and ClubDirector)
+router.get('/event/:eventId', requireRole('Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector'), (req, res) => {
   try {
     const eventId = parseInt(req.params.eventId);
     const userRole = req.user.role;
@@ -334,8 +334,8 @@ router.get('/event/:eventId', requireRole('Admin', 'EventAdmin', 'ClubDirector')
   }
 });
 
-// GET /api/reports/event/:eventId/timeslot-roster - Generate HTML timeslot roster report (Admin, EventAdmin)
-router.get('/event/:eventId/timeslot-roster', requireRole('Admin', 'EventAdmin'), (req, res) => {
+// GET /api/reports/event/:eventId/timeslot-roster - Generate HTML timeslot roster report (Admin, AdminViewOnly, EventAdmin)
+router.get('/event/:eventId/timeslot-roster', requireRole('Admin', 'AdminViewOnly', 'EventAdmin'), (req, res) => {
   try {
     const eventId = parseInt(req.params.eventId);
     const userRole = req.user.role;

@@ -29,7 +29,7 @@ router.get('/', (req, res) => {
 });
 
 // GET /api/users/search?firstName= - Search users by first name (for check-in dropdown)
-router.get('/search', requireRole('Admin'), (req, res) => {
+router.get('/search', requireRole('Admin', 'AdminViewOnly'), (req, res) => {
   try {
     const firstName = req.query.firstName || '';
     if (!firstName) {
@@ -47,8 +47,8 @@ router.get('/search', requireRole('Admin'), (req, res) => {
   }
 });
 
-// GET /api/users/checkin/:number - Get user by check-in number (Admin, EventAdmin, ClubDirector)
-router.get('/checkin/:number', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) => {
+// GET /api/users/checkin/:number - Get user by check-in number (Admin, AdminViewOnly, EventAdmin, ClubDirector)
+router.get('/checkin/:number', requireRole('Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector'), (req, res) => {
   try {
     const checkInNumber = parseInt(req.params.number);
     if (isNaN(checkInNumber)) {
@@ -117,7 +117,7 @@ router.post('/', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) 
       }
     }
 
-    // Validate only Admin or EventAdmin can set background check
+    // Validate only Admin or EventAdmin can set background check (not AdminViewOnly)
     const currentUser = req.user;
     if (BackgroundCheck && !['Admin', 'EventAdmin'].includes(currentUser.role)) {
       return res.status(403).json({ error: 'Only Admin or EventAdmin can set background check status' });
@@ -312,7 +312,7 @@ router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), async (re
       }
     }
     
-    // Validate only Admin or EventAdmin can update background check
+    // Validate only Admin or EventAdmin can update background check (not AdminViewOnly)
     if (updates.BackgroundCheck !== undefined && !['Admin', 'EventAdmin'].includes(req.user.role)) {
       return res.status(403).json({ error: 'Only Admin or EventAdmin can update background check status' });
     }

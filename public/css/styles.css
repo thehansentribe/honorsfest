@@ -1100,3 +1100,33 @@ body {
   }
 }
 
+/* View Only Badge */
+.view-only-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  margin-left: 8px;
+  background-color: #f59e0b;
+  color: white;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Disabled state for view-only users */
+.view-only-disabled {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+.view-only-disabled input,
+.view-only-disabled select,
+.view-only-disabled textarea,
+.view-only-disabled button {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+

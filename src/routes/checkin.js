@@ -15,7 +15,7 @@ router.use(verifyToken);
  * Admin/EventAdmin: all participants
  * ClubDirector: only their club's students
  */
-router.get('/participants/:eventId', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) => {
+router.get('/participants/:eventId', requireRole('Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector'), (req, res) => {
   try {
     const eventId = parseInt(req.params.eventId);
     const clubId = req.query.clubId ? parseInt(req.query.clubId) : null;

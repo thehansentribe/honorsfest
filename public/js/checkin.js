@@ -22,8 +22,8 @@ let checkInSortDirection = 'asc';
 function getCheckInTab(config) {
   checkInEventId = config.eventId;
   
-  // Admin can see all events, EventAdmin/ClubDirector see their event
-  const eventSelectorHtml = config.userRole === 'Admin' ? `
+  // Admin and AdminViewOnly can see all events, EventAdmin/ClubDirector see their event
+  const eventSelectorHtml = (config.userRole === 'Admin' || config.userRole === 'AdminViewOnly') ? `
     <div class="form-group" style="margin-bottom: 20px;">
       <label for="checkInEventSelect"><strong>Select Event</strong></label>
       <select id="checkInEventSelect" class="form-control" onchange="checkInLoadParticipants()">
@@ -391,6 +391,12 @@ function checkInRenderParticipants() {
  * Toggle checked-in status
  */
 async function checkInToggleCheckedIn(userId, checkedIn) {
+  if (typeof isViewOnly !== 'undefined' && isViewOnly) {
+    showNotification('View-only accounts cannot modify check-in status.', 'error');
+    const checkbox = document.querySelector(`input[onchange*="checkInToggleCheckedIn(${userId}"]`);
+    if (checkbox) checkbox.checked = !checkedIn;
+    return;
+  }
   try {
     const response = await fetchWithAuth(`/api/users/${userId}`, {
       method: 'PUT',
@@ -425,6 +431,12 @@ async function checkInToggleCheckedIn(userId, checkedIn) {
  * Toggle background check status
  */
 async function checkInToggleBackgroundCheck(userId, backgroundCheck) {
+  if (typeof isViewOnly !== 'undefined' && isViewOnly) {
+    showNotification('View-only accounts cannot modify background check status.', 'error');
+    const checkbox = document.querySelector(`input[onchange*="checkInToggleBackgroundCheck(${userId}"]`);
+    if (checkbox) checkbox.checked = !backgroundCheck;
+    return;
+  }
   try {
     const response = await fetchWithAuth(`/api/users/${userId}`, {
       method: 'PUT',
@@ -541,6 +553,10 @@ async function checkInViewDetails(userId) {
  */
 async function checkInUpdateUser(event, userId) {
   event.preventDefault();
+  if (typeof isViewOnly !== 'undefined' && isViewOnly) {
+    showNotification('View-only accounts cannot update user information.', 'error');
+    return;
+  }
   
   const checkedIn = document.getElementById('detailCheckedIn').checked;
   const backgroundCheck = document.getElementById('detailBackgroundCheck')?.checked || false;
@@ -606,6 +622,10 @@ async function checkInPopulateEventSelector() {
  * Confirm attendance - Remove all unchecked-in students from classes
  */
 async function checkInConfirmAttendance(eventId, clubId) {
+  if (typeof isViewOnly !== 'undefined' && isViewOnly) {
+    showNotification('View-only accounts cannot confirm attendance.', 'error');
+    return;
+  }
   if (!eventId) {
     showNotification('Please select an event first', 'error');
     return;

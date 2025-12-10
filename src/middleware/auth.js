@@ -46,6 +46,10 @@ function requireSuperAdmin(req, res, next) {
   next();
 }
 
-module.exports = { verifyToken, requireRole, requireSuperAdmin };
+function isViewOnlyRole(role) {
+  return role === 'AdminViewOnly';
+}
+
+module.exports = { verifyToken, requireRole, requireSuperAdmin, isViewOnlyRole };
 
 

@@ -287,8 +287,8 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// GET /api/invites - Get all invites created by current user (Admin, EventAdmin)
-router.get('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => {
+// GET /api/invites - Get all invites created by current user (Admin, AdminViewOnly, EventAdmin)
+router.get('/', verifyToken, requireRole('Admin', 'AdminViewOnly', 'EventAdmin'), (req, res) => {
   try {
     const invites = InviteCode.findByCreatedBy(req.user.id);
     res.json(invites);
@@ -298,8 +298,8 @@ router.get('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => {
   }
 });
 
-// GET /api/invites/user/:email - Get invite code for a user (Admin, EventAdmin)
-router.get('/user/:email', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => {
+// GET /api/invites/user/:email - Get invite code for a user (Admin, AdminViewOnly, EventAdmin)
+router.get('/user/:email', verifyToken, requireRole('Admin', 'AdminViewOnly', 'EventAdmin'), (req, res) => {
   try {
     const email = req.params.email;
     const user = User.findByEmail(email);
