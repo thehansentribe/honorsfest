@@ -129,6 +129,57 @@ function migrateDatabase() {
       console.log('✓ Settings table created');
     }
     
+    // Migrate InviteCodes table to include AdminViewOnly in Role CHECK constraint
+    const inviteCodesTableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='InviteCodes'").get();
+    if (inviteCodesTableInfo && inviteCodesTableInfo.sql) {
+      const hasAdminViewOnly = inviteCodesTableInfo.sql.includes("'AdminViewOnly'");
+      if (!hasAdminViewOnly) {
+        console.log('Migrating InviteCodes table to include AdminViewOnly role...');
+        
+        // Disable foreign keys temporarily
+        db.pragma('foreign_keys = OFF');
+        
+        // Create new table with updated constraint
+        db.exec(`
+          CREATE TABLE InviteCodes_new (
+            ID INTEGER PRIMARY KEY AUTOINCREMENT,
+            Code TEXT UNIQUE NOT NULL,
+            FirstName TEXT NOT NULL,
+            LastName TEXT NOT NULL,
+            Email TEXT NOT NULL,
+            Role TEXT NOT NULL CHECK(Role IN ('Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector')),
+            ClubID INTEGER,
+            EventID INTEGER,
+            CreatedBy INTEGER NOT NULL,
+            CreatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+            ExpiresAt TEXT NOT NULL,
+            Used BOOLEAN NOT NULL DEFAULT 0,
+            UsedAt TEXT,
+            FOREIGN KEY (ClubID) REFERENCES Clubs(ID),
+            FOREIGN KEY (EventID) REFERENCES Events(ID),
+            FOREIGN KEY (CreatedBy) REFERENCES Users(ID)
+          )
+        `);
+        
+        // Copy data from old table to new table
+        db.exec(`
+          INSERT INTO InviteCodes_new 
+          SELECT * FROM InviteCodes
+        `);
+        
+        // Drop old table
+        db.exec('DROP TABLE InviteCodes');
+        
+        // Rename new table
+        db.exec('ALTER TABLE InviteCodes_new RENAME TO InviteCodes');
+        
+        // Re-enable foreign keys
+        db.pragma('foreign_keys = ON');
+        
+        console.log('✓ InviteCodes table migrated successfully');
+      }
+    }
+    
   } catch (error) {
     console.error('Migration error:', error);
     // Don't throw, just log
