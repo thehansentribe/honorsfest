@@ -10,7 +10,7 @@ const { db } = require('../config/db');
 
 const router = express.Router();
 
-// POST /api/invites - Generate an invite code (Admin, EventAdmin)
+// POST /api/invites - Generate an invite code (Admin, EventAdmin only - AdminViewOnly cannot create invites)
 router.post('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => {
   try {
     const { firstName, lastName, email, role, clubId, eventId, expiresInDays } = req.body;
@@ -22,8 +22,8 @@ router.post('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => 
     }
     
     // Validate role
-    if (!['Admin', 'EventAdmin', 'ClubDirector'].includes(role)) {
-      return res.status(400).json({ error: 'Invalid role. Must be Admin, EventAdmin, or ClubDirector' });
+    if (!['Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role. Must be Admin, AdminViewOnly, EventAdmin, or ClubDirector' });
     }
     
     // Validate role-specific requirements
