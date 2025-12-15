@@ -708,6 +708,14 @@ async function showCreateClassFormClubDirector() {
   const honors = await honorsRes.json();
   const timeslots = await timeslotsRes.json();
   
+  // Sort honors by category, then by name
+  const sortedHonors = [...honors].sort((a, b) => {
+    if (a.Category !== b.Category) {
+      return a.Category.localeCompare(b.Category);
+    }
+    return a.Name.localeCompare(b.Name);
+  });
+  
   // Load teachers from the same club
   const teachersResponse = await fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Teacher`);
   const teachers = await teachersResponse.json();
@@ -728,7 +736,7 @@ async function showCreateClassFormClubDirector() {
           <label for="classHonor">Honor *</label>
           <select id="classHonor" name="classHonor" class="form-control" required>
             <option value="">Select Honor</option>
-            ${honors.map(h => `<option value="${h.ID}">${h.Name}</option>`).join('')}
+            ${sortedHonors.map(h => `<option value="${h.ID}">${h.Category}: ${h.Name}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">

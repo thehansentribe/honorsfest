@@ -3874,6 +3874,14 @@ async function showCreateClassForm() {
   console.log('Loaded honors:', honors.length, 'total');
   console.log('Dinosaurs in list?', honors.some(h => h.Name && h.Name.toLowerCase().includes('dinosaur')));
   
+  // Sort honors by category, then by name (API already does this, but ensure it)
+  const sortedHonors = [...honors].sort((a, b) => {
+    if (a.Category !== b.Category) {
+      return a.Category.localeCompare(b.Category);
+    }
+    return a.Name.localeCompare(b.Name);
+  });
+  
   const teachers = await teachersRes.json();
   const locations = await locationsRes.json();
   const timeslots = await timeslotsRes.json();
@@ -3893,7 +3901,7 @@ async function showCreateClassForm() {
           <label for="classHonor">Honor *</label>
           <select id="classHonor" name="classHonor" class="form-control" required>
             <option value="">Select Honor</option>
-            ${honors.map(h => `<option value="${h.ID}">${h.Name}</option>`).join('')}
+            ${sortedHonors.map(h => `<option value="${h.ID}">${h.Category}: ${h.Name}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
