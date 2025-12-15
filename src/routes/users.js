@@ -88,8 +88,13 @@ router.post('/', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) 
     const clubIdInt = ClubID ? parseInt(ClubID, 10) : null;
     const eventIdInt = EventID ? parseInt(EventID, 10) : null;
 
-    if (!FirstName || !LastName || !DateOfBirth || !Role) {
-      return res.status(400).json({ error: 'Missing required fields: FirstName, LastName, DateOfBirth, and Role are required' });
+    // DateOfBirth is optional for AdminViewOnly, required for all other roles
+    const dateOfBirthRequired = Role !== 'AdminViewOnly';
+    if (!FirstName || !LastName || !Role || (dateOfBirthRequired && !DateOfBirth)) {
+      const requiredFields = dateOfBirthRequired 
+        ? 'FirstName, LastName, DateOfBirth, and Role are required'
+        : 'FirstName, LastName, and Role are required (DateOfBirth is optional for AdminViewOnly)';
+      return res.status(400).json({ error: `Missing required fields: ${requiredFields}` });
     }
 
     // Validate email requirement based on role

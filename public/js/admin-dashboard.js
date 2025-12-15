@@ -2688,9 +2688,9 @@ function showCreateUserForm() {
           <input type="text" id="lastName" name="lastName" class="form-control" required>
         </div>
         <div class="form-group" id="dateOfBirthContainer">
-          <label for="dateOfBirth">Date of Birth *</label>
+          <label for="dateOfBirth">Date of Birth <span id="dateOfBirthRequired">*</span></label>
           <input type="date" id="dateOfBirth" name="dateOfBirth" class="form-control" required>
-          <small style="color: var(--text-light);">Age will be calculated automatically</small>
+          <small style="color: var(--text-light);">Age will be calculated automatically. Optional for Admin View Only users.</small>
         </div>
         <div class="form-group">
           <label for="email" id="emailLabel">Email *</label>
@@ -2838,7 +2838,11 @@ function showCreateUserForm() {
       if (passwordInput) passwordInput.required = true;
       if (submitBtn) submitBtn.textContent = 'Create User';
       if (dateOfBirthContainer) dateOfBirthContainer.style.display = 'block';
-      if (dateOfBirthInput) dateOfBirthInput.required = true;
+      // DateOfBirth is optional for AdminViewOnly
+      const isAdminViewOnly = role === 'AdminViewOnly';
+      if (dateOfBirthInput) dateOfBirthInput.required = !isAdminViewOnly;
+      const dateOfBirthRequiredLabel = document.getElementById('dateOfBirthRequired');
+      if (dateOfBirthRequiredLabel) dateOfBirthRequiredLabel.style.display = isAdminViewOnly ? 'none' : 'inline';
       if (phoneContainer) phoneContainer.style.display = 'block';
     }
     
@@ -2904,9 +2908,10 @@ async function editUser(userId) {
           <input type="text" id="editLastName" name="editLastName" class="form-control" value="${user.LastName}" required>
         </div>
         <div class="form-group">
-          <label for="editDateOfBirth">Date of Birth *</label>
-          <input type="date" id="editDateOfBirth" name="editDateOfBirth" class="form-control" value="${user.DateOfBirth || ''}" required>
+          <label for="editDateOfBirth">Date of Birth ${user.Role === 'AdminViewOnly' ? '' : '*'}</label>
+          <input type="date" id="editDateOfBirth" name="editDateOfBirth" class="form-control" value="${user.DateOfBirth || ''}" ${user.Role === 'AdminViewOnly' ? '' : 'required'}>
           ${user.Age !== null ? `<small style="color: var(--text-light);">Current age: ${user.Age}</small>` : ''}
+          ${user.Role === 'AdminViewOnly' ? '<small style="color: var(--text-light);">Optional for Admin View Only users.</small>' : ''}
         </div>
         ${user.IsAdult ? `
         <div class="form-group">
@@ -3165,8 +3170,9 @@ async function handleCreateUser(e) {
     BackgroundCheck: form.backgroundCheck?.checked || false
   };
 
-  // Validate
-  if (!userData.FirstName || !userData.LastName || !userData.DateOfBirth || !userData.Role) {
+  // Validate - DateOfBirth is optional for AdminViewOnly
+  const dateOfBirthRequired = userData.Role !== 'AdminViewOnly';
+  if (!userData.FirstName || !userData.LastName || !userData.Role || (dateOfBirthRequired && !userData.DateOfBirth)) {
     showNotification('Please fill in all required fields', 'error');
     return;
   }
@@ -3332,8 +3338,9 @@ async function handleEditUser(e, userId) {
     userData.Password = newPassword;
   }
 
-  // Validate
-  if (!userData.FirstName || !userData.LastName || !userData.DateOfBirth || !userData.Role) {
+  // Validate - DateOfBirth is optional for AdminViewOnly
+  const dateOfBirthRequired = userData.Role !== 'AdminViewOnly';
+  if (!userData.FirstName || !userData.LastName || !userData.Role || (dateOfBirthRequired && !userData.DateOfBirth)) {
     showNotification('Please fill in all required fields', 'error');
     return;
   }

@@ -105,14 +105,15 @@ router.post('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => 
     );
     
     // Create the user record immediately but mark as invited and not active
-    // Use a default DateOfBirth for invited users (they can update it later)
+    // DateOfBirth is optional for AdminViewOnly, use default for other roles
     const defaultDateOfBirth = new Date(new Date().getFullYear() - 30, 0, 1).toISOString().split('T')[0];
+    const dateOfBirth = role === 'AdminViewOnly' ? null : defaultDateOfBirth;
     
     try {
       User.create({
         FirstName: firstName,
         LastName: lastName,
-        DateOfBirth: defaultDateOfBirth, // Required field - use default for invited users
+        DateOfBirth: dateOfBirth, // Optional for AdminViewOnly, default for other roles
         Email: email,
         PasswordHash: '', // Empty for invited users until they set password
         Role: role,
