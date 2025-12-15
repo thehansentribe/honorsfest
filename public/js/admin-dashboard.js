@@ -3863,7 +3863,17 @@ async function showCreateClassForm() {
     fetchWithAuth(`/api/events/${eventId}/timeslots`)
   ]);
   
+  if (!honorsRes.ok) {
+    const error = await honorsRes.json().catch(() => ({ error: 'Failed to load honors' }));
+    showNotification(error.error || 'Error loading honors', 'error');
+    console.error('Error loading honors:', error);
+    return;
+  }
+  
   const honors = await honorsRes.json();
+  console.log('Loaded honors:', honors.length, 'total');
+  console.log('Dinosaurs in list?', honors.some(h => h.Name && h.Name.toLowerCase().includes('dinosaur')));
+  
   const teachers = await teachersRes.json();
   const locations = await locationsRes.json();
   const timeslots = await timeslotsRes.json();

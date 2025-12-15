@@ -4,6 +4,9 @@ const fs = require('fs');
 
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '../../database.sqlite');
 
+// Log the database path for debugging
+console.log(`[Database] Using database file: ${dbPath}`);
+
 // Ensure the directory exists for the database file
 const dbDir = path.dirname(dbPath);
 if (!fs.existsSync(dbDir)) {

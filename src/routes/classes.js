@@ -15,8 +15,17 @@ router.get('/honors', (req, res) => {
       search: req.query.search
     };
     const honors = Honor.getAll(filters);
+    console.log(`[Honors API] Returning ${honors.length} honors`);
+    // Log if Dinosaurs is in the results
+    const hasDinosaurs = honors.some(h => h.Name && h.Name.toLowerCase().includes('dinosaur'));
+    if (hasDinosaurs) {
+      console.log('[Honors API] Dinosaurs found in results');
+    } else {
+      console.log('[Honors API] Dinosaurs NOT found in results');
+    }
     res.json(honors);
   } catch (error) {
+    console.error('[Honors API] Error:', error);
     res.status(500).json({ error: error.message });
   }
 });
