@@ -748,6 +748,141 @@ async function initializeSystemTab() {
   await initializeBrandingSection();
 }
 
+async function showAddHonorModal() {
+  if (blockWriteOperation('add honors')) return;
+  
+  // Load existing categories
+  let categories = [];
+  try {
+    const response = await fetchWithAuth('/api/classes/honors/categories');
+    categories = await response.json();
+  } catch (error) {
+    console.error('Error loading categories:', error);
+    showNotification('Error loading categories', 'error');
+    return;
+  }
+
+  const modal = document.createElement('div');
+  modal.id = 'addHonorModal';
+  modal.className = 'modal';
+  modal.style.display = 'flex';
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2>Add New Honor</h2>
+        <button onclick="closeModal('addHonorModal')" class="btn btn-outline">×</button>
+      </div>
+      <form id="addHonorForm" onsubmit="handleAddHonor(event)">
+        <div class="form-group">
+          <label for="honorCategory">Category *</label>
+          <select id="honorCategory" name="honorCategory" class="form-control" required>
+            <option value="">Select Category</option>
+            ${categories.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
+            <option value="__NEW__">+ Add New Category</option>
+          </select>
+        </div>
+        <div class="form-group" id="newCategoryGroup" style="display: none;">
+          <label for="newCategoryName">New Category Name *</label>
+          <input type="text" id="newCategoryName" name="newCategoryName" class="form-control" placeholder="Enter new category name">
+        </div>
+        <div class="form-group">
+          <label for="honorName">Honor Name *</label>
+          <input type="text" id="honorName" name="honorName" class="form-control" required placeholder="Enter honor name">
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Add Honor</button>
+          <button type="button" onclick="closeModal('addHonorModal')" class="btn btn-outline">Cancel</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  // Show/hide new category input based on selection
+  const categorySelect = document.getElementById('honorCategory');
+  const newCategoryGroup = document.getElementById('newCategoryGroup');
+  categorySelect.addEventListener('change', function() {
+    if (this.value === '__NEW__') {
+      newCategoryGroup.style.display = 'block';
+      document.getElementById('newCategoryName').required = true;
+      document.getElementById('newCategoryName').focus();
+    } else {
+      newCategoryGroup.style.display = 'none';
+      document.getElementById('newCategoryName').required = false;
+    }
+  });
+}
+
+async function handleAddHonor(event) {
+  if (blockWriteOperation('add honors')) return;
+  event.preventDefault();
+
+  const form = event.target;
+  const categorySelect = document.getElementById('honorCategory');
+  const newCategoryInput = document.getElementById('newCategoryName');
+  const honorNameInput = document.getElementById('honorName');
+
+  let category = categorySelect.value;
+  const honorName = honorNameInput.value.trim();
+
+  // Validate honor name
+  if (!honorName) {
+    showNotification('Honor name is required', 'error');
+    return;
+  }
+
+  // Handle new category
+  if (category === '__NEW__') {
+    category = newCategoryInput.value.trim();
+    if (!category) {
+      showNotification('Category name is required', 'error');
+      newCategoryInput.focus();
+      return;
+    }
+  }
+
+  if (!category) {
+    showNotification('Please select or enter a category', 'error');
+    return;
+  }
+
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const originalText = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Adding...';
+
+  try {
+    const response = await fetchWithAuth('/api/classes/honors', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: honorName,
+        category: category
+      })
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      showNotification(`Honor "${honorName}" added successfully to "${category}" category`, 'success');
+      closeModal('addHonorModal');
+    } else {
+      // Handle duplicate error
+      if (response.status === 409) {
+        showNotification(result.error || 'This honor already exists in the selected category', 'error');
+      } else {
+        showNotification(result.error || 'Error adding honor', 'error');
+      }
+    }
+  } catch (error) {
+    console.error('Error adding honor:', error);
+    showNotification('Error adding honor: ' + error.message, 'error');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalText;
+  }
+}
+
 async function initializeBrandingSection() {
   const form = document.getElementById('brandingForm');
   if (!form) return;
@@ -936,6 +1071,20 @@ function getSystemTab() {
             <button type="submit" class="btn btn-primary">Save Branding</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Honors Management</h2>
+      </div>
+      <div style="padding: 20px;">
+        <p style="color: #666; margin-bottom: 15px;">
+          Add new honors to the system. Honors are organized by category.
+        </p>
+        <button onclick="showAddHonorModal()" class="btn btn-primary" id="addHonorBtn">
+          Add Honor
+        </button>
       </div>
     </div>
 
@@ -4520,6 +4669,8 @@ window.resendInvite = async function(email) {
 };
 window.handleEditUser = handleEditUser;
 window.closeModal = closeModal;
+window.showAddHonorModal = showAddHonorModal;
+window.handleAddHonor = handleAddHonor;
 window.handleCreateEvent = handleCreateEvent;
 window.toggleUserColumnFilter = toggleUserColumnFilter;
 window.updateUserFilter = updateUserFilter;

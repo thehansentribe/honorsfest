@@ -40,6 +40,40 @@ router.get('/honors/categories', (req, res) => {
   }
 });
 
+// POST /api/classes/honors - Create a new honor
+router.post('/honors', requireRole('Admin'), (req, res) => {
+  try {
+    const { name, category } = req.body;
+
+    if (!name || !category) {
+      return res.status(400).json({ error: 'Name and category are required' });
+    }
+
+    // Trim whitespace
+    const trimmedName = name.trim();
+    const trimmedCategory = category.trim();
+
+    if (!trimmedName || !trimmedCategory) {
+      return res.status(400).json({ error: 'Name and category cannot be empty' });
+    }
+
+    // Check if honor already exists (same name and category)
+    const existing = Honor.findByNameAndCategory(trimmedName, trimmedCategory);
+    if (existing) {
+      return res.status(409).json({ 
+        error: `The honor "${trimmedName}" already exists in the "${trimmedCategory}" category.` 
+      });
+    }
+
+    // Create the honor
+    const newHonor = Honor.create(trimmedName, trimmedCategory);
+    res.status(201).json(newHonor);
+  } catch (error) {
+    console.error('Error creating honor:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/classes/:eventId - List classes for event
 router.get('/:eventId', (req, res) => {
   try {

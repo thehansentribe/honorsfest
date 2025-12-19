@@ -27,6 +27,16 @@ class Honor {
   static getCategories() {
     return db.prepare('SELECT DISTINCT Category FROM Honors ORDER BY Category').all();
   }
+
+  static findByNameAndCategory(name, category) {
+    return db.prepare('SELECT * FROM Honors WHERE Name = ? AND Category = ?').get(name, category);
+  }
+
+  static create(name, category) {
+    const stmt = db.prepare('INSERT INTO Honors (Name, Category) VALUES (?, ?)');
+    const result = stmt.run(name, category);
+    return this.findById(result.lastInsertRowid);
+  }
 }
 
 module.exports = Honor;
