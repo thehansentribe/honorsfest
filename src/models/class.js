@@ -109,6 +109,12 @@ class Class {
       query += ' AND c.Active = ?';
       params.push(filters.active ? 1 : 0);
     }
+    
+    // Filter by honor active status if specified
+    if (filters.honorActive !== undefined) {
+      query += ' AND h.Active = ?';
+      params.push(filters.honorActive ? 1 : 0);
+    }
 
     if (filters.locationId) {
       query += ' AND c.LocationID = ?';

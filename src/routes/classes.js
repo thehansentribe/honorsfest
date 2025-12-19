@@ -126,6 +126,17 @@ router.get('/:eventId', (req, res) => {
       teacherId: req.query.teacherId
     };
     
+    // Club Directors only see active classes with active honors
+    if (user.role === 'ClubDirector') {
+      filters.active = true;
+      filters.honorActive = true;
+    }
+    // For other roles, honor active status can be filtered via query param if needed
+    // but by default show all classes for admins
+    if (req.query.active !== undefined && user.role !== 'ClubDirector') {
+      filters.active = req.query.active === 'true';
+    }
+    
     const classes = Class.findByEvent(eventId, filters);
     res.json(classes);
   } catch (error) {

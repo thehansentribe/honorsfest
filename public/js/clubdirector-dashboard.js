@@ -398,17 +398,16 @@ async function renderClasses() {
     clubDirectorClasses = await response.json();
     console.log('[ClubDirector] Classes response:', clubDirectorClasses);
     
-    const normalizeActive = (value) => value === 1 || value === true || value === '1';
-    const activeClasses = clubDirectorClasses.filter(c => normalizeActive(c.Active));
-    const inactiveClasses = clubDirectorClasses.filter(c => !normalizeActive(c.Active));
-    
-    if (activeClasses.length === 0 && inactiveClasses.length === 0) {
-      container.innerHTML = '<p class="text-center">No classes found for this event</p>';
+    // API already filters to only active classes with active honors for Club Directors
+    // So we just use all returned classes
+    if (clubDirectorClasses.length === 0) {
+      container.innerHTML = '<p class="text-center">No active classes found for this event</p>';
       return;
     }
     
+    const activeClasses = clubDirectorClasses;
     const hasActive = activeClasses.length > 0;
-    const hasInactive = inactiveClasses.length > 0;
+    const hasInactive = false; // Club Directors never see inactive classes
 
     const tableHtml = `
       <table class="data-table">
@@ -468,7 +467,7 @@ async function renderClasses() {
       </table>
     `;
     
-    const mobileCards = [...activeClasses, ...inactiveClasses].map(cls => {
+    const mobileCards = activeClasses.map(cls => {
       const isActive = normalizeActive(cls.Active);
       const canEdit = isActive && cls.CreatedBy === clubDirectorUser?.id;
       const dateTime = cls.TimeslotDate
