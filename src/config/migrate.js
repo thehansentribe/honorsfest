@@ -180,6 +180,18 @@ function migrateDatabase() {
       }
     }
     
+    // Check Honors table for Active column
+    const honorsTableInfo = db.prepare("PRAGMA table_info(Honors)").all();
+    const hasActive = honorsTableInfo.some(col => col.name === 'Active');
+    
+    if (!hasActive) {
+      console.log('Adding Active column to Honors table...');
+      db.exec('ALTER TABLE Honors ADD COLUMN Active BOOLEAN NOT NULL DEFAULT 1');
+      // Set all existing honors to active by default
+      db.exec('UPDATE Honors SET Active = 1 WHERE Active IS NULL');
+      console.log('✓ Active column added to Honors table');
+    }
+    
   } catch (error) {
     console.error('Migration error:', error);
     // Don't throw, just log

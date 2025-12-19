@@ -95,7 +95,8 @@ function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS Honors (
         ID INTEGER PRIMARY KEY AUTOINCREMENT,
         Name TEXT NOT NULL,
-        Category TEXT NOT NULL
+        Category TEXT NOT NULL,
+        Active BOOLEAN NOT NULL DEFAULT 1
       );
 
       CREATE TABLE IF NOT EXISTS Classes (

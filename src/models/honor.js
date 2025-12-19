@@ -15,6 +15,11 @@ class Honor {
       params.push(`%${filters.search}%`);
     }
 
+    if (filters.active !== undefined) {
+      query += ' AND Active = ?';
+      params.push(filters.active ? 1 : 0);
+    }
+
     query += ' ORDER BY Category, Name';
 
     return db.prepare(query).all(...params);
@@ -33,7 +38,7 @@ class Honor {
   }
 
   static create(name, category) {
-    const stmt = db.prepare('INSERT INTO Honors (Name, Category) VALUES (?, ?)');
+    const stmt = db.prepare('INSERT INTO Honors (Name, Category, Active) VALUES (?, ?, 1)');
     const result = stmt.run(name, category);
     return this.findById(result.lastInsertRowid);
   }

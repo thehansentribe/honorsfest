@@ -10,12 +10,24 @@ router.use(verifyToken);
 // GET /api/honors - List all honors
 router.get('/honors', (req, res) => {
   try {
+    const user = req.user;
     const filters = {
       category: req.query.category,
       search: req.query.search
     };
+    
+    // Club Directors only see active honors
+    if (user.role === 'ClubDirector') {
+      filters.active = true;
+    }
+    // For other roles, honor active status can be filtered via query param if needed
+    // but by default show all honors for admins
+    if (req.query.active !== undefined && user.role !== 'ClubDirector') {
+      filters.active = req.query.active === 'true';
+    }
+    
     const honors = Honor.getAll(filters);
-    console.log(`[Honors API] Returning ${honors.length} honors`);
+    console.log(`[Honors API] Returning ${honors.length} honors (role: ${user.role}, active filter: ${filters.active !== undefined ? filters.active : 'none'})`);
     // Log if Dinosaurs is in the results
     const hasDinosaurs = honors.some(h => h.Name && h.Name.toLowerCase().includes('dinosaur'));
     if (hasDinosaurs) {
