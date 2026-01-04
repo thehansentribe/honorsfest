@@ -368,6 +368,16 @@ function updateClubDirectorFilter(column, value) {
 
 // convertTo12Hour is now in utils.js and available globally
 
+// Helper function to normalize active status to boolean
+function normalizeActive(active) {
+  // Handle various possible formats: boolean, 0/1, null/undefined
+  if (active === null || active === undefined) return false;
+  if (typeof active === 'boolean') return active;
+  if (typeof active === 'number') return active !== 0;
+  if (typeof active === 'string') return active.toLowerCase() === 'true' || active === '1';
+  return Boolean(active);
+}
+
 // Override renderClasses to filter by their club's event
 async function renderClasses() {
   const container = document.getElementById('classesList');
