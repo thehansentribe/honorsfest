@@ -1730,8 +1730,8 @@ async function editClass(classId) {
   const [honorsRes, locationsRes, teachersRes, directorsRes] = await Promise.all([
     fetchWithAuth('/api/classes/honors'),
     fetchWithAuth(`/api/events/${eventId}/locations`),
-    fetchWithAuth(`/api/users?role=Teacher`),
-    fetchWithAuth(`/api/users?role=ClubDirector`)
+    fetchWithAuth(`/api/users?role=Teacher&eventId=${eventId}`),
+    fetchWithAuth(`/api/users?role=ClubDirector&eventId=${eventId}`)
   ]);
   
   const honors = await honorsRes.json();
@@ -3753,8 +3753,8 @@ async function showCreateClassForm() {
   // Load honors, teachers, locations, and timeslots for the event
   const [honorsRes, teachersRes, directorsRes, locationsRes, timeslotsRes] = await Promise.all([
     fetchWithAuth('/api/classes/honors'),
-    fetchWithAuth(`/api/users?role=Teacher`),
-    fetchWithAuth(`/api/users?role=ClubDirector`),
+    fetchWithAuth(`/api/users?role=Teacher&eventId=${eventId}`),
+    fetchWithAuth(`/api/users?role=ClubDirector&eventId=${eventId}`),
     fetchWithAuth(`/api/events/${eventId}/locations`),
     fetchWithAuth(`/api/events/${eventId}/timeslots`)
   ]);

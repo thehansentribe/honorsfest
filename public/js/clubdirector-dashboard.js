@@ -719,10 +719,10 @@ async function showCreateClassFormClubDirector() {
     return a.Name.localeCompare(b.Name);
   });
   
-  // Load teachers and club directors from the same club
+  // Load teachers and club directors from the same club for this event
   const [teachersResponse, directorsResponse] = await Promise.all([
-    fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Teacher`),
-    fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=ClubDirector`)
+    fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Teacher&eventId=${eventId}`),
+    fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=ClubDirector&eventId=${eventId}`)
   ]);
   const teachers = await teachersResponse.json();
   const directors = await directorsResponse.json();
@@ -905,8 +905,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const [honorsRes, locationsRes, teachersRes, directorsRes] = await Promise.all([
       fetchWithAuth('/api/classes/honors'),
       fetchWithAuth(`/api/events/${eventId}/locations`),
-      fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Teacher`),
-      fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=ClubDirector`)
+      fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Teacher&eventId=${eventId}`),
+      fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=ClubDirector&eventId=${eventId}`)
     ]);
     
     const honors = await honorsRes.json();
