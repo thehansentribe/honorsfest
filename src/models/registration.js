@@ -1,5 +1,6 @@
 const { db } = require('../config/db');
 const Class = require('./class');
+const User = require('./user');
 
 class Registration {
   static async register(userId, classId) {
@@ -9,6 +10,13 @@ class Registration {
       if (existing) {
         throw new Error('Already registered for this class');
       }
+
+      // Get user's role for student priority logic
+      const user = User.findById(userId);
+      if (!user) {
+        throw new Error('User not found');
+      }
+      const userRole = user.Role;
 
       // Get class details
       const classData = Class.findById(classId);
@@ -41,10 +49,53 @@ class Registration {
         db.prepare('INSERT INTO Attendance (ClassID, UserID) VALUES (?, ?)').run(classId, userId);
         return { id: result.lastInsertRowid, status: 'Enrolled' };
       } else {
-        // Add to waitlist
-        const waitlistCount = Class.getWaitlistCount(classId);
-        const result = stmt.run(userId, classId, 'Waitlisted', waitlistCount + 1);
-        return { id: result.lastInsertRowid, status: 'Waitlisted', position: waitlistCount + 1 };
+        // Class is full - implement student priority logic
+        const isStudent = userRole === 'Student';
+        
+        if (isStudent) {
+          // Students go to waitlist when class is full
+          const waitlistCount = Class.getWaitlistCount(classId);
+          const result = stmt.run(userId, classId, 'Waitlisted', waitlistCount + 1);
+          return { id: result.lastInsertRowid, status: 'Waitlisted', position: waitlistCount + 1 };
+        } else {
+          // Non-students (Teacher, ClubDirector, Staff) - find last enrolled non-student and move to waitlist
+          const lastNonStudent = db.prepare(`
+            SELECT r.ID, r.UserID
+            FROM Registrations r
+            JOIN Users u ON r.UserID = u.ID
+            WHERE r.ClassID = ? AND r.Status = 'Enrolled' AND u.Role IN ('Teacher', 'ClubDirector', 'Staff')
+            ORDER BY r.ID DESC
+            LIMIT 1
+          `).get(classId);
+          
+          if (lastNonStudent) {
+            // Move last non-student to waitlist
+            const waitlistCount = Class.getWaitlistCount(classId);
+            db.prepare(`
+              UPDATE Registrations
+              SET Status = 'Waitlisted', WaitlistOrder = ?
+              WHERE ID = ?
+            `).run(waitlistCount + 1, lastNonStudent.ID);
+            
+            // Delete attendance record for moved non-student
+            db.prepare('DELETE FROM Attendance WHERE ClassID = ? AND UserID = ?').run(classId, lastNonStudent.UserID);
+            
+            // Enroll the new non-student
+            const result = stmt.run(userId, classId, 'Enrolled', null);
+            // Create attendance record for new non-student
+            db.prepare('INSERT INTO Attendance (ClassID, UserID) VALUES (?, ?)').run(classId, userId);
+            
+            // Recalculate waitlist positions
+            this.recalculateWaitlistPositions(classId);
+            
+            return { id: result.lastInsertRowid, status: 'Enrolled' };
+          } else {
+            // No non-students enrolled, so add to waitlist normally
+            const waitlistCount = Class.getWaitlistCount(classId);
+            const result = stmt.run(userId, classId, 'Waitlisted', waitlistCount + 1);
+            return { id: result.lastInsertRowid, status: 'Waitlisted', position: waitlistCount + 1 };
+          }
+        }
       }
     })();
   }

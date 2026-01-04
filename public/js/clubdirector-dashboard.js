@@ -719,9 +719,18 @@ async function showCreateClassFormClubDirector() {
     return a.Name.localeCompare(b.Name);
   });
   
-  // Load teachers from the same club
-  const teachersResponse = await fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Teacher`);
+  // Load teachers and club directors from the same club
+  const [teachersResponse, directorsResponse] = await Promise.all([
+    fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Teacher`),
+    fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=ClubDirector`)
+  ]);
   const teachers = await teachersResponse.json();
+  const directors = await directorsResponse.json();
+  // Merge teachers and club directors for teacher selection
+  const allTeachers = [...teachers, ...directors].sort((a, b) => {
+    if (a.LastName !== b.LastName) return a.LastName.localeCompare(b.LastName);
+    return a.FirstName.localeCompare(b.FirstName);
+  });
   
   
   const modal = document.createElement('div');
@@ -746,7 +755,7 @@ async function showCreateClassFormClubDirector() {
           <label for="classTeacher">Teacher</label>
           <select id="classTeacher" name="classTeacher" class="form-control">
             <option value="">No Teacher (Unassigned)</option>
-            ${teachers.map(t => `<option value="${t.ID}">${t.FirstName} ${t.LastName}</option>`).join('')}
+            ${allTeachers.map(t => `<option value="${t.ID}">${t.FirstName} ${t.LastName}</option>`).join('')}
           </select>
           <small style="color: var(--text-light);">Optional - Teacher can be assigned later (Only teachers from your club)</small>
         </div>
@@ -893,15 +902,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     const eventId = clubDirectorSelectedEventId;
     
     // Load honors, teachers, locations for dropdowns
-    const [honorsRes, locationsRes, teachersRes] = await Promise.all([
+    const [honorsRes, locationsRes, teachersRes, directorsRes] = await Promise.all([
       fetchWithAuth('/api/classes/honors'),
       fetchWithAuth(`/api/events/${eventId}/locations`),
-      fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Teacher`)
+      fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Teacher`),
+      fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=ClubDirector`)
     ]);
     
     const honors = await honorsRes.json();
     const locations = await locationsRes.json();
     const teachers = await teachersRes.json();
+    const directors = await directorsRes.json();
+    // Merge teachers and club directors for teacher selection
+    const allTeachers = [...teachers, ...directors].sort((a, b) => {
+      if (a.LastName !== b.LastName) return a.LastName.localeCompare(b.LastName);
+      return a.FirstName.localeCompare(b.FirstName);
+    });
     
     const modal = document.createElement('div');
     modal.id = 'editClassModal';
@@ -923,7 +939,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <label for="editClassTeacher">Teacher</label>
             <select id="editClassTeacher" name="editClassTeacher" class="form-control">
               <option value="">Unassigned</option>
-              ${teachers.map(t => `<option value="${t.ID}" ${cls.TeacherID === t.ID ? 'selected' : ''}>${t.FirstName} ${t.LastName}</option>`).join('')}
+              ${allTeachers.map(t => `<option value="${t.ID}" ${cls.TeacherID === t.ID ? 'selected' : ''}>${t.FirstName} ${t.LastName}</option>`).join('')}
             </select>
           </div>
           <div class="form-group">

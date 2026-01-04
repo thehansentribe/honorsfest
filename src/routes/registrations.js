@@ -315,7 +315,7 @@ router.get('/available/:classId', requireRole('Admin', 'AdminViewOnly', 'EventAd
       SELECT u.ID, u.FirstName, u.LastName, u.Role, cl.Name as ClubName, u.ClubID
       FROM Users u
       LEFT JOIN Clubs cl ON u.ClubID = cl.ID
-      WHERE u.Role = 'Student' AND u.Active = 1
+      WHERE u.Role IN ('Student', 'Teacher', 'ClubDirector', 'Staff') AND u.Active = 1
     `;
     
     const params = [];

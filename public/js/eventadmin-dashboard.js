@@ -1727,15 +1727,22 @@ async function editClass(classId) {
   const eventId = select?.value || cls.EventID;
   
   // Load honors, teachers, locations for dropdowns
-  const [honorsRes, locationsRes, teachersRes] = await Promise.all([
+  const [honorsRes, locationsRes, teachersRes, directorsRes] = await Promise.all([
     fetchWithAuth('/api/classes/honors'),
     fetchWithAuth(`/api/events/${eventId}/locations`),
-    fetchWithAuth(`/api/users?role=Teacher`)
+    fetchWithAuth(`/api/users?role=Teacher`),
+    fetchWithAuth(`/api/users?role=ClubDirector`)
   ]);
   
   const honors = await honorsRes.json();
   const locations = await locationsRes.json();
   const teachers = await teachersRes.json();
+  const directors = await directorsRes.json();
+  // Merge teachers and club directors for teacher selection
+  const allTeachers = [...teachers, ...directors].sort((a, b) => {
+    if (a.LastName !== b.LastName) return a.LastName.localeCompare(b.LastName);
+    return a.FirstName.localeCompare(b.FirstName);
+  });
   
   const modal = document.createElement('div');
   modal.id = 'editClassModal';
@@ -1757,7 +1764,7 @@ async function editClass(classId) {
           <label for="editClassTeacher">Teacher</label>
           <select id="editClassTeacher" name="editClassTeacher" class="form-control">
             <option value="">Unassigned</option>
-            ${teachers.map(t => `<option value="${t.ID}" ${cls.TeacherID === t.ID ? 'selected' : ''}>${t.FirstName} ${t.LastName}</option>`).join('')}
+            ${allTeachers.map(t => `<option value="${t.ID}" ${cls.TeacherID === t.ID ? 'selected' : ''}>${t.FirstName} ${t.LastName}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
@@ -3744,17 +3751,25 @@ async function showCreateClassForm() {
   }
   
   // Load honors, teachers, locations, and timeslots for the event
-  const [honorsRes, teachersRes, locationsRes, timeslotsRes] = await Promise.all([
+  const [honorsRes, teachersRes, directorsRes, locationsRes, timeslotsRes] = await Promise.all([
     fetchWithAuth('/api/classes/honors'),
     fetchWithAuth(`/api/users?role=Teacher`),
+    fetchWithAuth(`/api/users?role=ClubDirector`),
     fetchWithAuth(`/api/events/${eventId}/locations`),
     fetchWithAuth(`/api/events/${eventId}/timeslots`)
   ]);
   
   const honors = await honorsRes.json();
   const teachers = await teachersRes.json();
+  const directors = await directorsRes.json();
   const locations = await locationsRes.json();
   const timeslots = await timeslotsRes.json();
+  
+  // Merge teachers and club directors for teacher selection
+  const allTeachers = [...teachers, ...directors].sort((a, b) => {
+    if (a.LastName !== b.LastName) return a.LastName.localeCompare(b.LastName);
+    return a.FirstName.localeCompare(b.FirstName);
+  });
   
   // Sort honors by category, then by name
   const sortedHonors = [...honors].sort((a, b) => {
@@ -3786,7 +3801,7 @@ async function showCreateClassForm() {
           <label for="classTeacher">Teacher</label>
           <select id="classTeacher" name="classTeacher" class="form-control">
             <option value="">No Teacher (Unassigned)</option>
-            ${teachers.map(t => `<option value="${t.ID}">${t.FirstName} ${t.LastName}</option>`).join('')}
+            ${allTeachers.map(t => `<option value="${t.ID}">${t.FirstName} ${t.LastName}</option>`).join('')}
           </select>
           <small style="color: var(--text-light);">Optional - Teacher can be assigned later</small>
         </div>
