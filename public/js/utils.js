@@ -480,6 +480,10 @@ async function showEditMyProfile() {
             <small style="color: var(--text-light);">Enter new password to change it, or leave blank to keep current password</small>
           `}
         </div>
+        <div class="form-group">
+          <label>Database ID</label>
+          <input type="text" value="${userData.ID}" class="form-control" disabled>
+        </div>
         <div class="form-actions">
           <button type="submit" class="btn btn-primary">Update Profile</button>
           <button type="button" onclick="closeModal('editMyProfileModal')" class="btn btn-outline">Cancel</button>

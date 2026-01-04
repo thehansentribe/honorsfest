@@ -2883,6 +2883,10 @@ async function editUser(userId) {
             <small style="color: var(--text-light);">Enter new password to change it, or leave blank to keep current password</small>
           `}
         </div>
+        <div class="form-group">
+          <label>Database ID</label>
+          <input type="text" value="${user.ID}" class="form-control" disabled>
+        </div>
         <div class="form-actions">
           <button type="submit" class="btn btn-primary">Update User</button>
           <button type="button" onclick="closeModal('editUserModal')" class="btn btn-outline">Cancel</button>

@@ -679,6 +679,10 @@ function editUserClubDirector(userId) {
           <input type="password" id="editPassword" name="editPassword" class="form-control">
           <small style="color: var(--text-light);">Leave blank to keep current password</small>
         </div>
+        <div class="form-group">
+          <label>Database ID</label>
+          <input type="text" value="${user.ID}" class="form-control" disabled>
+        </div>
         <div class="form-actions">
           <button type="submit" class="btn btn-primary">Update User</button>
           <button type="button" onclick="closeModal('editUserModal')" class="btn btn-outline">Cancel</button>

@@ -406,6 +406,50 @@ router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), async (re
   }
 });
 
+// DELETE /api/users/:id/permanent - Permanently delete user (Admin only)
+router.delete('/:id/permanent', requireRole('Admin'), async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const user = User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get user's registrations/classes before deletion
+    const Registration = require('../models/registration');
+    const registrations = Registration.findByUser(userId);
+    const classesCount = registrations.length;
+
+    // Delete from Stytch if user has stytch_user_id
+    if (user.stytch_user_id) {
+      try {
+        await StytchService.deleteUser(user.stytch_user_id);
+      } catch (stytchError) {
+        // Log error but continue with database deletion
+        console.error('Error deleting user from Stytch:', stytchError.message);
+        // Don't fail the entire operation if Stytch deletion fails
+      }
+    }
+
+    // Permanently delete from database
+    const deletedUser = User.deletePermanently(userId);
+    
+    if (!deletedUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ 
+      message: 'User permanently deleted successfully', 
+      user: deletedUser,
+      classesRemoved: classesCount
+    });
+  } catch (error) {
+    console.error('Error permanently deleting user:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // DELETE /api/users/:id - Deactivate user
 router.delete('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) => {
   try {

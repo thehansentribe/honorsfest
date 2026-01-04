@@ -1090,6 +1090,23 @@ function getSystemTab() {
 
     <div class="card">
       <div class="card-header">
+        <h2 class="card-title">Permanently Delete User</h2>
+      </div>
+      <div style="padding: 20px;">
+        <div style="background: #f8d7da; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #dc3545;">
+          <strong>⚠️ Warning:</strong> This action will permanently delete a user from the database, remove them from all classes, and delete their Stytch account. This action cannot be undone.
+        </div>
+        <p style="color: #666; margin-bottom: 15px;">
+          Enter a user ID to permanently delete a user from the system. The user will be removed from all classes, attendance records, and their Stytch account (if applicable).
+        </p>
+        <button onclick="showDeleteUserModal()" class="btn btn-danger" id="deleteUserBtn">
+          Permanently Delete User
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
         <h2 class="card-title">System Administration</h2>
       </div>
       <div style="padding: 20px;">
@@ -3132,6 +3149,10 @@ async function editUser(userId) {
             <small style="color: var(--text-light);">Enter new password to change it, or leave blank to keep current password</small>
           `}
         </div>
+        <div class="form-group">
+          <label>Database ID</label>
+          <input type="text" value="${user.ID}" class="form-control" disabled>
+        </div>
         <div class="form-actions">
           <button type="submit" class="btn btn-primary">Update User</button>
           <button type="button" onclick="closeModal('editUserModal')" class="btn btn-outline">Cancel</button>
@@ -4677,4 +4698,175 @@ window.updateUserFilter = updateUserFilter;
 window.renderUsers = renderUsers;
 window.toggleDeactivatedUsers = toggleDeactivatedUsers;
 // Old check-in functions removed - now using checkin.js module
+
+// Show delete user modal
+function showDeleteUserModal() {
+  const modal = document.createElement('div');
+  modal.id = 'deleteUserModal';
+  modal.className = 'modal';
+  modal.style.display = 'flex';
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">
+        <h2>Permanently Delete User</h2>
+        <button onclick="closeModal('deleteUserModal')" class="btn btn-outline">×</button>
+      </div>
+      <div style="padding: 20px;">
+        <div style="background: #f8d7da; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #dc3545;">
+          <strong>⚠️ Warning:</strong> This action will permanently delete the user from the database, remove them from all classes, and delete their Stytch account. This action cannot be undone.
+        </div>
+        <div class="form-group">
+          <label for="deleteUserIdInput">User ID *</label>
+          <input type="number" id="deleteUserIdInput" class="form-control" placeholder="Enter user ID number" min="1">
+          <small style="color: var(--text-light);">Enter the database ID number of the user to delete</small>
+        </div>
+        <div style="margin-bottom: 20px;">
+          <button onclick="handleLookupUserForDelete()" class="btn btn-secondary">Lookup User</button>
+        </div>
+        <div id="deleteUserInfo" style="display: none; margin-bottom: 20px;">
+          <h3 style="margin-bottom: 10px;">User Information</h3>
+          <div id="deleteUserDetails" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;"></div>
+          <div id="deleteUserClasses" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;"></div>
+          <button onclick="handleConfirmDeleteUser()" class="btn btn-danger" id="confirmDeleteBtn">Delete User Permanently</button>
+        </div>
+        <div class="form-actions" style="margin-top: 20px;">
+          <button type="button" onclick="closeModal('deleteUserModal')" class="btn btn-outline">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+// Lookup user for deletion
+async function handleLookupUserForDelete() {
+  const userIdInput = document.getElementById('deleteUserIdInput');
+  const userId = userIdInput?.value?.trim();
+  
+  if (!userId || isNaN(userId)) {
+    showNotification('Please enter a valid user ID number', 'error');
+    return;
+  }
+
+  const userIdNum = parseInt(userId);
+  const userInfoDiv = document.getElementById('deleteUserInfo');
+  const userDetailsDiv = document.getElementById('deleteUserDetails');
+  const userClassesDiv = document.getElementById('deleteUserClasses');
+  const confirmBtn = document.getElementById('confirmDeleteBtn');
+
+  try {
+    // Fetch user details
+    const userResponse = await fetchWithAuth(`/api/users/${userIdNum}`);
+    if (!userResponse.ok) {
+      if (userResponse.status === 404) {
+        showNotification('User not found with that ID', 'error');
+        userInfoDiv.style.display = 'none';
+        return;
+      }
+      throw new Error('Failed to fetch user');
+    }
+    const user = await userResponse.json();
+
+    // Fetch user's classes/registrations
+    const classesResponse = await fetchWithAuth(`/api/registrations/user/${userIdNum}`);
+    const classes = classesResponse.ok ? await classesResponse.json() : [];
+
+    // Display user information
+    userDetailsDiv.innerHTML = `
+      <div style="display: grid; grid-template-columns: auto 1fr; gap: 10px 20px;">
+        <strong>Name:</strong> <span>${user.FirstName} ${user.LastName}</span>
+        <strong>Username:</strong> <span>${user.Username}</span>
+        <strong>Email:</strong> <span>${user.Email || 'N/A'}</span>
+        <strong>Role:</strong> <span>${user.Role}</span>
+        <strong>Club:</strong> <span>${user.ClubName || 'None'}</span>
+        <strong>Database ID:</strong> <span>${user.ID}</span>
+      </div>
+    `;
+
+    // Display classes
+    if (classes.length > 0) {
+      userClassesDiv.innerHTML = `
+        <h4 style="margin-top: 0; margin-bottom: 10px;">Classes (${classes.length})</h4>
+        <div style="max-height: 200px; overflow-y: auto;">
+          <table class="table" style="font-size: 0.9rem;">
+            <thead>
+              <tr>
+                <th>Honor</th>
+                <th>Teacher</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${classes.map(cls => `
+                <tr>
+                  <td>${cls.HonorName || 'N/A'}</td>
+                  <td>${cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : 'N/A'}</td>
+                  <td>${cls.Status || 'N/A'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } else {
+      userClassesDiv.innerHTML = '<p style="margin: 0;">No classes registered</p>';
+    }
+
+    // Store user ID for deletion
+    confirmBtn.dataset.userId = userIdNum;
+    userInfoDiv.style.display = 'block';
+  } catch (error) {
+    showNotification('Error looking up user: ' + error.message, 'error');
+    userInfoDiv.style.display = 'none';
+  }
+}
+
+// Confirm and delete user
+async function handleConfirmDeleteUser() {
+  const confirmBtn = document.getElementById('confirmDeleteBtn');
+  const userId = confirmBtn?.dataset?.userId;
+
+  if (!userId) {
+    showNotification('User ID not found', 'error');
+    return;
+  }
+
+  if (!confirm(`Are you absolutely sure you want to permanently delete this user?\n\nThis will:\n- Delete the user from the database\n- Remove them from all ${document.getElementById('deleteUserClasses').textContent.includes('Classes') ? 'classes' : '0 classes'}\n- Delete their Stytch account (if applicable)\n\nThis action CANNOT be undone!`)) {
+    return;
+  }
+
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = 'Deleting...';
+
+  try {
+    const response = await fetchWithAuth(`/api/users/${userId}/permanent`, {
+      method: 'DELETE'
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      showNotification(`User permanently deleted successfully. ${result.classesRemoved || 0} class registration(s) removed.`, 'success');
+      closeModal('deleteUserModal');
+      
+      // Refresh users list if on users tab
+      if (currentTab === 'users') {
+        await loadUsers();
+        renderUsers();
+      }
+    } else {
+      showNotification(result.error || 'Error deleting user', 'error');
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Delete User Permanently';
+    }
+  } catch (error) {
+    showNotification('Error deleting user: ' + error.message, 'error');
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Delete User Permanently';
+  }
+}
+
+window.showDeleteUserModal = showDeleteUserModal;
+window.handleLookupUserForDelete = handleLookupUserForDelete;
+window.handleConfirmDeleteUser = handleConfirmDeleteUser;
 

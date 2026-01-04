@@ -320,6 +320,38 @@ class User {
   }
 
   /**
+   * Permanently delete a user from the database
+   * Removes all registrations, attendance records, and cleans up club director assignments
+   * @param {number} id - The user ID to delete
+   * @returns {Object|null} The deleted user object or null if not found
+   */
+  static deletePermanently(id) {
+    return db.transaction(() => {
+      // Get user before deletion
+      const user = this.findById(id);
+      if (!user) {
+        return null;
+      }
+
+      // Remove all registrations
+      db.prepare('DELETE FROM Registrations WHERE UserID = ?').run(id);
+      
+      // Remove all attendance records
+      db.prepare('DELETE FROM Attendance WHERE UserID = ?').run(id);
+      
+      // Clean up club director assignment if user is a director
+      if (user.Role === 'ClubDirector') {
+        db.prepare('UPDATE Clubs SET DirectorID = NULL WHERE DirectorID = ?').run(id);
+      }
+      
+      // Delete the user
+      db.prepare('DELETE FROM Users WHERE ID = ?').run(id);
+      
+      return user;
+    })();
+  }
+
+  /**
    * Handle club change for a user - updates EventID and removes registrations for incompatible events
    * @param {number} userId - The user ID
    * @param {number|null} oldClubId - The previous club ID (null if user had no club)

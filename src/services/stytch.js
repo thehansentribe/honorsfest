@@ -306,6 +306,35 @@ class StytchService {
       throw new Error(`Failed to send email update verification: ${error.message || JSON.stringify(error)}`);
     }
   }
+
+  /**
+   * Delete a user from Stytch
+   * @param {string} userId - Stytch user ID
+   * @returns {Promise<Object>} Delete response
+   */
+  static async deleteUser(userId) {
+    try {
+      const params = {
+        user_id: userId
+      };
+
+      const response = await client.users.delete(params);
+      
+      return {
+        success: true,
+        statusCode: response.status_code
+      };
+    } catch (error) {
+      console.error('Stytch deleteUser error:', error.message || error);
+      
+      // Provide more specific error messages
+      if (error.status_code === 404) {
+        throw new Error('User not found in Stytch.');
+      }
+      
+      throw new Error(`Failed to delete Stytch user: ${error.message || JSON.stringify(error)}`);
+    }
+  }
 }
 
 module.exports = StytchService;
