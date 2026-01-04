@@ -52,7 +52,7 @@ class User {
   static create(userData) {
     const { FirstName, LastName, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, Invited, InviteAccepted, BackgroundCheck, stytch_user_id, auth_method } = userData;
     
-    const Username = this.generateUsername(FirstName, LastName);
+    let Username = this.generateUsername(FirstName, LastName);
     const CheckInNumber = this.generateCheckInNumber();
     
     // Ensure PasswordHash is never null (for Stytch users without local password)
@@ -63,51 +63,13 @@ class User {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const result = stmt.run(
-      FirstName,
-      LastName,
-      Username,
-      DateOfBirth || null,
-      Email || null,
-      Phone || null,
-      safePasswordHash,
-      Role,
-      InvestitureLevel || 'None',
-      ClubID || null,
-      EventID || null,
-      Active !== undefined ? (Active ? 1 : 0) : 1,
-      Invited !== undefined ? (Invited ? 1 : 0) : 0,
-      InviteAccepted !== undefined ? (InviteAccepted ? 1 : 0) : 0,
-      BackgroundCheck !== undefined ? (BackgroundCheck ? 1 : 0) : 0,
-      CheckInNumber,
-      0,  // CheckedIn defaults to false
-      stytch_user_id || null,
-      auth_method || 'local'
-    );
-
-    const createdUser = this.findById(result.lastInsertRowid);
-    this.syncClubDirectorAssignment(createdUser);
-    return createdUser;
-  }
-
-  static bulkCreate(users) {
-    const insertStmt = db.prepare(`
-      INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck, CheckInNumber, CheckedIn, stytch_user_id, auth_method)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    const usersCreated = [];
-    const insertMany = db.transaction((userList) => {
-      for (const userData of userList) {
-        const { FirstName, LastName, DateOfBirth, Email, Phone, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck, PasswordHash, stytch_user_id, auth_method } = userData;
-        
-        const Username = this.generateUsername(FirstName, LastName);
-        const CheckInNumber = this.generateCheckInNumber();
-        
-        // Ensure PasswordHash is never null
-        const safePasswordHash = PasswordHash || '';
-        
-        const result = insertStmt.run(
+    // Retry logic for UNIQUE constraint violations
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    while (attempts < maxAttempts) {
+      try {
+        const result = stmt.run(
           FirstName,
           LastName,
           Username,
@@ -120,6 +82,8 @@ class User {
           ClubID || null,
           EventID || null,
           Active !== undefined ? (Active ? 1 : 0) : 1,
+          Invited !== undefined ? (Invited ? 1 : 0) : 0,
+          InviteAccepted !== undefined ? (InviteAccepted ? 1 : 0) : 0,
           BackgroundCheck !== undefined ? (BackgroundCheck ? 1 : 0) : 0,
           CheckInNumber,
           0,  // CheckedIn defaults to false
@@ -127,12 +91,133 @@ class User {
           auth_method || 'local'
         );
 
-        const user = this.findById(result.lastInsertRowid);
-        usersCreated.push(user);
+        const createdUser = this.findById(result.lastInsertRowid);
+        this.syncClubDirectorAssignment(createdUser);
+        
+        // Log if retry was needed
+        if (attempts > 0) {
+          console.log(`[User.create] Username collision resolved after ${attempts} retry(ies). Final username: ${Username}`);
+        }
+        
+        return createdUser;
+      } catch (error) {
+        // Check if it's a UNIQUE constraint violation on Username
+        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE' && 
+            (error.message.includes('Username') || error.message.includes('idx_users_username_unique'))) {
+          attempts++;
+          
+          if (attempts >= maxAttempts) {
+            console.error(`[User.create] Failed to create unique username after ${maxAttempts} attempts for ${FirstName} ${LastName}`);
+            throw new Error(`Failed to create unique username after ${maxAttempts} attempts. Please contact administrator.`);
+          }
+          
+          // Generate a new username with timestamp and random suffix
+          const baseUsername = `${FirstName.toLowerCase()}.${LastName.toLowerCase()}`;
+          const timestamp = Date.now();
+          const random = Math.floor(Math.random() * 10000);
+          Username = `${baseUsername}.${timestamp}.${random}`;
+          
+          console.warn(`[User.create] Username collision detected (attempt ${attempts}/${maxAttempts}). Retrying with: ${Username}`);
+        } else {
+          // Re-throw if it's a different error
+          throw error;
+        }
+      }
+    }
+  }
+
+  static bulkCreate(users) {
+    const insertStmt = db.prepare(`
+      INSERT INTO Users (FirstName, LastName, Username, DateOfBirth, Email, Phone, PasswordHash, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck, CheckInNumber, CheckedIn, stytch_user_id, auth_method)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const usersCreated = [];
+    
+    // Pre-generate all usernames to avoid race conditions within the batch
+    const usernames = new Set();
+    const userDataWithUsernames = users.map(userData => {
+      const { FirstName, LastName } = userData;
+      let username = this.generateUsername(FirstName, LastName);
+      
+      // Ensure uniqueness within this batch
+      let counter = 1;
+      const baseUsername = username;
+      while (usernames.has(username)) {
+        username = `${baseUsername}${counter}`;
+        counter++;
+      }
+      usernames.add(username);
+      
+      return { ...userData, _generatedUsername: username };
+    });
+
+    const insertMany = db.transaction((userList) => {
+      for (const userData of userList) {
+        const { FirstName, LastName, DateOfBirth, Email, Phone, Role, InvestitureLevel, ClubID, EventID, Active, BackgroundCheck, PasswordHash, stytch_user_id, auth_method, _generatedUsername } = userData;
+        
+        let Username = _generatedUsername;
+        const CheckInNumber = this.generateCheckInNumber();
+        
+        // Ensure PasswordHash is never null
+        const safePasswordHash = PasswordHash || '';
+        
+        let attempts = 0;
+        const maxAttempts = 10;
+        
+        while (attempts < maxAttempts) {
+          try {
+            const result = insertStmt.run(
+              FirstName,
+              LastName,
+              Username,
+              DateOfBirth || null,
+              Email || null,
+              Phone || null,
+              safePasswordHash,
+              Role,
+              InvestitureLevel || 'None',
+              ClubID || null,
+              EventID || null,
+              Active !== undefined ? (Active ? 1 : 0) : 1,
+              BackgroundCheck !== undefined ? (BackgroundCheck ? 1 : 0) : 0,
+              CheckInNumber,
+              0,  // CheckedIn defaults to false
+              stytch_user_id || null,
+              auth_method || 'local'
+            );
+
+            const user = this.findById(result.lastInsertRowid);
+            usersCreated.push(user);
+            break; // Success, exit retry loop
+          } catch (error) {
+            // Handle UNIQUE constraint violations
+            if (error.code === 'SQLITE_CONSTRAINT_UNIQUE' && 
+                (error.message.includes('Username') || error.message.includes('idx_users_username_unique'))) {
+              attempts++;
+              
+              if (attempts >= maxAttempts) {
+                console.error(`[User.bulkCreate] Failed to create unique username after ${maxAttempts} attempts for ${FirstName} ${LastName}`);
+                throw new Error(`Failed to create user ${FirstName} ${LastName} after multiple retry attempts. Please contact administrator.`);
+              }
+              
+              // Generate a new unique username
+              const baseUsername = `${FirstName.toLowerCase()}.${LastName.toLowerCase()}`;
+              const timestamp = Date.now();
+              const random = Math.floor(Math.random() * 10000);
+              Username = `${baseUsername}.${timestamp}.${random}`;
+              
+              console.warn(`[User.bulkCreate] Username collision detected (attempt ${attempts}/${maxAttempts}). Retrying with: ${Username}`);
+            } else {
+              // Re-throw if it's a different error
+              throw error;
+            }
+          }
+        }
       }
     });
 
-    insertMany(users);
+    insertMany(userDataWithUsernames);
     return usersCreated;
   }
 

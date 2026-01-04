@@ -192,6 +192,20 @@ function migrateDatabase() {
       console.log('✓ Active column added to Honors table');
     }
     
+    // Check if unique index exists on Username
+    const usernameIndexCheck = db.prepare(`
+      SELECT name FROM sqlite_master 
+      WHERE type='index' 
+      AND tbl_name='Users' 
+      AND (name='idx_users_username_unique' OR sql LIKE '%UNIQUE%Username%')
+    `).get();
+
+    if (!usernameIndexCheck) {
+      console.log('Adding unique index on Username column...');
+      db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_unique ON Users(Username)');
+      console.log('✓ Unique index on Username added');
+    }
+    
   } catch (error) {
     console.error('Migration error:', error);
     // Don't throw, just log

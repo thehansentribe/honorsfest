@@ -135,30 +135,40 @@ router.post('/register', async (req, res) => {
     }
     
     // Create the user in our database
-    const user = User.create({
-      FirstName: firstName,
-      LastName: lastName,
-      DateOfBirth: dateOfBirth || null,
-      Email: email,
-      Phone: phone || null,
-      PasswordHash: passwordHash,
-      Role: role,
-      InvestitureLevel: investitureLevel || 'None',
-      ClubID: codeData.ClubID,
-      EventID: codeData.EventID,
-      Active: true,
-      BackgroundCheck: false,
-      stytch_user_id: stytchUserId,
-      auth_method: authMethod
-    });
-    
-    res.status(201).json({
-      message: 'Account created successfully',
-      username: user.Username,
-      checkInNumber: user.CheckInNumber,
-      clubId: user.ClubID,
-      eventId: user.EventID
-    });
+    try {
+      const user = User.create({
+        FirstName: firstName,
+        LastName: lastName,
+        DateOfBirth: dateOfBirth || null,
+        Email: email,
+        Phone: phone || null,
+        PasswordHash: passwordHash,
+        Role: role,
+        InvestitureLevel: investitureLevel || 'None',
+        ClubID: codeData.ClubID,
+        EventID: codeData.EventID,
+        Active: true,
+        BackgroundCheck: false,
+        stytch_user_id: stytchUserId,
+        auth_method: authMethod
+      });
+      
+      res.status(201).json({
+        message: 'Account created successfully',
+        username: user.Username,
+        checkInNumber: user.CheckInNumber,
+        clubId: user.ClubID,
+        eventId: user.EventID
+      });
+    } catch (error) {
+      console.error('Registration error:', error);
+      if (error.message.includes('unique username')) {
+        return res.status(409).json({ 
+          error: 'Account creation failed due to username conflict. Please try again or contact support.' 
+        });
+      }
+      res.status(500).json({ error: error.message });
+    }
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ error: error.message });

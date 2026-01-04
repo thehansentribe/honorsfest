@@ -80,17 +80,37 @@ router.post('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => 
           auth_method: 'local' // Will be updated when they register
         });
       } catch (error) {
-        // If user already exists, update their invite status
-        const existingUser = User.findByEmail(email);
-        if (existingUser) {
-      User.update(existingUser.ID, {
-        Role: role,
-        ClubID: parsedClubId || existingUser.ClubID || null,
-        EventID: assignedEventId,
-        Active: 0,
-        Invited: 1,
-        InviteAccepted: 0
-      });
+        console.error('Error creating user for invite:', error);
+        // If username conflict, try to find existing user by email
+        if (error.message.includes('unique username')) {
+          const existingUser = User.findByEmail(email);
+          if (existingUser) {
+            User.update(existingUser.ID, {
+              Role: role,
+              ClubID: parsedClubId || existingUser.ClubID || null,
+              EventID: assignedEventId,
+              Active: 0,
+              Invited: 1,
+              InviteAccepted: 0
+            });
+          } else {
+            throw new Error(`Failed to create user record: ${error.message}`);
+          }
+        } else {
+          // If user already exists by email, update their invite status
+          const existingUser = User.findByEmail(email);
+          if (existingUser) {
+            User.update(existingUser.ID, {
+              Role: role,
+              ClubID: parsedClubId || existingUser.ClubID || null,
+              EventID: assignedEventId,
+              Active: 0,
+              Invited: 1,
+              InviteAccepted: 0
+            });
+          } else {
+            throw new Error(`Failed to create user record: ${error.message}`);
+          }
         }
       }
       
@@ -128,21 +148,38 @@ router.post('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => 
       });
     } catch (error) {
       console.error('Error creating user for invite:', error);
-      // If user already exists, update their invite status
-      const existingUser = User.findByEmail(email);
-      if (existingUser) {
-        User.update(existingUser.ID, {
-          Role: role,
-          ClubID: parsedClubId || existingUser.ClubID || null,
-          EventID: parsedEventId || existingUser.EventID || null,
-          Active: 0,
-          Invited: 1,
-          InviteAccepted: 0
-        });
+      // If username conflict, try to find existing user by email
+      if (error.message.includes('unique username')) {
+        const existingUser = User.findByEmail(email);
+        if (existingUser) {
+          User.update(existingUser.ID, {
+            Role: role,
+            ClubID: parsedClubId || existingUser.ClubID || null,
+            EventID: parsedEventId || existingUser.EventID || null,
+            Active: 0,
+            Invited: 1,
+            InviteAccepted: 0
+          });
+        } else {
+          throw new Error(`Failed to create user record: ${error.message}`);
+        }
       } else {
-        // If user creation failed and user doesn't exist, we should not create the invite
-        // This prevents the "User not found" error during registration
-        throw new Error(`Failed to create user record: ${error.message}`);
+        // If user already exists by email, update their invite status
+        const existingUser = User.findByEmail(email);
+        if (existingUser) {
+          User.update(existingUser.ID, {
+            Role: role,
+            ClubID: parsedClubId || existingUser.ClubID || null,
+            EventID: parsedEventId || existingUser.EventID || null,
+            Active: 0,
+            Invited: 1,
+            InviteAccepted: 0
+          });
+        } else {
+          // If user creation failed and user doesn't exist, we should not create the invite
+          // This prevents the "User not found" error during registration
+          throw new Error(`Failed to create user record: ${error.message}`);
+        }
       }
     }
     

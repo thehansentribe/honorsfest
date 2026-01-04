@@ -143,8 +143,17 @@ router.post('/', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) 
       BackgroundCheck
     };
 
-    const user = User.create(userData);
-    res.status(201).json(user);
+    try {
+      const user = User.create(userData);
+      res.status(201).json(user);
+    } catch (error) {
+      if (error.message.includes('unique username')) {
+        return res.status(409).json({ 
+          error: 'Username conflict detected. Please try again or contact administrator if the issue persists.' 
+        });
+      }
+      throw error; // Re-throw other errors
+    }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
