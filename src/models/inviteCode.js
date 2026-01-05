@@ -67,6 +67,21 @@ class InviteCode {
   static delete(code) {
     return db.prepare('DELETE FROM InviteCodes WHERE Code = ?').run(code.toUpperCase());
   }
+
+  static resetTime(code, expiresInDays = 30) {
+    const now = new Date();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + expiresInDays);
+    
+    db.prepare(`
+      UPDATE InviteCodes 
+      SET CreatedAt = ?,
+          ExpiresAt = ?
+      WHERE Code = ? AND Used = 0
+    `).run(now.toISOString(), expiresAt.toISOString(), code.toUpperCase());
+    
+    return db.prepare('SELECT * FROM InviteCodes WHERE Code = ?').get(code.toUpperCase());
+  }
 }
 
 module.exports = InviteCode;

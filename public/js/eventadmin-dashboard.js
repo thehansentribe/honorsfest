@@ -4433,11 +4433,28 @@ window.handleCreateUser = handleCreateUser;
 window.showInviteModal = showInviteModal;
 window.resendInvite = async function(email) {
   try {
+    // First, fetch the existing invite
     const response = await fetchWithAuth(`/api/invites/user/${encodeURIComponent(email)}`);
     const invite = await response.json();
     
     if (!response.ok) {
       showNotification(invite.error || 'Error fetching invite', 'error');
+      return;
+    }
+    
+    // Reset the invite time
+    const resetResponse = await fetchWithAuth(`/api/invites/${invite.Code}/reset`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ expiresInDays: 30 })
+    });
+    
+    const updatedInvite = await resetResponse.json();
+    
+    if (!resetResponse.ok) {
+      showNotification(updatedInvite.error || 'Error resetting invite time', 'error');
       return;
     }
     
@@ -4452,7 +4469,7 @@ window.resendInvite = async function(email) {
     const eventName = assignedEvent ? assignedEvent.Name : '';
     const clubName = user.ClubID ? (allClubs.find(c => c.ID === user.ClubID)?.Name || 'Club') : '';
     
-    // Show invite modal with existing code
+    // Show invite modal with updated invite (same code, but reset time)
     const inviteData = {
       firstName: user.FirstName,
       lastName: user.LastName,
@@ -4462,7 +4479,7 @@ window.resendInvite = async function(email) {
       eventId: assignedEventId
     };
     
-    showInviteModal(invite, inviteData);
+    showInviteModal(updatedInvite, inviteData);
   } catch (error) {
     showNotification('Error resending invite: ' + error.message, 'error');
   }

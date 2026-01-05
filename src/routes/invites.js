@@ -374,6 +374,35 @@ router.get('/user/:email', verifyToken, requireRole('Admin', 'AdminViewOnly', 'E
   }
 });
 
+// PUT /api/invites/:code/reset - Reset invite time (Admin, EventAdmin)
+router.put('/:code/reset', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => {
+  try {
+    const code = req.params.code.toUpperCase();
+    const { expiresInDays } = req.body;
+    const codeData = InviteCode.findByCode(code);
+    
+    if (!codeData) {
+      return res.status(404).json({ error: 'Invite code not found' });
+    }
+    
+    // Check if already used
+    if (codeData.Used === 1) {
+      return res.status(400).json({ error: 'Cannot reset time for an already used invite code' });
+    }
+    
+    // Verify the user created this invite or is an Admin
+    if (req.user.role !== 'Admin' && codeData.CreatedBy !== req.user.id) {
+      return res.status(403).json({ error: 'You can only reset invites you created' });
+    }
+    
+    const updatedInvite = InviteCode.resetTime(code, expiresInDays || 30);
+    res.json(updatedInvite);
+  } catch (error) {
+    console.error('Error resetting invite time:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // DELETE /api/invites/:code - Delete an invite code (Admin, EventAdmin)
 router.delete('/:code', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => {
   try {
