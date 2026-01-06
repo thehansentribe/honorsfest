@@ -580,6 +580,135 @@ router.get('/event/:eventId/timeslot-roster', requireRole('Admin', 'AdminViewOnl
   }
 });
 
+// GET /api/reports/users - Generate CSV report of all users (Admin, AdminViewOnly, EventAdmin)
+router.get('/users', requireRole('Admin', 'AdminViewOnly', 'EventAdmin'), (req, res) => {
+  try {
+    const userRole = req.user.role;
+    const userEventId = req.user.eventId; // For EventAdmin filtering
+    
+    // Get all users with club and event names
+    let usersQuery = `
+      SELECT 
+        u.ID,
+        u.FirstName,
+        u.LastName,
+        u.Username,
+        u.DateOfBirth,
+        u.Email,
+        u.Phone,
+        u.Role,
+        u.InvestitureLevel,
+        u.ClubID,
+        c.Name as ClubName,
+        u.EventID,
+        e.Name as EventName,
+        u.Active,
+        u.Invited,
+        u.InviteAccepted,
+        u.BackgroundCheck,
+        u.CheckInNumber,
+        u.CheckedIn,
+        u.stytch_user_id,
+        u.auth_method
+      FROM Users u
+      LEFT JOIN Clubs c ON u.ClubID = c.ID
+      LEFT JOIN Events e ON u.EventID = e.ID
+    `;
+    
+    // EventAdmin can only see users from their assigned event
+    let users;
+    if (userRole === 'EventAdmin' && userEventId) {
+      usersQuery += ` WHERE u.EventID = ?`;
+      usersQuery += ` ORDER BY u.LastName, u.FirstName`;
+      users = db.prepare(usersQuery).all(userEventId);
+    } else {
+      usersQuery += ` ORDER BY u.LastName, u.FirstName`;
+      users = db.prepare(usersQuery).all();
+    }
+    
+    // Define CSV headers - all user fields
+    const headers = [
+      'ID',
+      'FirstName',
+      'LastName',
+      'Username',
+      'DateOfBirth',
+      'Email',
+      'Phone',
+      'Role',
+      'InvestitureLevel',
+      'ClubID',
+      'ClubName',
+      'EventID',
+      'EventName',
+      'Active',
+      'Invited',
+      'InviteAccepted',
+      'BackgroundCheck',
+      'CheckInNumber',
+      'CheckedIn',
+      'StytchUserID',
+      'AuthMethod'
+    ];
+    
+    // Helper function to escape CSV values
+    const escapeCsvValue = (value) => {
+      if (value === null || value === undefined) {
+        return '';
+      }
+      const stringValue = String(value);
+      // If value contains comma, quote, or newline, wrap in quotes and escape quotes
+      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }
+      return stringValue;
+    };
+    
+    // Create CSV content
+    const csvLines = [];
+    
+    // Add header row
+    csvLines.push(headers.map(h => escapeCsvValue(h)).join(','));
+    
+    // Add data rows
+    users.forEach(user => {
+      const row = [
+        user.ID,
+        user.FirstName,
+        user.LastName,
+        user.Username,
+        user.DateOfBirth || '',
+        user.Email || '',
+        user.Phone || '',
+        user.Role,
+        user.InvestitureLevel || 'None',
+        user.ClubID || '',
+        user.ClubName || '',
+        user.EventID || '',
+        user.EventName || '',
+        user.Active ? 'Yes' : 'No',
+        user.Invited ? 'Yes' : 'No',
+        user.InviteAccepted ? 'Yes' : 'No',
+        user.BackgroundCheck ? 'Yes' : 'No',
+        user.CheckInNumber || '',
+        user.CheckedIn ? 'Yes' : 'No',
+        user.stytch_user_id || '',
+        user.auth_method || 'local'
+      ];
+      csvLines.push(row.map(v => escapeCsvValue(v)).join(','));
+    });
+    
+    const csv = csvLines.join('\n');
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=users-export-${new Date().toISOString().split('T')[0]}.csv`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Error generating users export:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
 
 

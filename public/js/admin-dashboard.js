@@ -744,6 +744,7 @@ function getReportsTab() {
       <div style="display: flex; gap: 10px; flex-wrap: wrap;">
         <button id="generateReportBtn" onclick="generateReport()" class="btn btn-primary" disabled>Generate CSV Report</button>
         <button id="generateTimeslotRosterBtn" onclick="generateTimeslotRosterReport()" class="btn btn-primary" disabled>Generate Timeslot Roster Report</button>
+        <button id="generateUsersExportBtn" onclick="generateUsersExport()" class="btn btn-secondary">Export Users CSV</button>
       </div>
     </div>
   `;
@@ -2725,6 +2726,29 @@ async function generateTimeslotRosterReport() {
   }
 }
 
+async function generateUsersExport() {
+  try {
+    const response = await fetchWithAuth('/api/reports/users');
+    if (!response.ok) {
+      const error = await response.json();
+      showNotification(error.error || 'Error generating users export', 'error');
+      return;
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `users-export-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    showNotification('Users export generated successfully', 'success');
+  } catch (error) {
+    showNotification('Error generating users export: ' + error.message, 'error');
+  }
+}
+
 // Modal functions
 function showCreateEventForm() {
   if (blockWriteOperation('create events')) return;
@@ -3880,6 +3904,7 @@ window.showConflictModal = showConflictModal;
 window.resolveConflict = resolveConflict;
 window.generateReport = generateReport;
 window.generateTimeslotRosterReport = generateTimeslotRosterReport;
+window.generateUsersExport = generateUsersExport;
 window.reseedDatabase = reseedDatabase;
 window.clearDatabaseForLaunch = clearDatabaseForLaunch;
 window.updateReportButton = updateReportButton;
