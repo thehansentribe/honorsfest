@@ -1341,6 +1341,8 @@ async function loadClasses(eventId) {
 }
 
 // Render functions
+let expandedEventId = null;
+
 function renderEvents() {
   const container = document.getElementById('eventsList');
   if (!container) return;
@@ -1354,6 +1356,7 @@ function renderEvents() {
     <table class="table">
       <thead>
         <tr>
+          <th style="width: 30px;"></th>
           <th>Name</th>
           <th>Start Date</th>
           <th>End Date</th>
@@ -1362,32 +1365,43 @@ function renderEvents() {
         </tr>
       </thead>
       <tbody>
-        ${allEvents.map(event => `
-          <tr>
-            <td>
+        ${allEvents.map(event => {
+          const isExpanded = expandedEventId === event.ID;
+          return `
+          <tr class="event-row" data-event-id="${event.ID}">
+            <td style="padding: 8px; text-align: center; cursor: pointer;" onclick="toggleEventDashboard(${event.ID})">
+              <span style="display: inline-block; transition: transform 0.3s; ${isExpanded ? 'transform: rotate(90deg);' : ''}">▶</span>
+            </td>
+            <td style="cursor: pointer;" onclick="toggleEventDashboard(${event.ID})">
               <strong>${event.Name}</strong>
             </td>
-            <td>${event.StartDate}</td>
-            <td>${event.EndDate}</td>
-            <td>${event.ClassCount || 0}</td>
+            <td style="cursor: pointer;" onclick="toggleEventDashboard(${event.ID})">${event.StartDate}</td>
+            <td style="cursor: pointer;" onclick="toggleEventDashboard(${event.ID})">${event.EndDate}</td>
+            <td style="cursor: pointer;" onclick="toggleEventDashboard(${event.ID})">${event.ClassCount || 0}</td>
             <td>
-              <button onclick="toggleEventActive(${event.ID}, ${event.Active ? 'true' : 'false'})" class="btn btn-sm ${event.Active ? 'btn-success' : 'btn-secondary'}" style="margin-right: 5px;">
+              <button onclick="event.stopPropagation(); toggleEventActive(${event.ID}, ${event.Active ? 'true' : 'false'})" class="btn btn-sm ${event.Active ? 'btn-success' : 'btn-secondary'}" style="margin-right: 5px;">
                 ${event.Active ? 'Event Open' : 'Event Closed'}
               </button>
-              <button onclick="toggleEventStatus(${event.ID}, '${event.Status}')" class="btn btn-sm ${event.Status === 'Live' ? 'btn-success' : 'btn-secondary'}" style="margin-right: 5px;">
+              <button onclick="event.stopPropagation(); toggleEventStatus(${event.ID}, '${event.Status}')" class="btn btn-sm ${event.Status === 'Live' ? 'btn-success' : 'btn-secondary'}" style="margin-right: 5px;">
                 ${event.Status === 'Live' ? 'Registration Open' : 'Registration Closed'}
               </button>
-              <button onclick="manageEventClubs(${event.ID})" class="btn btn-sm btn-info" style="margin-right: 5px;">Manage Clubs</button>
-              <button onclick="editEvent(${event.ID})" class="btn btn-sm btn-primary">Edit</button>
+              <button onclick="event.stopPropagation(); manageEventClubs(${event.ID})" class="btn btn-sm btn-info" style="margin-right: 5px;">Manage Clubs</button>
+              <button onclick="event.stopPropagation(); editEvent(${event.ID})" class="btn btn-sm btn-primary">Edit</button>
             </td>
           </tr>
-        `).join('')}
+          ${isExpanded ? `<tr id="event-dashboard-${event.ID}" class="event-dashboard-row"><td colspan="6" style="padding: 0;"><div id="event-dashboard-content-${event.ID}" style="padding: 20px; background: #f8f9fa; border-top: 2px solid #007bff;">Loading dashboard...</div></td></tr>` : ''}
+        `;
+        }).join('')}
       </tbody>
     </table>
   `;
   
   const mobileCards = allEvents.map(event => {
+    const isExpanded = expandedEventId === event.ID;
     const actionsHtml = `
+      <button onclick="toggleEventDashboard(${event.ID})" class="btn btn-sm btn-outline" style="margin-bottom: 5px;">
+        ${isExpanded ? '▼ Hide Dashboard' : '▶ Show Dashboard'}
+      </button>
       <button onclick="toggleEventActive(${event.ID}, ${event.Active ? 'true' : 'false'})" class="btn btn-sm ${event.Active ? 'btn-success' : 'btn-secondary'}">
         ${event.Active ? 'Event Open' : 'Event Closed'}
       </button>
@@ -1396,6 +1410,7 @@ function renderEvents() {
       </button>
       <button onclick="manageEventClubs(${event.ID})" class="btn btn-sm btn-info">Manage Clubs</button>
       <button onclick="editEvent(${event.ID})" class="btn btn-sm btn-primary">Edit</button>
+      ${isExpanded ? `<div id="event-dashboard-mobile-${event.ID}" style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;">Loading dashboard...</div>` : ''}
     `;
     
     return createMobileCard({
@@ -1407,7 +1422,158 @@ function renderEvents() {
   }).join('');
   
   container.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
+  
+  // Load dashboard for expanded event if any
+  if (expandedEventId) {
+    loadEventDashboard(expandedEventId);
+  }
 }
+
+async function toggleEventDashboard(eventId) {
+  if (expandedEventId === eventId) {
+    // Collapse
+    expandedEventId = null;
+    renderEvents();
+  } else {
+    // Expand
+    expandedEventId = eventId;
+    renderEvents();
+    await loadEventDashboard(eventId);
+  }
+}
+
+async function loadEventDashboard(eventId) {
+  const desktopContent = document.getElementById(`event-dashboard-content-${eventId}`);
+  const mobileContent = document.getElementById(`event-dashboard-mobile-${eventId}`);
+  
+  try {
+    const response = await fetchWithAuth(`/api/events/${eventId}/dashboard`);
+    if (!response.ok) {
+      throw new Error('Failed to load event dashboard');
+    }
+    
+    const data = await response.json();
+    const { event, statistics, clubs, locations, timeslots } = data;
+    
+    // Format address
+    const addressParts = [event.Street, event.City, event.State, event.ZIP].filter(p => p);
+    const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'Not specified';
+    
+    // Format role labels
+    const roleLabels = {
+      Student: event.RoleLabelStudent || 'Student',
+      Teacher: event.RoleLabelTeacher || 'Teacher',
+      Staff: event.RoleLabelStaff || 'Staff',
+      ClubDirector: event.RoleLabelClubDirector || 'Club Director',
+      EventAdmin: event.RoleLabelEventAdmin || 'Event Admin'
+    };
+    
+    const dashboardHtml = `
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px;">
+        <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
+          <h3 style="margin: 0 0 15px 0; color: #495057; font-size: 1.1rem;">Event Information</h3>
+          <div style="display: grid; gap: 10px;">
+            <div><strong>Name:</strong> ${event.Name}</div>
+            <div><strong>Start Date:</strong> ${event.StartDate}</div>
+            <div><strong>End Date:</strong> ${event.EndDate}</div>
+            <div><strong>Status:</strong> <span class="badge ${event.Status === 'Live' ? 'badge-success' : 'badge-secondary'}">${event.Status}</span></div>
+            <div><strong>Active:</strong> <span class="badge ${event.Active ? 'badge-success' : 'badge-secondary'}">${event.Active ? 'Yes' : 'No'}</span></div>
+            <div><strong>Coordinator:</strong> ${event.CoordinatorName || 'N/A'}</div>
+            ${event.Description ? `<div><strong>Description:</strong> ${event.Description}</div>` : ''}
+          </div>
+        </div>
+        
+        <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
+          <h3 style="margin: 0 0 15px 0; color: #495057; font-size: 1.1rem;">Statistics</h3>
+          <div style="display: grid; gap: 10px;">
+            <div><strong>Classes:</strong> ${statistics.classes}</div>
+            <div><strong>Total Registrations:</strong> ${statistics.registrations}</div>
+            <div><strong>Enrolled:</strong> ${statistics.enrolled}</div>
+            <div><strong>Waitlisted:</strong> ${statistics.waitlisted}</div>
+            <div><strong>Unique Users:</strong> ${statistics.users}</div>
+            <div><strong>Clubs:</strong> ${statistics.clubs}</div>
+            <div><strong>Locations:</strong> ${statistics.locations}</div>
+            <div><strong>Timeslots:</strong> ${statistics.timeslots}</div>
+          </div>
+        </div>
+        
+        <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
+          <h3 style="margin: 0 0 15px 0; color: #495057; font-size: 1.1rem;">Location</h3>
+          <div style="display: grid; gap: 10px;">
+            ${event.LocationDescription ? `<div><strong>Description:</strong> ${event.LocationDescription}</div>` : ''}
+            <div><strong>Address:</strong> ${fullAddress}</div>
+          </div>
+        </div>
+        
+        <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
+          <h3 style="margin: 0 0 15px 0; color: #495057; font-size: 1.1rem;">Role Labels</h3>
+          <div style="display: grid; gap: 8px; font-size: 0.9rem;">
+            <div><strong>Student:</strong> ${roleLabels.Student}</div>
+            <div><strong>Teacher:</strong> ${roleLabels.Teacher}</div>
+            <div><strong>Staff:</strong> ${roleLabels.Staff}</div>
+            <div><strong>Club Director:</strong> ${roleLabels.ClubDirector}</div>
+            <div><strong>Event Admin:</strong> ${roleLabels.EventAdmin}</div>
+          </div>
+        </div>
+      </div>
+      
+      ${clubs.length > 0 ? `
+        <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6; margin-bottom: 20px;">
+          <h3 style="margin: 0 0 15px 0; color: #495057; font-size: 1.1rem;">Linked Clubs (${clubs.length})</h3>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+            ${clubs.map(club => `<span class="badge badge-secondary" style="font-size: 0.9rem; padding: 6px 12px; background-color: #17a2b8; color: white;">${club.Name}</span>`).join('')}
+          </div>
+        </div>
+      ` : ''}
+      
+      ${locations.length > 0 ? `
+        <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6; margin-bottom: 20px;">
+          <h3 style="margin: 0 0 15px 0; color: #495057; font-size: 1.1rem;">Locations (${locations.length})</h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;">
+            ${locations.map(loc => `
+              <div style="padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                <div><strong>${loc.Name}</strong></div>
+                <div style="font-size: 0.85rem; color: #6c757d;">Capacity: ${loc.MaxCapacity}</div>
+                ${loc.Description ? `<div style="font-size: 0.85rem; color: #6c757d; margin-top: 5px;">${loc.Description}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+      
+      ${timeslots.length > 0 ? `
+        <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
+          <h3 style="margin: 0 0 15px 0; color: #495057; font-size: 1.1rem;">Timeslots (${timeslots.length})</h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px;">
+            ${timeslots.map(ts => `
+              <div style="padding: 10px; background: #f8f9fa; border-radius: 5px; font-size: 0.9rem;">
+                <div><strong>${ts.Date}</strong></div>
+                <div>${convertTo12Hour(ts.StartTime)} - ${convertTo12Hour(ts.EndTime)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+    `;
+    
+    if (desktopContent) {
+      desktopContent.innerHTML = dashboardHtml;
+    }
+    if (mobileContent) {
+      mobileContent.innerHTML = dashboardHtml;
+    }
+  } catch (error) {
+    const errorHtml = `<div style="padding: 20px; text-align: center; color: #dc3545;">Error loading dashboard: ${error.message}</div>`;
+    if (desktopContent) {
+      desktopContent.innerHTML = errorHtml;
+    }
+    if (mobileContent) {
+      mobileContent.innerHTML = errorHtml;
+    }
+  }
+}
+
+window.toggleEventDashboard = toggleEventDashboard;
 
 function renderUsers() {
   const container = document.getElementById('usersList');
@@ -1961,6 +2127,10 @@ async function handleEditEvent(event, eventId) {
       showNotification('Event updated successfully', 'success');
       closeModal('editEventModal');
       await loadEvents();
+      // Reload dashboard if this event is currently expanded
+      if (expandedEventId === eventId) {
+        await loadEventDashboard(eventId);
+      }
     } else {
       const error = await response.json();
       showNotification(error.error || 'Error updating event', 'error');
@@ -2025,6 +2195,10 @@ async function toggleEventActive(eventId, currentActiveStr) {
       
       // Reload from server to ensure we have the latest data (this will call renderEvents again)
       await loadEvents();
+      // Reload dashboard if this event is currently expanded
+      if (expandedEventId === eventId) {
+        await loadEventDashboard(eventId);
+      }
     } else {
       const error = await response.json();
       showNotification(error.error || 'Error updating event status', 'error');
@@ -2047,6 +2221,10 @@ async function toggleEventStatus(eventId, currentStatus) {
     if (response.ok) {
       showNotification(`Class registration ${newStatus === 'Live' ? 'opened' : 'closed'} successfully`, 'success');
       await loadEvents();
+      // Reload dashboard if this event is currently expanded
+      if (expandedEventId === eventId) {
+        await loadEventDashboard(eventId);
+      }
     } else {
       const error = await response.json();
       showNotification(error.error || 'Error updating registration status', 'error');

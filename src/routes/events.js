@@ -74,6 +74,78 @@ router.get('/:id', (req, res) => {
   }
 });
 
+// GET /api/events/:id/dashboard - Get event dashboard with statistics
+router.get('/:id/dashboard', (req, res) => {
+  try {
+    const { db } = require('../config/db');
+    const eventId = parseInt(req.params.id);
+    const event = Event.findById(eventId);
+    
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    
+    // Get statistics
+    const classCount = db.prepare('SELECT COUNT(*) as count FROM Classes WHERE EventID = ? AND Active = 1').get(eventId);
+    const registrationCount = db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM Registrations r
+      JOIN Classes c ON r.ClassID = c.ID
+      WHERE c.EventID = ? AND c.Active = 1
+    `).get(eventId);
+    const enrolledCount = db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM Registrations r
+      JOIN Classes c ON r.ClassID = c.ID
+      WHERE c.EventID = ? AND c.Active = 1 AND r.Status = 'Enrolled'
+    `).get(eventId);
+    const waitlistCount = db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM Registrations r
+      JOIN Classes c ON r.ClassID = c.ID
+      WHERE c.EventID = ? AND c.Active = 1 AND r.Status = 'Waitlisted'
+    `).get(eventId);
+    const clubCount = db.prepare('SELECT COUNT(DISTINCT ClubID) as count FROM ClubEvents WHERE EventID = ?').get(eventId);
+    const locationCount = db.prepare('SELECT COUNT(*) as count FROM Locations WHERE EventID = ?').get(eventId);
+    const timeslotCount = db.prepare('SELECT COUNT(*) as count FROM Timeslots WHERE EventID = ?').get(eventId);
+    const userCount = db.prepare(`
+      SELECT COUNT(DISTINCT u.ID) as count
+      FROM Users u
+      JOIN Registrations r ON u.ID = r.UserID
+      JOIN Classes c ON r.ClassID = c.ID
+      WHERE c.EventID = ? AND c.Active = 1
+    `).get(eventId);
+    
+    // Get clubs linked to this event
+    const clubs = Club.findByEvent(eventId);
+    
+    // Get locations for this event
+    const locations = Location.findByEvent(eventId);
+    
+    // Get timeslots for this event
+    const timeslots = Timeslot.findByEvent(eventId);
+    
+    res.json({
+      event,
+      statistics: {
+        classes: classCount.count,
+        registrations: registrationCount.count,
+        enrolled: enrolledCount.count,
+        waitlisted: waitlistCount.count,
+        clubs: clubCount.count,
+        locations: locationCount.count,
+        timeslots: timeslotCount.count,
+        users: userCount.count
+      },
+      clubs,
+      locations,
+      timeslots
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // POST /api/events - Create event (Admin only)
 router.post('/', requireRole('Admin'), (req, res) => {
   try {
