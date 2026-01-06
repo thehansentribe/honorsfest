@@ -140,14 +140,10 @@
       const codeFromUrl = urlParams.get('code');
       
       if (codeFromUrl) {
-        // Pre-populate the code field
+        // Pre-populate the code field (but don't automatically validate)
         const codeInput = document.getElementById('registrationCode');
         if (codeInput) {
           codeInput.value = codeFromUrl.toUpperCase();
-          // Automatically validate the code
-          setTimeout(() => {
-            validateCode();
-          }, 100);
         }
       }
     });
