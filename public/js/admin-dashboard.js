@@ -654,11 +654,16 @@ function getEventsTab() {
 }
 
 function getUsersTab() {
+  const hasActiveFilters = Object.keys(userFilters).length > 0;
   return `
     <div class="card">
       <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
         <h2 class="card-title" style="margin: 0;">Users</h2>
-        <div style="display: flex; gap: 0.5rem;">
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button onclick="toggleUserFilters()" class="btn btn-outline ${hasActiveFilters ? 'btn-primary' : ''}" id="toggleFiltersBtn" title="Toggle filter row">
+            ${hasActiveFilters ? '🔍 Filters Active' : '🔍 Filter'}
+          </button>
+          ${hasActiveFilters ? `<button onclick="clearUserFilters()" class="btn btn-outline" title="Clear all filters">Clear Filters</button>` : ''}
           <button onclick="toggleDeactivatedUsers()" class="btn btn-outline" id="toggleDeactivatedBtn">
             ${showDeactivatedUsers ? 'Hide Deactivated' : 'Show Deactivated'}
           </button>
@@ -1516,27 +1521,27 @@ function renderUsers() {
           <th class="filterable ${userFilters.bgcheck ? 'filter-active' : ''}" onclick="toggleUserColumnFilter('bgcheck')">BG Check ${userSortColumn === 'bgcheck' ? (userSortDirection === 'asc' ? '↑' : '↓') : ''}</th>
           <th>Actions</th>
         </tr>
-        <tr class="filter-row" id="userFilterRow" style="display: ${Object.keys(userFilters).length > 0 ? 'table-row' : 'none'};">
+        <tr class="filter-row" id="userFilterRow" style="display: ${Object.keys(userFilters).length > 0 ? 'table-row' : 'none'}; background-color: #f8fafc;">
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-name" value="${userFilters.name || ''}" oninput="updateUserFilter('name', this.value)" placeholder="Filter...">
+            <input type="text" class="filter-input" id="filter-name" value="${userFilters.name || ''}" oninput="updateUserFilter('name', this.value)" placeholder="Filter by name...">
           </td>
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-username" value="${userFilters.username || ''}" oninput="updateUserFilter('username', this.value)" placeholder="Filter...">
+            <input type="text" class="filter-input" id="filter-username" value="${userFilters.username || ''}" oninput="updateUserFilter('username', this.value)" placeholder="Filter by username...">
           </td>
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-role" value="${userFilters.role || ''}" oninput="updateUserFilter('role', this.value)" placeholder="Filter...">
+            <input type="text" class="filter-input" id="filter-role" value="${userFilters.role || ''}" oninput="updateUserFilter('role', this.value)" placeholder="Filter by role...">
           </td>
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-event" value="${userFilters.event || ''}" oninput="updateUserFilter('event', this.value)" placeholder="Filter...">
+            <input type="text" class="filter-input" id="filter-event" value="${userFilters.event || ''}" oninput="updateUserFilter('event', this.value)" placeholder="Filter by event...">
           </td>
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-club" value="${userFilters.club || ''}" oninput="updateUserFilter('club', this.value)" placeholder="Filter...">
+            <input type="text" class="filter-input" id="filter-club" value="${userFilters.club || ''}" oninput="updateUserFilter('club', this.value)" placeholder="Filter by club...">
           </td>
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-age" value="${userFilters.age || ''}" oninput="updateUserFilter('age', this.value)" placeholder="Filter...">
+            <input type="text" class="filter-input" id="filter-age" value="${userFilters.age || ''}" oninput="updateUserFilter('age', this.value)" placeholder="Filter by age...">
           </td>
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-bgcheck" value="${userFilters.bgcheck || ''}" oninput="updateUserFilter('bgcheck', this.value)" placeholder="Filter...">
+            <input type="text" class="filter-input" id="filter-bgcheck" value="${userFilters.bgcheck || ''}" oninput="updateUserFilter('bgcheck', this.value)" placeholder="yes/no...">
           </td>
           <td class="filter-cell"></td>
         </tr>
@@ -1599,12 +1604,15 @@ function renderUsers() {
       }).join('');
   
   container.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
+  
+  // Update filter button state after rendering
+  updateFilterButtonState();
 }
 
 function toggleUserColumnFilter(column) {
   // Show filter row if hidden and add filter for this column
   const filterRow = document.getElementById('userFilterRow');
-  if (filterRow.style.display === 'none') {
+  if (filterRow && filterRow.style.display === 'none') {
     filterRow.style.display = 'table-row';
   }
   
@@ -1612,6 +1620,13 @@ function toggleUserColumnFilter(column) {
   const filterInput = document.getElementById(`filter-${column}`);
   if (filterInput) {
     filterInput.focus();
+  }
+  
+  // Update filter button state
+  const filterBtn = document.getElementById('toggleFiltersBtn');
+  if (filterBtn && filterRow && filterRow.style.display !== 'none') {
+    filterBtn.classList.add('btn-primary');
+    filterBtn.textContent = '🔍 Filters Active';
   }
   
   // Toggle sorting
@@ -1632,10 +1647,103 @@ function updateUserFilter(column, value) {
     delete userFilters[column];
     // Hide filter row if no filters active
     if (Object.keys(userFilters).length === 0) {
-      document.getElementById('userFilterRow').style.display = 'none';
+      const filterRow = document.getElementById('userFilterRow');
+      if (filterRow) filterRow.style.display = 'none';
+      // Update filter button state
+      const filterBtn = document.getElementById('toggleFiltersBtn');
+      if (filterBtn) {
+        filterBtn.classList.remove('btn-primary');
+        filterBtn.textContent = '🔍 Filter';
+      }
+      // Remove clear filters button
+      const clearBtn = filterBtn?.nextElementSibling;
+      if (clearBtn && clearBtn.onclick?.toString().includes('clearUserFilters')) {
+        clearBtn.remove();
+      }
     }
   }
   renderUsers();
+  // Update filter button state
+  updateFilterButtonState();
+}
+
+function toggleUserFilters() {
+  const filterRow = document.getElementById('userFilterRow');
+  if (!filterRow) return;
+  
+  const isVisible = filterRow.style.display !== 'none';
+  filterRow.style.display = isVisible ? 'none' : 'table-row';
+  
+  // Update button text
+  const filterBtn = document.getElementById('toggleFiltersBtn');
+  if (filterBtn) {
+    if (isVisible) {
+      filterBtn.classList.remove('btn-primary');
+      filterBtn.textContent = '🔍 Filter';
+    } else {
+      filterBtn.classList.add('btn-primary');
+      filterBtn.textContent = '🔍 Filters Active';
+    }
+  }
+}
+
+function clearUserFilters() {
+  userFilters = {};
+  userSortColumn = null;
+  userSortDirection = 'asc';
+  
+  // Clear all filter inputs
+  const filterInputs = document.querySelectorAll('.filter-input');
+  filterInputs.forEach(input => input.value = '');
+  
+  // Hide filter row
+  const filterRow = document.getElementById('userFilterRow');
+  if (filterRow) filterRow.style.display = 'none';
+  
+  // Update filter button
+  const filterBtn = document.getElementById('toggleFiltersBtn');
+  if (filterBtn) {
+    filterBtn.classList.remove('btn-primary');
+    filterBtn.textContent = '🔍 Filter';
+  }
+  
+  // Remove clear filters button
+  const clearBtn = filterBtn?.nextElementSibling;
+  if (clearBtn && clearBtn.onclick?.toString().includes('clearUserFilters')) {
+    clearBtn.remove();
+  }
+  
+  renderUsers();
+}
+
+function updateFilterButtonState() {
+  const filterBtn = document.getElementById('toggleFiltersBtn');
+  if (!filterBtn) return;
+  
+  const hasActiveFilters = Object.keys(userFilters).length > 0;
+  if (hasActiveFilters) {
+    filterBtn.classList.add('btn-primary');
+    filterBtn.textContent = '🔍 Filters Active';
+    
+    // Add clear filters button if it doesn't exist
+    if (!filterBtn.nextElementSibling || !filterBtn.nextElementSibling.onclick?.toString().includes('clearUserFilters')) {
+      const clearBtn = document.createElement('button');
+      clearBtn.onclick = clearUserFilters;
+      clearBtn.className = 'btn btn-outline';
+      clearBtn.textContent = 'Clear Filters';
+      clearBtn.title = 'Clear all filters';
+      filterBtn.insertAdjacentElement('afterend', clearBtn);
+    }
+  } else {
+    filterBtn.classList.remove('btn-primary');
+    filterBtn.textContent = '🔍 Filter';
+    
+    // Remove clear filters button
+    const clearBtn = filterBtn.nextElementSibling;
+    if (clearBtn && clearBtn.onclick?.toString().includes('clearUserFilters')) {
+      clearBtn.remove();
+    }
+  }
 }
 
 async function renderLocations() {
@@ -4727,6 +4835,8 @@ window.handleAddHonor = handleAddHonor;
 window.handleCreateEvent = handleCreateEvent;
 window.toggleUserColumnFilter = toggleUserColumnFilter;
 window.updateUserFilter = updateUserFilter;
+window.toggleUserFilters = toggleUserFilters;
+window.clearUserFilters = clearUserFilters;
 window.renderUsers = renderUsers;
 window.toggleDeactivatedUsers = toggleDeactivatedUsers;
 // Old check-in functions removed - now using checkin.js module
