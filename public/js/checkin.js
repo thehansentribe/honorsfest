@@ -44,7 +44,7 @@ function getCheckInTab(config) {
           <label for="checkInNumberFilter"><strong>Filter by Check-In Number</strong></label>
           <input type="number" id="checkInNumberFilter" class="form-control" 
                  placeholder="Enter check-in number to filter..." 
-                 oninput="checkInFilterByNumber(this.value)"
+                 oninput="debouncedCheckInFilterByNumber(this.value)"
                  style="max-width: 300px;">
         </div>
 
@@ -149,6 +149,9 @@ function checkInFilterByNumber(checkInNumber) {
   checkInFilter = checkInNumber;
   checkInRenderParticipants();
 }
+
+// Debounced version of checkInFilterByNumber (400ms delay)
+const debouncedCheckInFilterByNumber = debounce(checkInFilterByNumber, 400);
 
 /**
  * Sort check-in participants by column
@@ -675,6 +678,7 @@ async function checkInConfirmAttendance(eventId, clubId) {
 window.getCheckInTab = getCheckInTab;
 window.checkInLoadParticipants = checkInLoadParticipants;
 window.checkInFilterByNumber = checkInFilterByNumber;
+window.debouncedCheckInFilterByNumber = debouncedCheckInFilterByNumber;
 window.checkInSortByColumn = checkInSortByColumn;
 window.checkInToggleCheckedIn = checkInToggleCheckedIn;
 window.checkInToggleBackgroundCheck = checkInToggleBackgroundCheck;

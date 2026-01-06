@@ -1284,25 +1284,25 @@ function renderUsers() {
         </tr>
         <tr class="filter-row" id="userFilterRow" style="display: ${Object.keys(userFilters).length > 0 ? 'table-row' : 'none'}; background-color: #f8fafc;">
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-name" value="${userFilters.name || ''}" oninput="updateUserFilter('name', this.value)" placeholder="Filter by name...">
+            <input type="text" class="filter-input" id="filter-name" value="${userFilters.name || ''}" oninput="debouncedUpdateUserFilter('name', this.value)" placeholder="Filter by name...">
           </td>
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-username" value="${userFilters.username || ''}" oninput="updateUserFilter('username', this.value)" placeholder="Filter by username...">
+            <input type="text" class="filter-input" id="filter-username" value="${userFilters.username || ''}" oninput="debouncedUpdateUserFilter('username', this.value)" placeholder="Filter by username...">
           </td>
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-role" value="${userFilters.role || ''}" oninput="updateUserFilter('role', this.value)" placeholder="Filter by role...">
+            <input type="text" class="filter-input" id="filter-role" value="${userFilters.role || ''}" oninput="debouncedUpdateUserFilter('role', this.value)" placeholder="Filter by role...">
           </td>
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-event" value="${userFilters.event || ''}" oninput="updateUserFilter('event', this.value)" placeholder="Filter by event...">
+            <input type="text" class="filter-input" id="filter-event" value="${userFilters.event || ''}" oninput="debouncedUpdateUserFilter('event', this.value)" placeholder="Filter by event...">
           </td>
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-club" value="${userFilters.club || ''}" oninput="updateUserFilter('club', this.value)" placeholder="Filter by club...">
+            <input type="text" class="filter-input" id="filter-club" value="${userFilters.club || ''}" oninput="debouncedUpdateUserFilter('club', this.value)" placeholder="Filter by club...">
           </td>
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-age" value="${userFilters.age || ''}" oninput="updateUserFilter('age', this.value)" placeholder="Filter by age...">
+            <input type="text" class="filter-input" id="filter-age" value="${userFilters.age || ''}" oninput="debouncedUpdateUserFilter('age', this.value)" placeholder="Filter by age...">
           </td>
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-bgcheck" value="${userFilters.bgcheck || ''}" oninput="updateUserFilter('bgcheck', this.value)" placeholder="yes/no...">
+            <input type="text" class="filter-input" id="filter-bgcheck" value="${userFilters.bgcheck || ''}" oninput="debouncedUpdateUserFilter('bgcheck', this.value)" placeholder="yes/no...">
           </td>
           <td class="filter-cell"></td>
         </tr>
@@ -1427,6 +1427,9 @@ function updateUserFilter(column, value) {
   // Update filter button state
   updateFilterButtonState();
 }
+
+// Debounced version of updateUserFilter (400ms delay)
+const debouncedUpdateUserFilter = debounce(updateUserFilter, 400);
 
 function toggleUserFilters() {
   const filterRow = document.getElementById('userFilterRow');
@@ -4597,6 +4600,7 @@ window.closeModal = closeModal;
 window.handleCreateEvent = handleCreateEvent;
 window.toggleUserColumnFilter = toggleUserColumnFilter;
 window.updateUserFilter = updateUserFilter;
+window.debouncedUpdateUserFilter = debouncedUpdateUserFilter;
 window.toggleUserFilters = toggleUserFilters;
 window.clearUserFilters = clearUserFilters;
 window.renderUsers = renderUsers;

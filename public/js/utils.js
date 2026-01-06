@@ -563,6 +563,24 @@ async function handleUpdateMyProfile(e) {
   }
 }
 
+/**
+ * Debounce function to delay execution until after a pause in input
+ * @param {Function} func - Function to debounce
+ * @param {number} wait - Delay in milliseconds
+ * @returns {Function} Debounced function
+ */
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
 // Make functions globally available
 window.logout = logout;
 window.preventBackNavigation = preventBackNavigation;
@@ -572,3 +590,4 @@ window.closeModal = closeModal;
 window.showEditMyProfile = showEditMyProfile;
 window.handleUpdateMyProfile = handleUpdateMyProfile;
 window.convertTo12Hour = convertTo12Hour;
+window.debounce = debounce;

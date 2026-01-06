@@ -265,25 +265,25 @@ function renderUsers() {
         </tr>
         <tr class="filter-row" id="clubDirectorFilterRow" style="display: ${Object.keys(clubDirectorFilters).length > 0 ? 'table-row' : 'none'};">
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-cd-name" value="${clubDirectorFilters.name || ''}" oninput="updateClubDirectorFilter('name', this.value)" placeholder="Filter...">
+            <input type="text" class="filter-input" id="filter-cd-name" value="${clubDirectorFilters.name || ''}" oninput="debouncedUpdateClubDirectorFilter('name', this.value)" placeholder="Filter...">
           </td>
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-cd-username" value="${clubDirectorFilters.username || ''}" oninput="updateClubDirectorFilter('username', this.value)" placeholder="Filter...">
+            <input type="text" class="filter-input" id="filter-cd-username" value="${clubDirectorFilters.username || ''}" oninput="debouncedUpdateClubDirectorFilter('username', this.value)" placeholder="Filter...">
           </td>
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-cd-role" value="${clubDirectorFilters.role || ''}" oninput="updateClubDirectorFilter('role', this.value)" placeholder="Filter...">
+            <input type="text" class="filter-input" id="filter-cd-role" value="${clubDirectorFilters.role || ''}" oninput="debouncedUpdateClubDirectorFilter('role', this.value)" placeholder="Filter...">
           </td>
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-cd-club" value="${clubDirectorFilters.club || ''}" oninput="updateClubDirectorFilter('club', this.value)" placeholder="Filter...">
+            <input type="text" class="filter-input" id="filter-cd-club" value="${clubDirectorFilters.club || ''}" oninput="debouncedUpdateClubDirectorFilter('club', this.value)" placeholder="Filter...">
           </td>
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-cd-age" value="${clubDirectorFilters.age || ''}" oninput="updateClubDirectorFilter('age', this.value)" placeholder="Filter...">
+            <input type="text" class="filter-input" id="filter-cd-age" value="${clubDirectorFilters.age || ''}" oninput="debouncedUpdateClubDirectorFilter('age', this.value)" placeholder="Filter...">
           </td>
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-cd-active" value="${clubDirectorFilters.active || ''}" oninput="updateClubDirectorFilter('active', this.value)" placeholder="Filter...">
+            <input type="text" class="filter-input" id="filter-cd-active" value="${clubDirectorFilters.active || ''}" oninput="debouncedUpdateClubDirectorFilter('active', this.value)" placeholder="Filter...">
           </td>
           <td class="filter-cell">
-            <input type="text" class="filter-input" id="filter-cd-bgcheck" value="${clubDirectorFilters.bgcheck || ''}" oninput="updateClubDirectorFilter('bgcheck', this.value)" placeholder="Filter...">
+            <input type="text" class="filter-input" id="filter-cd-bgcheck" value="${clubDirectorFilters.bgcheck || ''}" oninput="debouncedUpdateClubDirectorFilter('bgcheck', this.value)" placeholder="Filter...">
           </td>
           <td class="filter-cell"></td>
         </tr>
@@ -365,6 +365,9 @@ function updateClubDirectorFilter(column, value) {
   }
   renderUsers();
 }
+
+// Debounced version of updateClubDirectorFilter (400ms delay)
+const debouncedUpdateClubDirectorFilter = debounce(updateClubDirectorFilter, 400);
 
 // convertTo12Hour is now in utils.js and available globally
 
@@ -1775,6 +1778,7 @@ Thank you!`;
   // Export filter functions
   window.toggleClubDirectorColumnFilter = toggleClubDirectorColumnFilter;
   window.updateClubDirectorFilter = updateClubDirectorFilter;
+  window.debouncedUpdateClubDirectorFilter = debouncedUpdateClubDirectorFilter;
   window.renderUsers = renderUsers;
   window.copyCodeEmail = copyCodeEmail;
   window.copyRegistrationLink = copyRegistrationLink;
