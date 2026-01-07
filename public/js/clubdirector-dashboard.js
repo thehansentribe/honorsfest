@@ -173,7 +173,9 @@ function getImportTab() {
           <h3 style="margin-bottom: 15px;">Import Preview</h3>
           <div id="importSummary" style="margin-bottom: 15px; padding: 10px; background: #f8fafc; border-radius: 5px;"></div>
           <div id="importPreviewTable" style="overflow-x: auto; margin-bottom: 20px;"></div>
-          <button id="importValidUsersBtn" onclick="importValidUsers()" class="btn btn-primary" disabled>Import Valid Users</button>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <button id="importValidUsersBtn" onclick="importValidUsers()" class="btn btn-primary" disabled>Import Valid Users</button>
+          </div>
         </div>
       </div>
     </div>
@@ -860,6 +862,7 @@ async function showCreateClassFormClubDirector() {
 // Import functionality - CSV parsing and validation
 let parsedUsers = [];
 let userValidations = [];
+let importedUsersData = []; // Store successfully imported users with usernames and passwords
 
 // Setup file upload handler (called when import tab is loaded)
 function setupCSVFileInput() {
@@ -878,20 +881,34 @@ function setupCSVFileInput() {
         return;
       }
       
-      try {
-        parsedUsers = await parseCSVFile(file);
-        userValidations = parsedUsers.map((row, index) => validateUserRow(row, index));
-        renderImportPreview(parsedUsers, userValidations);
-        showNotification(`CSV parsed: ${parsedUsers.length} user${parsedUsers.length !== 1 ? 's' : ''} found`, 'success');
-      } catch (error) {
-        showNotification('Error parsing CSV: ' + error.message, 'error');
-        parsedUsers = [];
-        userValidations = [];
-        const previewDiv = document.getElementById('importPreview');
-        if (previewDiv) {
-          previewDiv.style.display = 'none';
-        }
-      }
+            try {
+              parsedUsers = await parseCSVFile(file);
+              
+              // Clear previous import data when new file is uploaded
+              importedUsersData = [];
+              const existingDownloadBtn = document.getElementById('downloadImportedUsersBtn');
+              if (existingDownloadBtn) {
+                existingDownloadBtn.remove();
+              }
+              
+              // Fetch existing users to check for duplicates
+              const existingUsersResponse = await fetchWithAuth('/api/users');
+              const existingUsers = existingUsersResponse.ok ? await existingUsersResponse.json() : [];
+              
+              // Validate all rows with duplicate checking
+              userValidations = parsedUsers.map((row, index) => validateUserRow(row, index, existingUsers));
+              
+              renderImportPreview(parsedUsers, userValidations);
+              showNotification(`CSV parsed: ${parsedUsers.length} user${parsedUsers.length !== 1 ? 's' : ''} found`, 'success');
+            } catch (error) {
+              showNotification('Error parsing CSV: ' + error.message, 'error');
+              parsedUsers = [];
+              userValidations = [];
+              const previewDiv = document.getElementById('importPreview');
+              if (previewDiv) {
+                previewDiv.style.display = 'none';
+              }
+            }
     });
   }
 }
@@ -1024,8 +1041,40 @@ function parseCSVLine(line) {
   return values;
 }
 
+// Check if username would be duplicate
+async function checkUsernameDuplicate(firstName, lastName) {
+  try {
+    // Generate potential base username
+    const baseUsername = `${firstName.toLowerCase()}.${lastName.toLowerCase()}`;
+    
+    // Fetch all users to check for existing usernames
+    const response = await fetchWithAuth('/api/users');
+    if (!response.ok) {
+      return false; // If we can't check, allow it (server will handle duplicates)
+    }
+    
+    const allUsers = await response.json();
+    
+    // Check if base username exists
+    if (allUsers.some(u => u.Username === baseUsername)) {
+      return true;
+    }
+    
+    // Check for numbered variations (firstname.lastname1, firstname.lastname2, etc.)
+    const usernamePattern = new RegExp(`^${baseUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\d*$`);
+    if (allUsers.some(u => usernamePattern.test(u.Username))) {
+      return true; // A variation exists, which is fine - server will generate unique one
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error checking username:', error);
+    return false; // If check fails, allow it (server will handle duplicates)
+  }
+}
+
 // Validate a user row
-function validateUserRow(row, rowIndex) {
+function validateUserRow(row, rowIndex, existingUsers = []) {
   const errors = [];
   const rowNum = rowIndex + 2; // +2 because row 1 is header, and we're 0-indexed
   
@@ -1078,6 +1127,16 @@ function validateUserRow(row, rowIndex) {
     const validLevels = ['None', 'Friend', 'Companion', 'Explorer', 'Ranger', 'Voyager', 'Guide', 'MasterGuide'];
     if (!validLevels.includes(row.InvestitureLevel.trim())) {
       errors.push(`InvestitureLevel must be one of: ${validLevels.join(', ')}`);
+    }
+  }
+  
+  // Check for duplicate username (only if other validations pass)
+  if (errors.length === 0 && row.FirstName && row.LastName) {
+    const baseUsername = `${row.FirstName.trim().toLowerCase()}.${row.LastName.trim().toLowerCase()}`;
+    const exactMatch = existingUsers.some(u => u.Username === baseUsername);
+    
+    if (exactMatch) {
+      errors.push('Username already exists (duplicate first/last name combination)');
     }
   }
   
@@ -1165,6 +1224,58 @@ function renderImportPreview(parsedUsers, validations) {
   }
 }
 
+// Download imported users CSV with usernames and passwords
+function downloadImportedUsersCSV() {
+  if (importedUsersData.length === 0) {
+    showNotification('No imported users data available', 'error');
+    return;
+  }
+  
+  const headers = ['FirstName', 'LastName', 'DateOfBirth', 'Email', 'Phone', 'Role', 'InvestitureLevel', 'Username', 'Password'];
+  
+  // CSV escaping function
+  const escapeCSV = (value) => {
+    if (value === null || value === undefined) return '';
+    const str = String(value);
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+  
+  // Build CSV content
+  const csvLines = [
+    headers.map(escapeCSV).join(','),
+    ...importedUsersData.map(user => [
+      user.FirstName,
+      user.LastName,
+      user.DateOfBirth,
+      user.Email || '',
+      user.Phone || '',
+      user.Role,
+      user.InvestitureLevel || 'None',
+      user.Username,
+      user.Password
+    ].map(escapeCSV).join(','))
+  ];
+  
+  const csvContent = csvLines.join('\n');
+  
+  // Create download
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const timestamp = new Date().toISOString().split('T')[0];
+  a.download = `imported-users-${timestamp}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+  
+  showNotification('Imported users CSV downloaded', 'success');
+}
+
 // Import valid users
 async function importValidUsers() {
   if (!clubDirectorClubId || !clubDirectorSelectedEventId) {
@@ -1185,12 +1296,31 @@ async function importValidUsers() {
     importBtn.textContent = 'Importing...';
   }
   
+  // Clear previous import data
+  importedUsersData = [];
+  
   let successCount = 0;
   let failureCount = 0;
   const failures = [];
   
+  // Fetch existing users again before import to check for duplicates
+  const existingUsersResponse = await fetchWithAuth('/api/users');
+  const existingUsers = existingUsersResponse.ok ? await existingUsersResponse.json() : [];
+  const existingUsernames = new Set(existingUsers.map(u => u.Username));
+  
   for (let i = 0; i < validUsers.length; i++) {
     const user = validUsers[i];
+    
+    // Check for duplicate username before importing
+    const baseUsername = `${user.FirstName.trim().toLowerCase()}.${user.LastName.trim().toLowerCase()}`;
+    if (existingUsernames.has(baseUsername)) {
+      failureCount++;
+      failures.push({
+        name: `${user.FirstName} ${user.LastName}`,
+        error: 'Username already exists (duplicate first/last name combination)'
+      });
+      continue;
+    }
     
     const userData = {
       FirstName: user.FirstName.trim(),
@@ -1218,6 +1348,20 @@ async function importValidUsers() {
       
       if (response.ok) {
         successCount++;
+        // Store imported user data with username and password
+        importedUsersData.push({
+          FirstName: user.FirstName.trim(),
+          LastName: user.LastName.trim(),
+          DateOfBirth: user.DateOfBirth.trim(),
+          Email: user.Email ? user.Email.trim() : '',
+          Phone: user.Phone ? user.Phone.trim() : '',
+          Role: user.Role.trim(),
+          InvestitureLevel: (user.InvestitureLevel && user.InvestitureLevel.trim()) || 'None',
+          Username: result.Username || baseUsername,
+          Password: 'password123'
+        });
+        // Add to existing usernames set to prevent duplicates in same batch
+        existingUsernames.add(result.Username || baseUsername);
       } else {
         failureCount++;
         failures.push({
@@ -1255,17 +1399,28 @@ async function importValidUsers() {
   // Refresh users list
   await loadUsers();
   
-  // Clear preview
-  parsedUsers = [];
-  userValidations = [];
-  const previewDiv = document.getElementById('importPreview');
-  if (previewDiv) {
-    previewDiv.style.display = 'none';
+  // Show download button if users were imported
+  if (successCount > 0) {
+    const previewDiv = document.getElementById('importPreview');
+    if (previewDiv) {
+      const downloadBtn = document.getElementById('downloadImportedUsersBtn');
+      if (!downloadBtn) {
+        const downloadButton = document.createElement('button');
+        downloadButton.id = 'downloadImportedUsersBtn';
+        downloadButton.className = 'btn btn-success';
+        downloadButton.style.marginLeft = '10px';
+        downloadButton.textContent = 'Download Imported Users CSV';
+        downloadButton.onclick = downloadImportedUsersCSV;
+        const importBtnContainer = importBtn.parentElement;
+        if (importBtnContainer) {
+          importBtnContainer.appendChild(downloadButton);
+        }
+      }
+    }
   }
-  const fileInput = document.getElementById('csvFileInput');
-  if (fileInput) {
-    fileInput.value = '';
-  }
+  
+  // Clear preview after a delay to allow download
+  // Don't clear immediately so user can download CSV
 }
 
 // Now the DOMContentLoaded handler
@@ -1372,6 +1527,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.switchClubDirectorEvent = switchClubDirectorEvent;
   window.generateSampleCSV = generateSampleCSV;
   window.importValidUsers = importValidUsers;
+  window.downloadImportedUsersCSV = downloadImportedUsersCSV;
   
   // Restore last active tab or default to users
   const savedTab = localStorage.getItem('directorCurrentTab') || 'users';
