@@ -60,6 +60,13 @@ async function clubdirectorSwitchTab(tabName, clickedElement = null) {
       content.innerHTML = getCodesTab();
       await renderCodes();
       break;
+    case 'import':
+      content.innerHTML = getImportTab();
+      // Setup file upload handler after tab is loaded
+      setTimeout(() => {
+        setupCSVFileInput();
+      }, 0);
+      break;
     case 'reports':
       content.innerHTML = getReportsTab();
       break;
@@ -118,6 +125,56 @@ function getCodesTab() {
       </div>
       <div id="codesList">
         <p class="text-center">Loading codes...</p>
+      </div>
+    </div>
+  `;
+}
+
+// Get Import Tab HTML for Club Director
+function getImportTab() {
+  if (clubDirectorEvents.length === 0) {
+    return `
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Import Users</h2>
+        </div>
+        <p class="text-center" style="color: #d32f2f;">No events assigned to your club. Please contact an administrator to be assigned to an event.</p>
+      </div>
+    `;
+  }
+  
+  if (!clubDirectorSelectedEventId) {
+    return `
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Import Users</h2>
+        </div>
+        <p class="text-center" style="color: #d32f2f;">Please select an event first using the dropdown above</p>
+      </div>
+    `;
+  }
+  
+  return `
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Import Users from CSV</h2>
+      </div>
+      <div style="padding: 20px;">
+        <div style="margin-bottom: 20px;">
+          <button onclick="generateSampleCSV()" class="btn btn-secondary" style="margin-right: 10px;">Download Sample CSV</button>
+          <small style="color: var(--text-light);">Download a sample CSV file with examples of Student, Teacher, and Staff users</small>
+        </div>
+        <div style="margin-bottom: 20px;">
+          <label for="csvFileInput" style="display: block; margin-bottom: 8px; font-weight: bold;">Upload CSV File:</label>
+          <input type="file" id="csvFileInput" accept=".csv" style="margin-bottom: 10px;">
+          <small style="color: var(--text-light); display: block;">Select a CSV file to import users. The file should have columns: FirstName, LastName, DateOfBirth, Email, Phone, Role, InvestitureLevel</small>
+        </div>
+        <div id="importPreview" style="display: none;">
+          <h3 style="margin-bottom: 15px;">Import Preview</h3>
+          <div id="importSummary" style="margin-bottom: 15px; padding: 10px; background: #f8fafc; border-radius: 5px;"></div>
+          <div id="importPreviewTable" style="overflow-x: auto; margin-bottom: 20px;"></div>
+          <button id="importValidUsersBtn" onclick="importValidUsers()" class="btn btn-primary" disabled>Import Valid Users</button>
+        </div>
       </div>
     </div>
   `;
@@ -800,6 +857,417 @@ async function showCreateClassFormClubDirector() {
   document.body.appendChild(modal);
 }
 
+// Import functionality - CSV parsing and validation
+let parsedUsers = [];
+let userValidations = [];
+
+// Setup file upload handler (called when import tab is loaded)
+function setupCSVFileInput() {
+  const csvFileInput = document.getElementById('csvFileInput');
+  if (csvFileInput) {
+    // Remove existing listeners by cloning
+    const newInput = csvFileInput.cloneNode(true);
+    csvFileInput.parentNode.replaceChild(newInput, csvFileInput);
+    
+    newInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      if (!file.name.toLowerCase().endsWith('.csv')) {
+        showNotification('Please select a CSV file', 'error');
+        return;
+      }
+      
+      try {
+        parsedUsers = await parseCSVFile(file);
+        userValidations = parsedUsers.map((row, index) => validateUserRow(row, index));
+        renderImportPreview(parsedUsers, userValidations);
+        showNotification(`CSV parsed: ${parsedUsers.length} user${parsedUsers.length !== 1 ? 's' : ''} found`, 'success');
+      } catch (error) {
+        showNotification('Error parsing CSV: ' + error.message, 'error');
+        parsedUsers = [];
+        userValidations = [];
+        const previewDiv = document.getElementById('importPreview');
+        if (previewDiv) {
+          previewDiv.style.display = 'none';
+        }
+      }
+    });
+  }
+}
+
+// Generate sample CSV file
+function generateSampleCSV() {
+  const headers = ['FirstName', 'LastName', 'DateOfBirth', 'Email', 'Phone', 'Role', 'InvestitureLevel'];
+  
+  // Sample data with examples for Student, Teacher, and Staff
+  const sampleData = [
+    ['John', 'Doe', '2010-05-15', 'john.doe@example.com', '555-0101', 'Student', 'Explorer'],
+    ['Jane', 'Smith', '1985-03-20', 'jane.smith@example.com', '555-0102', 'Teacher', 'Guide'],
+    ['Bob', 'Johnson', '1990-07-10', 'bob.johnson@example.com', '555-0103', 'Staff', 'Ranger']
+  ];
+  
+  // CSV escaping function
+  const escapeCSV = (value) => {
+    if (value === null || value === undefined) return '';
+    const str = String(value);
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+  
+  // Build CSV content
+  const csvLines = [
+    headers.map(escapeCSV).join(','),
+    ...sampleData.map(row => row.map(escapeCSV).join(','))
+  ];
+  
+  const csvContent = csvLines.join('\n');
+  
+  // Create download
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'user-import-sample.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+  
+  showNotification('Sample CSV downloaded', 'success');
+}
+
+// Parse CSV file
+function parseCSVFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        const lines = text.split(/\r?\n/).filter(line => line.trim());
+        
+        if (lines.length === 0) {
+          reject(new Error('CSV file is empty'));
+          return;
+        }
+        
+        // Parse header row
+        const headers = parseCSVLine(lines[0]);
+        const normalizedHeaders = headers.map(h => h.trim());
+        
+        // Validate required headers
+        const requiredHeaders = ['FirstName', 'LastName', 'DateOfBirth', 'Role'];
+        const missingHeaders = requiredHeaders.filter(h => !normalizedHeaders.includes(h));
+        if (missingHeaders.length > 0) {
+          reject(new Error(`Missing required columns: ${missingHeaders.join(', ')}`));
+          return;
+        }
+        
+        // Parse data rows
+        const data = [];
+        for (let i = 1; i < lines.length; i++) {
+          const values = parseCSVLine(lines[i]);
+          if (values.length === 0 || values.every(v => !v.trim())) continue; // Skip empty rows
+          
+          const row = {};
+          normalizedHeaders.forEach((header, index) => {
+            row[header] = values[index] ? values[index].trim() : '';
+          });
+          data.push(row);
+        }
+        
+        resolve(data);
+      } catch (error) {
+        reject(new Error('Error parsing CSV: ' + error.message));
+      }
+    };
+    
+    reader.onerror = () => reject(new Error('Error reading file'));
+    reader.readAsText(file);
+  });
+}
+
+// Parse a single CSV line handling quoted fields
+function parseCSVLine(line) {
+  const values = [];
+  let current = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const nextChar = line[i + 1];
+    
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        // Escaped quote
+        current += '"';
+        i++; // Skip next quote
+      } else {
+        // Toggle quote state
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      // End of field
+      values.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  
+  // Add last field
+  values.push(current);
+  
+  return values;
+}
+
+// Validate a user row
+function validateUserRow(row, rowIndex) {
+  const errors = [];
+  const rowNum = rowIndex + 2; // +2 because row 1 is header, and we're 0-indexed
+  
+  // Required fields
+  if (!row.FirstName || !row.FirstName.trim()) {
+    errors.push('FirstName is required');
+  }
+  
+  if (!row.LastName || !row.LastName.trim()) {
+    errors.push('LastName is required');
+  }
+  
+  if (!row.DateOfBirth || !row.DateOfBirth.trim()) {
+    errors.push('DateOfBirth is required');
+  } else {
+    // Validate date format YYYY-MM-DD
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(row.DateOfBirth.trim())) {
+      errors.push('DateOfBirth must be in YYYY-MM-DD format');
+    } else {
+      // Validate it's a valid date
+      const date = new Date(row.DateOfBirth.trim());
+      if (isNaN(date.getTime())) {
+        errors.push('DateOfBirth is not a valid date');
+      }
+    }
+  }
+  
+  if (!row.Role || !row.Role.trim()) {
+    errors.push('Role is required');
+  } else {
+    const validRoles = ['Student', 'Teacher', 'Staff'];
+    if (!validRoles.includes(row.Role.trim())) {
+      errors.push(`Role must be one of: ${validRoles.join(', ')}`);
+    }
+  }
+  
+  // Optional fields validation
+  if (row.Email && row.Email.trim()) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(row.Email.trim())) {
+      errors.push('Email format is invalid');
+    }
+  }
+  
+  // Phone is optional, no validation needed (any format accepted)
+  
+  // InvestitureLevel validation
+  if (row.InvestitureLevel && row.InvestitureLevel.trim()) {
+    const validLevels = ['None', 'Friend', 'Companion', 'Explorer', 'Ranger', 'Voyager', 'Guide', 'MasterGuide'];
+    if (!validLevels.includes(row.InvestitureLevel.trim())) {
+      errors.push(`InvestitureLevel must be one of: ${validLevels.join(', ')}`);
+    }
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors: errors
+  };
+}
+
+// Render import preview table
+function renderImportPreview(parsedUsers, validations) {
+  const previewDiv = document.getElementById('importPreview');
+  const summaryDiv = document.getElementById('importSummary');
+  const tableDiv = document.getElementById('importPreviewTable');
+  const importBtn = document.getElementById('importValidUsersBtn');
+  
+  if (!previewDiv || !summaryDiv || !tableDiv) return;
+  
+  previewDiv.style.display = 'block';
+  
+  // Calculate summary
+  const validCount = validations.filter(v => v.valid).length;
+  const invalidCount = validations.filter(v => !v.valid).length;
+  const totalCount = parsedUsers.length;
+  
+  summaryDiv.innerHTML = `
+    <strong>Summary:</strong> ${validCount} valid, ${invalidCount} invalid out of ${totalCount} total user${totalCount !== 1 ? 's' : ''}
+  `;
+  
+  // Build table
+  const tableHtml = `
+    <table class="table" style="width: 100%;">
+      <thead>
+        <tr>
+          <th>Row #</th>
+          <th>FirstName</th>
+          <th>LastName</th>
+          <th>DateOfBirth</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Role</th>
+          <th>InvestitureLevel</th>
+          <th>Status</th>
+          <th>Errors</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${parsedUsers.map((user, index) => {
+          const validation = validations[index];
+          const rowNum = index + 2; // +2 because row 1 is header, and we're 0-indexed
+          const isValid = validation.valid;
+          
+          // Determine which cells have errors
+          const firstNameError = !user.FirstName || !user.FirstName.trim();
+          const lastNameError = !user.LastName || !user.LastName.trim();
+          const dobError = !user.DateOfBirth || !user.DateOfBirth.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(user.DateOfBirth.trim());
+          const emailError = user.Email && user.Email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.Email.trim());
+          const roleError = !user.Role || !['Student', 'Teacher', 'Staff'].includes(user.Role.trim());
+          const investitureError = user.InvestitureLevel && user.InvestitureLevel.trim() && !['None', 'Friend', 'Companion', 'Explorer', 'Ranger', 'Voyager', 'Guide', 'MasterGuide'].includes(user.InvestitureLevel.trim());
+          
+          return `
+            <tr style="${isValid ? '' : 'background-color: #fff5f5;'}">
+              <td>${rowNum}</td>
+              <td style="${firstNameError ? 'border: 2px solid red;' : ''}">${user.FirstName || ''}</td>
+              <td style="${lastNameError ? 'border: 2px solid red;' : ''}">${user.LastName || ''}</td>
+              <td style="${dobError ? 'border: 2px solid red;' : ''}">${user.DateOfBirth || ''}</td>
+              <td style="${emailError ? 'border: 2px solid red;' : ''}">${user.Email || ''}</td>
+              <td>${user.Phone || ''}</td>
+              <td style="${roleError ? 'border: 2px solid red;' : ''}">${user.Role || ''}</td>
+              <td style="${investitureError ? 'border: 2px solid red;' : ''}">${user.InvestitureLevel || ''}</td>
+              <td>${isValid ? '<span style="color: green;">✓</span>' : '<span style="color: red;">✗</span>'}</td>
+              <td style="color: red; font-size: 0.875rem;">${validation.errors.length > 0 ? validation.errors.join(', ') : ''}</td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+  
+  tableDiv.innerHTML = tableHtml;
+  
+  // Enable/disable import button
+  if (importBtn) {
+    importBtn.disabled = validCount === 0;
+  }
+}
+
+// Import valid users
+async function importValidUsers() {
+  if (!clubDirectorClubId || !clubDirectorSelectedEventId) {
+    showNotification('Club or event information is missing', 'error');
+    return;
+  }
+  
+  const validUsers = parsedUsers.filter((_, index) => userValidations[index].valid);
+  
+  if (validUsers.length === 0) {
+    showNotification('No valid users to import', 'error');
+    return;
+  }
+  
+  const importBtn = document.getElementById('importValidUsersBtn');
+  if (importBtn) {
+    importBtn.disabled = true;
+    importBtn.textContent = 'Importing...';
+  }
+  
+  let successCount = 0;
+  let failureCount = 0;
+  const failures = [];
+  
+  for (let i = 0; i < validUsers.length; i++) {
+    const user = validUsers[i];
+    
+    const userData = {
+      FirstName: user.FirstName.trim(),
+      LastName: user.LastName.trim(),
+      DateOfBirth: user.DateOfBirth.trim(),
+      Email: user.Email ? user.Email.trim() : null,
+      Phone: user.Phone ? user.Phone.trim() : null,
+      Role: user.Role.trim(),
+      InvestitureLevel: (user.InvestitureLevel && user.InvestitureLevel.trim()) || 'None',
+      ClubID: clubDirectorClubId,
+      EventID: clubDirectorSelectedEventId,
+      Password: 'password123',
+      Active: true,
+      BackgroundCheck: false
+    };
+    
+    try {
+      const response = await fetchWithAuth('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        successCount++;
+      } else {
+        failureCount++;
+        failures.push({
+          name: `${user.FirstName} ${user.LastName}`,
+          error: result.error || 'Unknown error'
+        });
+      }
+    } catch (error) {
+      failureCount++;
+      failures.push({
+        name: `${user.FirstName} ${user.LastName}`,
+        error: error.message || 'Network error'
+      });
+    }
+  }
+  
+  // Reset button
+  if (importBtn) {
+    importBtn.disabled = false;
+    importBtn.textContent = 'Import Valid Users';
+  }
+  
+  // Show results
+  let message = `Import complete: ${successCount} user${successCount !== 1 ? 's' : ''} imported successfully`;
+  if (failureCount > 0) {
+    message += `, ${failureCount} failed`;
+    if (failures.length > 0) {
+      const failureDetails = failures.map(f => `${f.name}: ${f.error}`).join('; ');
+      message += `. Failures: ${failureDetails}`;
+    }
+  }
+  
+  showNotification(message, failureCount > 0 ? 'error' : 'success');
+  
+  // Refresh users list
+  await loadUsers();
+  
+  // Clear preview
+  parsedUsers = [];
+  userValidations = [];
+  const previewDiv = document.getElementById('importPreview');
+  if (previewDiv) {
+    previewDiv.style.display = 'none';
+  }
+  const fileInput = document.getElementById('csvFileInput');
+  if (fileInput) {
+    fileInput.value = '';
+  }
+}
+
 // Now the DOMContentLoaded handler
 document.addEventListener('DOMContentLoaded', async () => {
   // Clear any previous dashboard state
@@ -902,6 +1370,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.editUser = editUserClubDirector;
   window.showCreateClassForm = showCreateClassFormClubDirector;
   window.switchClubDirectorEvent = switchClubDirectorEvent;
+  window.generateSampleCSV = generateSampleCSV;
+  window.importValidUsers = importValidUsers;
   
   // Restore last active tab or default to users
   const savedTab = localStorage.getItem('directorCurrentTab') || 'users';
@@ -1877,6 +2347,18 @@ Thank you!`;
         break;
       case 'codes':
         await renderCodes();
+        break;
+      case 'import':
+        // Reload import tab with new event context
+        const importContent = document.getElementById('content');
+        if (importContent) {
+          importContent.innerHTML = getImportTab();
+          // Re-setup file upload handler
+          setTimeout(() => {
+            setupCSVFileInput();
+          }, 0);
+        }
+        setupEventSelector();
         break;
       case 'reports':
         // Reload reports tab with new event context
