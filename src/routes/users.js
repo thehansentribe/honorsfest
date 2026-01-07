@@ -1,12 +1,30 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const { parse } = require('csv-parse/sync');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const User = require('../models/user');
 const StytchService = require('../services/stytch');
 const { allowMultipleClubDirectors } = require('../config/features');
 
 const router = express.Router();
+
+// Configure multer for CSV file uploads (memory storage)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept CSV files only
+    if (file.mimetype === 'text/csv' || file.mimetype === 'application/vnd.ms-excel' || file.originalname.endsWith('.csv')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only CSV files are allowed'), false);
+    }
+  }
+});
 
 // All routes require authentication
 router.use(verifyToken);
@@ -468,6 +486,291 @@ router.delete('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, 
     }
     res.json({ message: 'User deactivated successfully', user });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/users/import/sample - Download sample CSV (ClubDirector only)
+router.get('/import/sample', requireRole('ClubDirector'), (req, res) => {
+  try {
+    const headers = [
+      'FirstName',
+      'LastName',
+      'DateOfBirth',
+      'Email',
+      'Phone',
+      'Role',
+      'InvestitureLevel',
+      'Active',
+      'BackgroundCheck'
+    ];
+
+    const sampleRows = [
+      ['John', 'Doe', '2010-05-15', 'john.doe@example.com', '555-0101', 'Student', 'Explorer', '1', '0'],
+      ['Jane', 'Smith', '1985-03-20', 'jane.smith@example.com', '555-0102', 'Teacher', 'MasterGuide', '1', '1'],
+      ['Bob', 'Johnson', '1990-07-10', 'bob.johnson@example.com', '555-0103', 'Staff', 'Ranger', '1', '0']
+    ];
+
+    // Helper function to escape CSV values
+    const escapeCsvValue = (value) => {
+      if (value === null || value === undefined) {
+        return '';
+      }
+      const stringValue = String(value);
+      // If value contains comma, quote, or newline, wrap in quotes and escape quotes
+      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }
+      return stringValue;
+    };
+
+    const csvLines = [];
+    csvLines.push(headers.map(escapeCsvValue).join(',')); // Add headers
+    sampleRows.forEach(row => {
+      csvLines.push(row.map(escapeCsvValue).join(','));
+    });
+
+    const csv = csvLines.join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=user-import-sample.csv');
+    res.send(csv);
+  } catch (error) {
+    console.error('Error generating sample CSV:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/users/import/validate - Validate CSV file without importing (ClubDirector only)
+router.post('/import/validate', requireRole('ClubDirector'), upload.single('csvFile'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No CSV file uploaded' });
+    }
+
+    const userRole = req.user.role;
+    const userClubId = req.user.clubId;
+    const userEventId = req.user.eventId;
+
+    if (!userClubId || !userEventId) {
+      return res.status(400).json({ error: 'Club Director must have a club and event assigned' });
+    }
+
+    // Parse CSV file
+    let records;
+    try {
+      records = parse(req.file.buffer.toString('utf8'), {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+        relax_column_count: true
+      });
+    } catch (parseError) {
+      return res.status(400).json({ error: `CSV parsing error: ${parseError.message}` });
+    }
+
+    if (records.length === 0) {
+      return res.status(400).json({ error: 'CSV file is empty or has no valid rows' });
+    }
+
+    if (records.length > 1000) {
+      return res.status(400).json({ error: 'CSV file contains too many rows. Maximum 1000 users per import.' });
+    }
+
+    const validUsers = [];
+    const errors = [];
+    const warnings = [];
+    const emailSet = new Set();
+
+    // Valid roles for Club Directors
+    const allowedRoles = ['Student', 'Teacher', 'Staff'];
+    const validInvestitureLevels = ['Friend', 'Companion', 'Explorer', 'Ranger', 'Voyager', 'Guide', 'MasterGuide', 'None'];
+
+    records.forEach((row, index) => {
+      const rowNumber = index + 2; // +2 because row 1 is header, and index is 0-based
+      const rowErrors = [];
+      const rowWarnings = [];
+
+      // Required fields validation
+      if (!row.FirstName || !row.FirstName.trim()) {
+        rowErrors.push({ field: 'FirstName', message: 'First name is required' });
+      }
+      if (!row.LastName || !row.LastName.trim()) {
+        rowErrors.push({ field: 'LastName', message: 'Last name is required' });
+      }
+      if (!row.DateOfBirth || !row.DateOfBirth.trim()) {
+        rowErrors.push({ field: 'DateOfBirth', message: 'Date of birth is required' });
+      }
+      if (!row.Role || !row.Role.trim()) {
+        rowErrors.push({ field: 'Role', message: 'Role is required' });
+      }
+
+      // Role validation - Club Directors can only import Student, Teacher, or Staff
+      if (row.Role && !allowedRoles.includes(row.Role.trim())) {
+        rowErrors.push({ field: 'Role', message: 'Club Directors can only import Student, Teacher, or Staff roles' });
+      }
+
+      // DateOfBirth format validation (YYYY-MM-DD)
+      if (row.DateOfBirth) {
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(row.DateOfBirth.trim())) {
+          rowErrors.push({ field: 'DateOfBirth', message: 'Date of birth must be in YYYY-MM-DD format' });
+        } else {
+          // Validate it's a valid date
+          const date = new Date(row.DateOfBirth.trim());
+          if (isNaN(date.getTime())) {
+            rowErrors.push({ field: 'DateOfBirth', message: 'Date of birth is not a valid date' });
+          }
+        }
+      }
+
+      // Email format validation (if provided)
+      if (row.Email && row.Email.trim()) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(row.Email.trim())) {
+          rowErrors.push({ field: 'Email', message: 'Invalid email format' });
+        }
+      }
+
+      // InvestitureLevel validation
+      if (row.InvestitureLevel && row.InvestitureLevel.trim() && !validInvestitureLevels.includes(row.InvestitureLevel.trim())) {
+        rowErrors.push({ field: 'InvestitureLevel', message: `Investiture level must be one of: ${validInvestitureLevels.join(', ')}` });
+      }
+
+      // Active validation (should be 0 or 1, or true/false)
+      let active = true;
+      if (row.Active !== undefined && row.Active !== null && row.Active !== '') {
+        const activeStr = String(row.Active).trim().toLowerCase();
+        if (activeStr === '0' || activeStr === 'false' || activeStr === 'no') {
+          active = false;
+        } else if (activeStr !== '1' && activeStr !== 'true' && activeStr !== 'yes') {
+          rowErrors.push({ field: 'Active', message: 'Active must be 1/0, true/false, or yes/no' });
+        }
+      }
+
+      // BackgroundCheck validation (should be 0 or 1, or true/false)
+      let backgroundCheck = false;
+      if (row.BackgroundCheck !== undefined && row.BackgroundCheck !== null && row.BackgroundCheck !== '') {
+        const bgStr = String(row.BackgroundCheck).trim().toLowerCase();
+        if (bgStr === '1' || bgStr === 'true' || bgStr === 'yes') {
+          backgroundCheck = true;
+        } else if (bgStr !== '0' && bgStr !== 'false' && bgStr !== 'no') {
+          rowErrors.push({ field: 'BackgroundCheck', message: 'BackgroundCheck must be 1/0, true/false, or yes/no' });
+        }
+      }
+
+      // Check for duplicate emails in CSV
+      if (row.Email && row.Email.trim()) {
+        const emailLower = row.Email.trim().toLowerCase();
+        if (emailSet.has(emailLower)) {
+          rowWarnings.push({ field: 'Email', message: 'Duplicate email in CSV file' });
+        } else {
+          emailSet.add(emailLower);
+        }
+
+        // Check if user already exists in database
+        const existingUser = User.findByEmail(emailLower);
+        if (existingUser) {
+          rowWarnings.push({ field: 'Email', message: `User with email ${emailLower} already exists in database` });
+        }
+      }
+
+      if (rowErrors.length > 0) {
+        errors.push({
+          row: rowNumber,
+          errors: rowErrors
+        });
+      } else {
+        // Build valid user object
+        const userData = {
+          FirstName: row.FirstName.trim(),
+          LastName: row.LastName.trim(),
+          DateOfBirth: row.DateOfBirth.trim(),
+          Email: row.Email ? row.Email.trim() : null,
+          Phone: row.Phone ? row.Phone.trim() : null,
+          Role: row.Role.trim(),
+          InvestitureLevel: row.InvestitureLevel ? row.InvestitureLevel.trim() : 'None',
+          Active: active,
+          BackgroundCheck: backgroundCheck,
+          ClubID: userClubId,
+          EventID: userEventId,
+          PasswordHash: bcrypt.hashSync('password123', 10) // Default password
+        };
+
+        validUsers.push({
+          row: rowNumber,
+          data: userData,
+          warnings: rowWarnings
+        });
+      }
+
+      // Add warnings to errors array if there are any
+      if (rowWarnings.length > 0 && rowErrors.length === 0) {
+        warnings.push({
+          row: rowNumber,
+          warnings: rowWarnings
+        });
+      }
+    });
+
+    res.json({
+      validUsers: validUsers.map(v => v.data),
+      validUsersWithMetadata: validUsers,
+      errors,
+      warnings,
+      summary: {
+        total: records.length,
+        valid: validUsers.length,
+        errors: errors.length,
+        warnings: warnings.length
+      }
+    });
+  } catch (error) {
+    console.error('Error validating CSV:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/users/import/finalize - Finalize import after preview (ClubDirector only)
+router.post('/import/finalize', requireRole('ClubDirector'), (req, res) => {
+  try {
+    const { validUsers } = req.body;
+
+    if (!Array.isArray(validUsers) || validUsers.length === 0) {
+      return res.status(400).json({ error: 'No valid users to import' });
+    }
+
+    if (validUsers.length > 1000) {
+      return res.status(400).json({ error: 'Too many users to import. Maximum 1000 users per import.' });
+    }
+
+    const userRole = req.user.role;
+    const userClubId = req.user.clubId;
+    const userEventId = req.user.eventId;
+
+    // Verify all users have correct ClubID and EventID
+    for (const user of validUsers) {
+      if (user.ClubID !== userClubId || user.EventID !== userEventId) {
+        return res.status(403).json({ error: 'Cannot import users for different club or event' });
+      }
+
+      // Ensure role is allowed
+      const allowedRoles = ['Student', 'Teacher', 'Staff'];
+      if (!allowedRoles.includes(user.Role)) {
+        return res.status(403).json({ error: 'Club Directors can only import Student, Teacher, or Staff roles' });
+      }
+    }
+
+    // Use bulkCreate to import users
+    const createdUsers = User.bulkCreate(validUsers);
+
+    res.json({
+      message: `Successfully imported ${createdUsers.length} user(s)`,
+      count: createdUsers.length,
+      users: createdUsers
+    });
+  } catch (error) {
+    console.error('Error finalizing import:', error);
     res.status(500).json({ error: error.message });
   }
 });

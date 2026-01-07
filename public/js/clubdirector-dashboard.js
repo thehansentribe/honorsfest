@@ -52,6 +52,13 @@ async function clubdirectorSwitchTab(tabName, clickedElement = null) {
       content.innerHTML = getUsersTab();
       renderUsers();
       break;
+    case 'import':
+      content.innerHTML = getImportUsersTab();
+      // Set up drag and drop after DOM is ready
+      setTimeout(() => {
+        setupDragAndDrop();
+      }, 100);
+      break;
     case 'classes':
       content.innerHTML = getClassesTabClubDirector();
       renderClasses();
@@ -1936,7 +1943,384 @@ Thank you!`;
       showNotification('Error generating report: ' + error.message, 'error');
     }
   }
-});
+
+// Get Import Users Tab HTML
+function getImportUsersTab() {
+  return `
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Import Users from CSV</h2>
+      </div>
+      <div style="padding: 20px;">
+        <div style="margin-bottom: 20px;">
+          <button onclick="downloadSampleCSV()" class="btn btn-primary" style="margin-bottom: 15px;">
+            📥 Download Sample CSV
+          </button>
+          <p style="color: #666; font-size: 0.9rem; margin-bottom: 15px;">
+            Download a sample CSV file with the correct format and example data for Student, Teacher, and Staff roles.
+          </p>
+        </div>
+
+        <div id="uploadSection" style="margin-bottom: 20px;">
+          <div id="dropZone" style="border: 2px dashed #ccc; border-radius: 8px; padding: 30px; text-align: center; background: #f8f9fa; transition: all 0.3s;">
+            <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="handleCSVFileSelect(event)">
+            <button onclick="document.getElementById('csvFileInput').click()" class="btn btn-primary" style="margin-bottom: 10px;">
+              Choose CSV File
+            </button>
+            <p style="color: #666; font-size: 0.9rem; margin: 10px 0;">
+              or drag and drop your CSV file here
+            </p>
+            <p id="selectedFileName" style="color: #007bff; font-weight: bold; margin-top: 10px; display: none;"></p>
+            <button id="uploadBtn" onclick="handleCSVUpload()" class="btn btn-success" style="margin-top: 15px; display: none;">
+              Upload and Validate
+            </button>
+          </div>
+        </div>
+
+        <div id="loadingSection" style="display: none; text-align: center; padding: 20px;">
+          <div style="color: #007bff; font-size: 1.1rem;">⏳ Validating CSV file...</div>
+        </div>
+
+        <div id="previewSection" style="display: none;">
+          <div style="background: #e7f3ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #007bff;">
+            <h3 style="margin: 0 0 10px 0;">Validation Summary</h3>
+            <div id="validationSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+              <!-- Summary will be populated here -->
+            </div>
+          </div>
+
+          <div id="validUsersSection" style="margin-bottom: 20px;">
+            <h3 style="margin-bottom: 15px;">Valid Users (<span id="validCount">0</span>)</h3>
+            <div style="max-height: 400px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px;">
+              <table class="table" style="margin: 0;">
+                <thead style="position: sticky; top: 0; background: white; z-index: 10;">
+                  <tr>
+                    <th>Row</th>
+                    <th>First Name</th>
+                    <th>Last Name</th>
+                    <th>Date of Birth</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Role</th>
+                    <th>Investiture Level</th>
+                  </tr>
+                </thead>
+                <tbody id="validUsersTable">
+                  <!-- Valid users will be populated here -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="errorsSection" style="margin-bottom: 20px; display: none;">
+            <h3 style="margin-bottom: 15px; color: #dc3545;">Errors (<span id="errorCount">0</span>)</h3>
+            <div style="max-height: 300px; overflow-y: auto; border: 1px solid #dc3545; border-radius: 4px; background: #fff5f5;">
+              <div id="errorsList" style="padding: 15px;">
+                <!-- Errors will be populated here -->
+              </div>
+            </div>
+          </div>
+
+          <div id="warningsSection" style="margin-bottom: 20px; display: none;">
+            <h3 style="margin-bottom: 15px; color: #856404;">Warnings (<span id="warningCount">0</span>)</h3>
+            <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ffc107; border-radius: 4px; background: #fffbf0;">
+              <div id="warningsList" style="padding: 15px;">
+                <!-- Warnings will be populated here -->
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button onclick="resetImportTab()" class="btn btn-outline">Cancel</button>
+            <button id="importBtn" onclick="handleFinalizeImport()" class="btn btn-primary" disabled>
+              Import <span id="importCount">0</span> User(s)
+            </button>
+          </div>
+        </div>
+
+        <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+          <h4 style="margin-top: 0;">Instructions:</h4>
+          <ul style="margin: 10px 0; padding-left: 20px; color: #666;">
+            <li>Download the sample CSV to see the correct format</li>
+            <li>Required fields: FirstName, LastName, DateOfBirth, Role</li>
+            <li>Role must be: Student, Teacher, or Staff</li>
+            <li>DateOfBirth must be in YYYY-MM-DD format</li>
+            <li>Email is optional but must be valid format if provided</li>
+            <li>InvestitureLevel must be one of: Friend, Companion, Explorer, Ranger, Voyager, Guide, MasterGuide, None</li>
+            <li>Active and BackgroundCheck should be 1/0, true/false, or yes/no</li>
+            <li>All imported users will be assigned to your club and current event</li>
+            <li>Default password for all imported users: password123</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+let importValidationData = null;
+
+async function downloadSampleCSV() {
+  try {
+    const response = await fetchWithAuth('/api/users/import/sample');
+    if (!response.ok) {
+      throw new Error('Failed to download sample CSV');
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'user-import-sample.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    showNotification('Sample CSV downloaded successfully', 'success');
+  } catch (error) {
+    showNotification('Error downloading sample CSV: ' + error.message, 'error');
+  }
+}
+
+function handleCSVFileSelect(event) {
+  const file = event.target.files[0];
+  if (file) {
+    if (!file.name.endsWith('.csv')) {
+      showNotification('Please select a CSV file', 'error');
+      return;
+    }
+    document.getElementById('selectedFileName').textContent = `Selected: ${file.name}`;
+    document.getElementById('selectedFileName').style.display = 'block';
+    document.getElementById('uploadBtn').style.display = 'inline-block';
+  }
+}
+
+async function handleCSVUpload() {
+  const fileInput = document.getElementById('csvFileInput');
+  const file = fileInput.files[0];
+  
+  if (!file) {
+    showNotification('Please select a CSV file first', 'error');
+    return;
+  }
+
+  const uploadSection = document.getElementById('uploadSection');
+  const loadingSection = document.getElementById('loadingSection');
+  const previewSection = document.getElementById('previewSection');
+
+  uploadSection.style.display = 'none';
+  loadingSection.style.display = 'block';
+  previewSection.style.display = 'none';
+
+  try {
+    const formData = new FormData();
+    formData.append('csvFile', file);
+
+    const response = await fetchWithAuth('/api/users/import/validate', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to validate CSV');
+    }
+
+    const data = await response.json();
+    importValidationData = data;
+
+    loadingSection.style.display = 'none';
+    previewSection.style.display = 'block';
+
+    showImportPreview(data);
+  } catch (error) {
+    loadingSection.style.display = 'none';
+    uploadSection.style.display = 'block';
+    showNotification('Error validating CSV: ' + error.message, 'error');
+  }
+}
+
+function showImportPreview(data) {
+  const { validUsers, validUsersWithMetadata, errors, warnings, summary } = data;
+
+  // Update summary
+  document.getElementById('validationSummary').innerHTML = `
+    <div><strong>Total Rows:</strong> ${summary.total}</div>
+    <div style="color: #28a745;"><strong>Valid:</strong> ${summary.valid}</div>
+    <div style="color: #dc3545;"><strong>Errors:</strong> ${summary.errors}</div>
+    <div style="color: #856404;"><strong>Warnings:</strong> ${summary.warnings}</div>
+  `;
+
+  // Show valid users
+  const validCount = validUsers.length;
+  document.getElementById('validCount').textContent = validCount;
+  document.getElementById('importCount').textContent = validCount;
+  
+  const validUsersTable = document.getElementById('validUsersTable');
+  if (validCount > 0) {
+    validUsersTable.innerHTML = validUsersWithMetadata.map((item, idx) => {
+      const u = item.data;
+      return `
+        <tr>
+          <td>${item.row}</td>
+          <td>${u.FirstName}</td>
+          <td>${u.LastName}</td>
+          <td>${u.DateOfBirth}</td>
+          <td>${u.Email || '<em>None</em>'}</td>
+          <td>${u.Phone || '<em>None</em>'}</td>
+          <td>${u.Role}</td>
+          <td>${u.InvestitureLevel}</td>
+        </tr>
+      `;
+    }).join('');
+    document.getElementById('validUsersSection').style.display = 'block';
+    document.getElementById('importBtn').disabled = false;
+  } else {
+    validUsersTable.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px;">No valid users to import</td></tr>';
+    document.getElementById('validUsersSection').style.display = 'block';
+    document.getElementById('importBtn').disabled = true;
+  }
+
+  // Show errors
+  if (errors.length > 0) {
+    document.getElementById('errorCount').textContent = errors.length;
+    document.getElementById('errorsList').innerHTML = errors.map(err => `
+      <div style="margin-bottom: 10px; padding: 10px; background: white; border-radius: 4px;">
+        <strong>Row ${err.row}:</strong>
+        <ul style="margin: 5px 0 0 20px; color: #dc3545;">
+          ${err.errors.map(e => `<li><strong>${e.field}:</strong> ${e.message}</li>`).join('')}
+        </ul>
+      </div>
+    `).join('');
+    document.getElementById('errorsSection').style.display = 'block';
+  } else {
+    document.getElementById('errorsSection').style.display = 'none';
+  }
+
+  // Show warnings
+  if (warnings.length > 0) {
+    document.getElementById('warningCount').textContent = warnings.length;
+    document.getElementById('warningsList').innerHTML = warnings.map(warn => `
+      <div style="margin-bottom: 10px; padding: 10px; background: white; border-radius: 4px;">
+        <strong>Row ${warn.row}:</strong>
+        <ul style="margin: 5px 0 0 20px; color: #856404;">
+          ${warn.warnings.map(w => `<li><strong>${w.field}:</strong> ${w.message}</li>`).join('')}
+        </ul>
+      </div>
+    `).join('');
+    document.getElementById('warningsSection').style.display = 'block';
+  } else {
+    document.getElementById('warningsSection').style.display = 'none';
+  }
+}
+
+async function handleFinalizeImport() {
+  if (!importValidationData || !importValidationData.validUsers || importValidationData.validUsers.length === 0) {
+    showNotification('No valid users to import', 'error');
+    return;
+  }
+
+  const confirmed = confirm(`Are you sure you want to import ${importValidationData.validUsers.length} user(s)?`);
+  if (!confirmed) {
+    return;
+  }
+
+  const importBtn = document.getElementById('importBtn');
+  importBtn.disabled = true;
+  importBtn.textContent = 'Importing...';
+
+  try {
+    const response = await fetchWithAuth('/api/users/import/finalize', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        validUsers: importValidationData.validUsers
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to import users');
+    }
+
+    const result = await response.json();
+    showNotification(`Successfully imported ${result.count} user(s)`, 'success');
+    
+    // Reset the import tab
+    resetImportTab();
+    
+    // Optionally switch to Users tab to see the new users
+    setTimeout(() => {
+      clubdirectorSwitchTab('users');
+    }, 1500);
+  } catch (error) {
+    showNotification('Error importing users: ' + error.message, 'error');
+    importBtn.disabled = false;
+    importBtn.innerHTML = `Import <span id="importCount">${importValidationData.validUsers.length}</span> User(s)`;
+  }
+}
+
+function resetImportTab() {
+  importValidationData = null;
+  document.getElementById('csvFileInput').value = '';
+  document.getElementById('selectedFileName').style.display = 'none';
+  document.getElementById('uploadBtn').style.display = 'none';
+  document.getElementById('uploadSection').style.display = 'block';
+  document.getElementById('loadingSection').style.display = 'none';
+  document.getElementById('previewSection').style.display = 'none';
+}
+
+function setupDragAndDrop() {
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('csvFileInput');
+  
+  if (!dropZone || !fileInput) return;
+
+  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    dropZone.addEventListener(eventName, preventDefaults, false);
+  });
+
+  function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  ['dragenter', 'dragover'].forEach(eventName => {
+    dropZone.addEventListener(eventName, () => {
+      dropZone.style.borderColor = '#007bff';
+      dropZone.style.background = '#e7f3ff';
+    }, false);
+  });
+
+  ['dragleave', 'drop'].forEach(eventName => {
+    dropZone.addEventListener(eventName, () => {
+      dropZone.style.borderColor = '#ccc';
+      dropZone.style.background = '#f8f9fa';
+    }, false);
+  });
+
+  dropZone.addEventListener('drop', (e) => {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    
+    if (files.length > 0) {
+      const file = files[0];
+      if (file.name.endsWith('.csv')) {
+        fileInput.files = files;
+        handleCSVFileSelect({ target: fileInput });
+      } else {
+        showNotification('Please drop a CSV file', 'error');
+      }
+    }
+  }, false);
+}
+
+// Expose functions globally
+window.downloadSampleCSV = downloadSampleCSV;
+window.handleCSVFileSelect = handleCSVFileSelect;
+window.handleCSVUpload = handleCSVUpload;
+window.handleFinalizeImport = handleFinalizeImport;
+window.resetImportTab = resetImportTab;
 
 })(); // End IIFE - closes the wrapper around all Club Director code
 
