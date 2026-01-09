@@ -1401,9 +1401,9 @@ async function loadSystemStats() {
       <table class="table" style="margin-bottom: 0; background: white;">
         <thead>
           <tr>
-            <th>Users</th>
-            <th>Classes & Registrations</th>
-            <th>User Roles</th>
+            <th>Overview</th>
+            <th>Administration</th>
+            <th>Participants</th>
           </tr>
         </thead>
         <tbody>
@@ -1416,14 +1416,34 @@ async function loadSystemStats() {
             </td>
             <td>
               <div style="padding: 8px 0;">
+                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Admins</div>
+                <div style="font-size: 1.3rem; color: #6f42c1; font-weight: bold;">${stats.users.admin}</div>
+              </div>
+            </td>
+            <td>
+              <div style="padding: 8px 0;">
+                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Teachers</div>
+                <div style="font-size: 1.3rem; color: #20c997; font-weight: bold;">${stats.users.teacher}</div>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div style="padding: 8px 0;">
                 <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Total Classes</div>
                 <div style="font-size: 1.3rem; color: #007bff; font-weight: bold;">${stats.classes}</div>
               </div>
             </td>
             <td>
               <div style="padding: 8px 0;">
-                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Admins</div>
-                <div style="font-size: 1.3rem; color: #6f42c1; font-weight: bold;">${stats.users.admin}</div>
+                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Event Admins</div>
+                <div style="font-size: 1.3rem; color: #e83e8c; font-weight: bold;">${stats.users.eventAdmin}</div>
+              </div>
+            </td>
+            <td>
+              <div style="padding: 8px 0;">
+                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Staff</div>
+                <div style="font-size: 1.3rem; color: #17a2b8; font-weight: bold;">${stats.users.staff}</div>
               </div>
             </td>
           </tr>
@@ -1436,56 +1456,26 @@ async function loadSystemStats() {
             </td>
             <td>
               <div style="padding: 8px 0;">
-                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Total Waitlisted</div>
-                <div style="font-size: 1.3rem; color: #ffc107; font-weight: bold;">${stats.waitlisted}</div>
-              </div>
-            </td>
-            <td>
-              <div style="padding: 8px 0;">
-                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Event Admins</div>
-                <div style="font-size: 1.3rem; color: #e83e8c; font-weight: bold;">${stats.users.eventAdmin}</div>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td></td>
-            <td></td>
-            <td>
-              <div style="padding: 8px 0;">
                 <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Club Directors</div>
                 <div style="font-size: 1.3rem; color: #fd7e14; font-weight: bold;">${stats.users.clubDirector}</div>
               </div>
             </td>
-          </tr>
-          <tr>
-            <td></td>
-            <td></td>
-            <td>
-              <div style="padding: 8px 0;">
-                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Teachers</div>
-                <div style="font-size: 1.3rem; color: #20c997; font-weight: bold;">${stats.users.teacher}</div>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td></td>
-            <td></td>
-            <td>
-              <div style="padding: 8px 0;">
-                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Staff</div>
-                <div style="font-size: 1.3rem; color: #17a2b8; font-weight: bold;">${stats.users.staff}</div>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td></td>
-            <td></td>
             <td>
               <div style="padding: 8px 0;">
                 <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Students</div>
                 <div style="font-size: 1.3rem; color: #28a745; font-weight: bold;">${stats.users.student}</div>
               </div>
             </td>
+          </tr>
+          <tr>
+            <td>
+              <div style="padding: 8px 0;">
+                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Total Waitlisted</div>
+                <div style="font-size: 1.3rem; color: #ffc107; font-weight: bold;">${stats.waitlisted}</div>
+              </div>
+            </td>
+            <td></td>
+            <td></td>
           </tr>
         </tbody>
       </table>
