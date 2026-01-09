@@ -108,16 +108,41 @@ router.get('/:id/dashboard', (req, res) => {
     const clubCount = db.prepare('SELECT COUNT(DISTINCT ClubID) as count FROM ClubEvents WHERE EventID = ?').get(eventId);
     const locationCount = db.prepare('SELECT COUNT(*) as count FROM Locations WHERE EventID = ?').get(eventId);
     const timeslotCount = db.prepare('SELECT COUNT(*) as count FROM Timeslots WHERE EventID = ?').get(eventId);
+    // Count all users in clubs linked to this event (not just those with registrations)
     const userCount = db.prepare(`
       SELECT COUNT(DISTINCT u.ID) as count
       FROM Users u
-      JOIN Registrations r ON u.ID = r.UserID
-      JOIN Classes c ON r.ClassID = c.ID
-      WHERE c.EventID = ? AND c.Active = 1
+      INNER JOIN ClubEvents ce ON u.ClubID = ce.ClubID
+      WHERE ce.EventID = ? AND u.Role IN ('Student', 'Teacher', 'Staff', 'ClubDirector') AND u.Active = 1
     `).get(eventId);
     
     // Get clubs linked to this event
     const clubs = Club.findByEvent(eventId);
+    
+    // Enhance clubs with user counts for this event
+    const clubsWithCounts = clubs.map(club => {
+      const teacherCount = db.prepare(`
+        SELECT COUNT(*) as count FROM Users 
+        WHERE ClubID = ? AND Role = 'Teacher' AND EventID = ? AND Active = 1
+      `).get(club.ID, eventId).count;
+      
+      const staffCount = db.prepare(`
+        SELECT COUNT(*) as count FROM Users 
+        WHERE ClubID = ? AND Role = 'Staff' AND EventID = ? AND Active = 1
+      `).get(club.ID, eventId).count;
+      
+      const studentCount = db.prepare(`
+        SELECT COUNT(*) as count FROM Users 
+        WHERE ClubID = ? AND Role = 'Student' AND EventID = ? AND Active = 1
+      `).get(club.ID, eventId).count;
+      
+      return {
+        ...club,
+        TeacherCount: teacherCount,
+        StaffCount: staffCount,
+        StudentCount: studentCount
+      };
+    });
     
     // Get locations for this event
     const locations = Location.findByEvent(eventId);
@@ -137,9 +162,89 @@ router.get('/:id/dashboard', (req, res) => {
         timeslots: timeslotCount.count,
         users: userCount.count
       },
-      clubs,
+      clubs: clubsWithCounts,
       locations,
       timeslots
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/events/system-stats - Get system-wide statistics
+router.get('/system-stats', (req, res) => {
+  try {
+    const { db } = require('../config/db');
+    
+    // Count users by role across all events
+    const adminCount = db.prepare(`
+      SELECT COUNT(*) as count FROM Users 
+      WHERE Role IN ('Admin', 'AdminViewOnly') AND Active = 1
+    `).get().count;
+    
+    const eventAdminCount = db.prepare(`
+      SELECT COUNT(*) as count FROM Users 
+      WHERE Role = 'EventAdmin' AND Active = 1
+    `).get().count;
+    
+    const clubDirectorCount = db.prepare(`
+      SELECT COUNT(*) as count FROM Users 
+      WHERE Role = 'ClubDirector' AND Active = 1
+    `).get().count;
+    
+    const teacherCount = db.prepare(`
+      SELECT COUNT(*) as count FROM Users 
+      WHERE Role = 'Teacher' AND Active = 1
+    `).get().count;
+    
+    const staffCount = db.prepare(`
+      SELECT COUNT(*) as count FROM Users 
+      WHERE Role = 'Staff' AND Active = 1
+    `).get().count;
+    
+    const studentCount = db.prepare(`
+      SELECT COUNT(*) as count FROM Users 
+      WHERE Role = 'Student' AND Active = 1
+    `).get().count;
+    
+    const totalUsersCount = db.prepare(`
+      SELECT COUNT(*) as count FROM Users WHERE Active = 1
+    `).get().count;
+    
+    // Count all active classes across all events
+    const totalClassesCount = db.prepare(`
+      SELECT COUNT(*) as count FROM Classes WHERE Active = 1
+    `).get().count;
+    
+    // Count all enrolled registrations across all events
+    const totalEnrolledCount = db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM Registrations r
+      JOIN Classes c ON r.ClassID = c.ID
+      WHERE c.Active = 1 AND r.Status = 'Enrolled'
+    `).get().count;
+    
+    // Count all waitlisted registrations across all events
+    const totalWaitlistedCount = db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM Registrations r
+      JOIN Classes c ON r.ClassID = c.ID
+      WHERE c.Active = 1 AND r.Status = 'Waitlisted'
+    `).get().count;
+    
+    res.json({
+      users: {
+        admin: adminCount,
+        eventAdmin: eventAdminCount,
+        clubDirector: clubDirectorCount,
+        teacher: teacherCount,
+        staff: staffCount,
+        student: studentCount,
+        total: totalUsersCount
+      },
+      classes: totalClassesCount,
+      enrolled: totalEnrolledCount,
+      waitlisted: totalWaitlistedCount
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -592,6 +592,7 @@ async function switchTab(tabName, clickedElement = null) {
   switch(tabName) {
     case 'events':
       content.innerHTML = await getEventsTab();
+      await loadSystemStats();
       await renderEvents();
       break;
     case 'locations':
@@ -631,6 +632,7 @@ async function switchTab(tabName, clickedElement = null) {
       break;
     default:
       content.innerHTML = await getEventsTab();
+      await loadSystemStats();
       await renderEvents();
       break;
   }
@@ -647,6 +649,12 @@ function getEventsTab() {
       <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
         <h2 class="card-title" style="margin: 0;">Events</h2>
         <button onclick="showCreateEventForm()" class="btn btn-primary">Create New Event</button>
+      </div>
+      <div id="systemStats" style="padding: 15px; margin-bottom: 20px; background: #f8f9fa; border-radius: 8px;">
+        <h3 style="margin: 0 0 15px 0; color: #495057; font-size: 1.1rem;">System Statistics</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+          <div id="systemStatsContent">Loading system statistics...</div>
+        </div>
       </div>
       <div id="eventsList"></div>
     </div>
@@ -1520,8 +1528,29 @@ async function loadEventDashboard(eventId) {
       ${clubs.length > 0 ? `
         <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6; margin-bottom: 20px;">
           <h3 style="margin: 0 0 15px 0; color: #495057; font-size: 1.1rem;">Linked Clubs (${clubs.length})</h3>
-          <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-            ${clubs.map(club => `<span class="badge badge-secondary" style="font-size: 0.9rem; padding: 6px 12px; background-color: #17a2b8; color: white;">${club.Name}</span>`).join('')}
+          <div style="overflow-x: auto;">
+            <table class="table" style="margin-bottom: 0;">
+              <thead>
+                <tr>
+                  <th>Club Name</th>
+                  <th>Director</th>
+                  <th>Teachers</th>
+                  <th>Staff</th>
+                  <th>Students</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${clubs.map(club => `
+                  <tr>
+                    <td><strong>${club.Name}</strong></td>
+                    <td>${club.DirectorFirstName && club.DirectorLastName ? `${club.DirectorFirstName} ${club.DirectorLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
+                    <td>${club.TeacherCount || 0}</td>
+                    <td>${club.StaffCount || 0}</td>
+                    <td>${club.StudentCount || 0}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
           </div>
         </div>
       ` : ''}
@@ -1574,6 +1603,65 @@ async function loadEventDashboard(eventId) {
 }
 
 window.toggleEventDashboard = toggleEventDashboard;
+
+async function loadSystemStats() {
+  const statsContainer = document.getElementById('systemStatsContent');
+  if (!statsContainer) return;
+  
+  try {
+    const response = await fetchWithAuth('/api/events/system-stats');
+    if (!response.ok) {
+      throw new Error('Failed to load system statistics');
+    }
+    
+    const stats = await response.json();
+    
+    statsContainer.innerHTML = `
+      <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #dee2e6;">
+        <div style="font-weight: bold; margin-bottom: 8px; color: #495057;">Total Users</div>
+        <div style="font-size: 1.5rem; color: #007bff;">${stats.users.total}</div>
+      </div>
+      <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #dee2e6;">
+        <div style="font-weight: bold; margin-bottom: 8px; color: #495057;">Admins</div>
+        <div style="font-size: 1.5rem; color: #6f42c1;">${stats.users.admin}</div>
+      </div>
+      <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #dee2e6;">
+        <div style="font-weight: bold; margin-bottom: 8px; color: #495057;">Event Admins</div>
+        <div style="font-size: 1.5rem; color: #e83e8c;">${stats.users.eventAdmin}</div>
+      </div>
+      <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #dee2e6;">
+        <div style="font-weight: bold; margin-bottom: 8px; color: #495057;">Club Directors</div>
+        <div style="font-size: 1.5rem; color: #fd7e14;">${stats.users.clubDirector}</div>
+      </div>
+      <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #dee2e6;">
+        <div style="font-weight: bold; margin-bottom: 8px; color: #495057;">Teachers</div>
+        <div style="font-size: 1.5rem; color: #20c997;">${stats.users.teacher}</div>
+      </div>
+      <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #dee2e6;">
+        <div style="font-weight: bold; margin-bottom: 8px; color: #495057;">Staff</div>
+        <div style="font-size: 1.5rem; color: #17a2b8;">${stats.users.staff}</div>
+      </div>
+      <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #dee2e6;">
+        <div style="font-weight: bold; margin-bottom: 8px; color: #495057;">Students</div>
+        <div style="font-size: 1.5rem; color: #28a745;">${stats.users.student}</div>
+      </div>
+      <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #dee2e6;">
+        <div style="font-weight: bold; margin-bottom: 8px; color: #495057;">Total Classes</div>
+        <div style="font-size: 1.5rem; color: #007bff;">${stats.classes}</div>
+      </div>
+      <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #dee2e6;">
+        <div style="font-weight: bold; margin-bottom: 8px; color: #495057;">Total Enrolled</div>
+        <div style="font-size: 1.5rem; color: #28a745;">${stats.enrolled}</div>
+      </div>
+      <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #dee2e6;">
+        <div style="font-weight: bold; margin-bottom: 8px; color: #495057;">Total Waitlisted</div>
+        <div style="font-size: 1.5rem; color: #ffc107;">${stats.waitlisted}</div>
+      </div>
+    `;
+  } catch (error) {
+    statsContainer.innerHTML = `<div style="color: #dc3545;">Error loading system statistics: ${error.message}</div>`;
+  }
+}
 
 function renderUsers() {
   const container = document.getElementById('usersList');
