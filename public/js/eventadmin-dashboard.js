@@ -1207,59 +1207,88 @@ async function loadEventDashboard(eventId) {
       EventAdmin: event.RoleLabelEventAdmin || 'Event Admin'
     };
     
+    // Create main event overview table
+    const eventTableHtml = `
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Event Information</th>
+            <th>Statistics</th>
+            <th>Location</th>
+            <th>Role Labels</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <div><strong>Name:</strong> ${event.Name}</div>
+              <div><strong>Start Date:</strong> ${event.StartDate}</div>
+              <div><strong>End Date:</strong> ${event.EndDate}</div>
+              <div><strong>Status:</strong> <span class="badge ${event.Status === 'Live' ? 'badge-success' : 'badge-secondary'}">${event.Status}</span></div>
+              <div><strong>Active:</strong> <span class="badge ${event.Active ? 'badge-success' : 'badge-secondary'}">${event.Active ? 'Yes' : 'No'}</span></div>
+              <div><strong>Coordinator:</strong> ${event.CoordinatorName || 'N/A'}</div>
+              ${event.Description ? `<div style="margin-top: 8px;"><strong>Description:</strong> ${event.Description}</div>` : ''}
+            </td>
+            <td>
+              <div><strong>Classes:</strong> ${statistics.classes}</div>
+              <div><strong>Registrations:</strong> ${statistics.registrations}</div>
+              <div><strong>Enrolled:</strong> ${statistics.enrolled}</div>
+              <div><strong>Waitlisted:</strong> ${statistics.waitlisted}</div>
+              <div><strong>Unique Users:</strong> ${statistics.users}</div>
+              <div><strong>Clubs:</strong> ${statistics.clubs}</div>
+              <div><strong>Locations:</strong> ${statistics.locations}</div>
+              <div><strong>Timeslots:</strong> ${statistics.timeslots}</div>
+            </td>
+            <td>
+              ${event.LocationDescription ? `<div><strong>Description:</strong> ${event.LocationDescription}</div>` : ''}
+              <div><strong>Address:</strong> ${fullAddress}</div>
+            </td>
+            <td style="font-size: 0.9rem;">
+              <div><strong>Student:</strong> ${roleLabels.Student}</div>
+              <div><strong>Teacher:</strong> ${roleLabels.Teacher}</div>
+              <div><strong>Staff:</strong> ${roleLabels.Staff}</div>
+              <div><strong>Club Director:</strong> ${roleLabels.ClubDirector}</div>
+              <div><strong>Event Admin:</strong> ${roleLabels.EventAdmin}</div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+    
+    const eventMobileCards = createMobileCard({
+      'Event Name': event.Name,
+      'Start Date': event.StartDate,
+      'End Date': event.EndDate,
+      'Status': event.Status,
+      'Active': event.Active ? 'Yes' : 'No',
+      'Coordinator': event.CoordinatorName || 'N/A',
+      'Description': event.Description || 'N/A',
+      'Location': event.LocationDescription || fullAddress,
+      'Address': fullAddress !== 'Not specified' ? fullAddress : 'N/A',
+      'Classes': statistics.classes,
+      'Registrations': statistics.registrations,
+      'Enrolled': statistics.enrolled,
+      'Waitlisted': statistics.waitlisted,
+      'Unique Users': statistics.users,
+      'Clubs': statistics.clubs,
+      'Locations': statistics.locations,
+      'Timeslots': statistics.timeslots,
+      'Student Label': roleLabels.Student,
+      'Teacher Label': roleLabels.Teacher,
+      'Staff Label': roleLabels.Staff,
+      'Club Director Label': roleLabels.ClubDirector,
+      'Event Admin Label': roleLabels.EventAdmin
+    }, 'Event Overview');
+    
     const dashboardHtml = `
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px;">
-        <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
-          <h3 style="margin: 0 0 15px 0; color: #495057; font-size: 1.1rem;">Event Information</h3>
-          <div style="display: grid; gap: 10px;">
-            <div><strong>Name:</strong> ${event.Name}</div>
-            <div><strong>Start Date:</strong> ${event.StartDate}</div>
-            <div><strong>End Date:</strong> ${event.EndDate}</div>
-            <div><strong>Status:</strong> <span class="badge ${event.Status === 'Live' ? 'badge-success' : 'badge-secondary'}">${event.Status}</span></div>
-            <div><strong>Active:</strong> <span class="badge ${event.Active ? 'badge-success' : 'badge-secondary'}">${event.Active ? 'Yes' : 'No'}</span></div>
-            <div><strong>Coordinator:</strong> ${event.CoordinatorName || 'N/A'}</div>
-            ${event.Description ? `<div><strong>Description:</strong> ${event.Description}</div>` : ''}
-          </div>
-        </div>
-        
-        <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
-          <h3 style="margin: 0 0 15px 0; color: #495057; font-size: 1.1rem;">Statistics</h3>
-          <div style="display: grid; gap: 10px;">
-            <div><strong>Classes:</strong> ${statistics.classes}</div>
-            <div><strong>Total Registrations:</strong> ${statistics.registrations}</div>
-            <div><strong>Enrolled:</strong> ${statistics.enrolled}</div>
-            <div><strong>Waitlisted:</strong> ${statistics.waitlisted}</div>
-            <div><strong>Unique Users:</strong> ${statistics.users}</div>
-            <div><strong>Clubs:</strong> ${statistics.clubs}</div>
-            <div><strong>Locations:</strong> ${statistics.locations}</div>
-            <div><strong>Timeslots:</strong> ${statistics.timeslots}</div>
-          </div>
-        </div>
-        
-        <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
-          <h3 style="margin: 0 0 15px 0; color: #495057; font-size: 1.1rem;">Location</h3>
-          <div style="display: grid; gap: 10px;">
-            ${event.LocationDescription ? `<div><strong>Description:</strong> ${event.LocationDescription}</div>` : ''}
-            <div><strong>Address:</strong> ${fullAddress}</div>
-          </div>
-        </div>
-        
-        <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
-          <h3 style="margin: 0 0 15px 0; color: #495057; font-size: 1.1rem;">Role Labels</h3>
-          <div style="display: grid; gap: 8px; font-size: 0.9rem;">
-            <div><strong>Student:</strong> ${roleLabels.Student}</div>
-            <div><strong>Teacher:</strong> ${roleLabels.Teacher}</div>
-            <div><strong>Staff:</strong> ${roleLabels.Staff}</div>
-            <div><strong>Club Director:</strong> ${roleLabels.ClubDirector}</div>
-            <div><strong>Event Admin:</strong> ${roleLabels.EventAdmin}</div>
-          </div>
-        </div>
+      <div style="margin-bottom: 20px;">
+        ${wrapResponsiveTable(eventTableHtml, eventMobileCards)}
       </div>
       
       ${clubs.length > 0 ? `
         <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6; margin-bottom: 20px;">
           <h3 style="margin: 0 0 15px 0; color: #495057; font-size: 1.1rem;">Linked Clubs (${clubs.length})</h3>
-          <div style="overflow-x: auto;">
+          ${wrapResponsiveTable(`
             <table class="table" style="margin-bottom: 0;">
               <thead>
                 <tr>
@@ -1282,36 +1311,70 @@ async function loadEventDashboard(eventId) {
                 `).join('')}
               </tbody>
             </table>
-          </div>
+          `, clubs.map(club => createMobileCard({
+            'Club Name': club.Name,
+            'Director': club.DirectorFirstName && club.DirectorLastName ? `${club.DirectorFirstName} ${club.DirectorLastName}` : 'Unassigned',
+            'Teachers': club.TeacherCount || 0,
+            'Staff': club.StaffCount || 0,
+            'Students': club.StudentCount || 0
+          }, club.Name)).join(''))}
         </div>
       ` : ''}
       
       ${locations.length > 0 ? `
         <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6; margin-bottom: 20px;">
           <h3 style="margin: 0 0 15px 0; color: #495057; font-size: 1.1rem;">Locations (${locations.length})</h3>
-          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;">
-            ${locations.map(loc => `
-              <div style="padding: 10px; background: #f8f9fa; border-radius: 5px;">
-                <div><strong>${loc.Name}</strong></div>
-                <div style="font-size: 0.85rem; color: #6c757d;">Capacity: ${loc.MaxCapacity}</div>
-                ${loc.Description ? `<div style="font-size: 0.85rem; color: #6c757d; margin-top: 5px;">${loc.Description}</div>` : ''}
-              </div>
-            `).join('')}
-          </div>
+          ${wrapResponsiveTable(`
+            <table class="table" style="margin-bottom: 0;">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Capacity</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${locations.map(loc => `
+                  <tr>
+                    <td><strong>${loc.Name}</strong></td>
+                    <td>${loc.MaxCapacity}</td>
+                    <td>${loc.Description || '-'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `, locations.map(loc => createMobileCard({
+            'Name': loc.Name,
+            'Capacity': loc.MaxCapacity,
+            'Description': loc.Description || '-'
+          }, loc.Name)).join(''))}
         </div>
       ` : ''}
       
       ${timeslots.length > 0 ? `
         <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
           <h3 style="margin: 0 0 15px 0; color: #495057; font-size: 1.1rem;">Timeslots (${timeslots.length})</h3>
-          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px;">
-            ${timeslots.map(ts => `
-              <div style="padding: 10px; background: #f8f9fa; border-radius: 5px; font-size: 0.9rem;">
-                <div><strong>${ts.Date}</strong></div>
-                <div>${convertTo12Hour(ts.StartTime)} - ${convertTo12Hour(ts.EndTime)}</div>
-              </div>
-            `).join('')}
-          </div>
+          ${wrapResponsiveTable(`
+            <table class="table" style="margin-bottom: 0;">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${timeslots.map(ts => `
+                  <tr>
+                    <td><strong>${ts.Date}</strong></td>
+                    <td>${convertTo12Hour(ts.StartTime)} - ${convertTo12Hour(ts.EndTime)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `, timeslots.map(ts => createMobileCard({
+            'Date': ts.Date,
+            'Time': `${convertTo12Hour(ts.StartTime)} - ${convertTo12Hour(ts.EndTime)}`
+          }, ts.Date)).join(''))}
         </div>
       ` : ''}
     `;
