@@ -426,6 +426,7 @@
                 locationId: c.LocationID || '',
                 timeslotId: c.TimeslotID || '',
                 honorName: c.HonorName || 'Unknown',
+                club: c.ClubName || 'N/A',
                 teacher: displayTeacher,
                 location: displayLocation,
                 sessionTime: sessionTime,
@@ -443,6 +444,7 @@
           <thead>
             <tr>
               <th>Honor Name</th>
+              <th>Club</th>
               <th>Teacher</th>
               <th>Location</th>
               <th>Session Time</th>
@@ -454,6 +456,7 @@
             ${tableData.map(c => `
               <tr data-class-id="${c.classId}" data-honor-id="${c.honorId}" data-teacher-id="${c.teacherId}" data-location-id="${c.locationId}" data-timeslot-id="${c.timeslotId}">
                 <td>${c.honorName}</td>
+                <td>${c.club || '<span style="color: #999;">N/A</span>'}</td>
                 <td>${c.teacher}</td>
                 <td>${c.location}</td>
                 <td>${c.sessionTime}</td>
@@ -473,6 +476,7 @@
         
         return createMobileCard({
           'Honor Name': c.honorName,
+          'Club': c.club,
           'Teacher': c.teacher.replace(/<[^>]*>/g, ''), // Strip HTML tags
           'Location': c.location.replace(/<[^>]*>/g, ''), // Strip HTML tags
           'Session Time': sessionTimePlain,

@@ -4419,12 +4419,13 @@ async function renderClasses() {
       <table class="data-table">
         <thead>
           <tr>
-            <th style="width: 20%; padding: 12px 8px; text-align: left;">Honor</th>
-            <th style="width: 15%; padding: 12px 8px; text-align: left;">Teacher</th>
-            <th style="width: 15%; padding: 12px 8px; text-align: left;">Location</th>
-            <th style="width: 18%; padding: 12px 8px; text-align: left;">Date/Time</th>
-            <th style="width: 15%; padding: 12px 8px; text-align: left;">Capacity</th>
-            <th style="width: 10%; padding: 12px 8px; text-align: left;">Status</th>
+            <th style="width: 18%; padding: 12px 8px; text-align: left;">Honor</th>
+            <th style="width: 12%; padding: 12px 8px; text-align: left;">Club</th>
+            <th style="width: 13%; padding: 12px 8px; text-align: left;">Teacher</th>
+            <th style="width: 13%; padding: 12px 8px; text-align: left;">Location</th>
+            <th style="width: 16%; padding: 12px 8px; text-align: left;">Date/Time</th>
+            <th style="width: 13%; padding: 12px 8px; text-align: left;">Capacity</th>
+            <th style="width: 8%; padding: 12px 8px; text-align: left;">Status</th>
             <th style="width: 10%; padding: 12px 8px; text-align: left;">Actions</th>
           </tr>
         </thead>
@@ -4432,6 +4433,7 @@ async function renderClasses() {
           ${activeClasses.map(cls => `
           <tr style="border-bottom: 1px solid #e0e0e0;">
             <td style="padding: 12px 8px; text-align: left;"><strong>${cls.HonorName || 'N/A'}</strong></td>
+            <td style="padding: 12px 8px; text-align: left;">${cls.ClubName || '<span style="color: #999;">N/A</span>'}</td>
             <td style="padding: 12px 8px; text-align: left;">${cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
             <td style="padding: 12px 8px; text-align: left;">${cls.LocationName || 'N/A'}</td>
             <td style="padding: 12px 8px; text-align: left;">
@@ -4449,11 +4451,12 @@ async function renderClasses() {
         `).join('')}
         ${inactiveClasses.length > 0 ? `
           <tr style="background: #f9f9f9; border-top: 2px solid #ccc;">
-            <td colspan="7" style="padding: 10px; font-weight: bold; color: #666;">Deactivated Classes</td>
+            <td colspan="8" style="padding: 10px; font-weight: bold; color: #666;">Deactivated Classes</td>
           </tr>
           ${inactiveClasses.map(cls => `
           <tr style="border-bottom: 1px solid #e0e0e0; opacity: 0.7; background: #f9f9f9;">
             <td style="padding: 12px 8px; text-align: left;"><strong>${cls.HonorName || 'N/A'}</strong></td>
+            <td style="padding: 12px 8px; text-align: left;">${cls.ClubName || '<span style="color: #999;">N/A</span>'}</td>
             <td style="padding: 12px 8px; text-align: left;">${cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
             <td style="padding: 12px 8px; text-align: left;">${cls.LocationName || 'N/A'}</td>
             <td style="padding: 12px 8px; text-align: left;">
@@ -4490,6 +4493,7 @@ async function renderClasses() {
       
       return createMobileCard({
         'Honor': cls.HonorName || 'N/A',
+        'Club': cls.ClubName || 'N/A',
         'Teacher': cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : 'Unassigned',
         'Location': cls.LocationName || 'N/A',
         'Date/Time': dateTime,
