@@ -70,7 +70,7 @@ async function renderSummarySection() {
           <div style="font-size: 2rem; font-weight: bold; color: #333;">${totalClasses || 0}</div>
         </div>
         <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-          <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Total Seats</div>
+          <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Total Seats Teaching</div>
           <div style="font-size: 2rem; font-weight: bold; color: #333;">${totalSeats || 0}</div>
         </div>
       </div>
@@ -724,10 +724,12 @@ async function loadEvents() {
 async function loadUsers() {
   try {
     // Club Directors ONLY see users from their own club
+    // Only show active users (deactivated users should not appear in club dashboard)
     const queryParams = new URLSearchParams();
     if (clubDirectorClubId) {
       queryParams.append('clubId', clubDirectorClubId);
     }
+    queryParams.append('active', '1'); // Only fetch active users
     
     const response = await fetchWithAuth(`/api/users?${queryParams.toString()}`);
     clubDirectorUsers = await response.json();
@@ -927,9 +929,10 @@ async function showCreateClassFormClubDirector() {
   });
   
   // Load teachers and club directors from the same club for this event
+  // Only show active users (deactivated users should not appear in dropdowns)
   const [teachersResponse, directorsResponse] = await Promise.all([
-    fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Teacher&eventId=${eventId}`),
-    fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=ClubDirector&eventId=${eventId}`)
+    fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Teacher&eventId=${eventId}&active=1`),
+    fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=ClubDirector&eventId=${eventId}&active=1`)
   ]);
   const teachers = await teachersResponse.json();
   const directors = await directorsResponse.json();
@@ -1683,8 +1686,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const [honorsRes, locationsRes, teachersRes, directorsRes] = await Promise.all([
       fetchWithAuth('/api/classes/honors'),
       fetchWithAuth(`/api/events/${eventId}/locations`),
-      fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Teacher&eventId=${eventId}`),
-      fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=ClubDirector&eventId=${eventId}`)
+      fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Teacher&eventId=${eventId}&active=1`),
+      fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=ClubDirector&eventId=${eventId}&active=1`)
     ]);
     
     const honors = await honorsRes.json();

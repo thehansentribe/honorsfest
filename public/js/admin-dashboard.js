@@ -2474,11 +2474,12 @@ async function editClass(classId) {
   const eventId = select?.value || cls.EventID;
   
   // Load honors, teachers, locations for dropdowns
+  // Only show active users (deactivated users should not appear in dropdowns)
   const [honorsRes, locationsRes, teachersRes, directorsRes] = await Promise.all([
     fetchWithAuth('/api/classes/honors'),
     fetchWithAuth(`/api/events/${eventId}/locations`),
-    fetchWithAuth(`/api/users?role=Teacher&eventId=${eventId}`),
-    fetchWithAuth(`/api/users?role=ClubDirector&eventId=${eventId}`)
+    fetchWithAuth(`/api/users?role=Teacher&eventId=${eventId}&active=1`),
+    fetchWithAuth(`/api/users?role=ClubDirector&eventId=${eventId}&active=1`)
   ]);
   
   const honors = await honorsRes.json();
@@ -4551,10 +4552,11 @@ async function showCreateClassForm() {
   }
   
   // Load honors, teachers, locations, and timeslots for the event
+  // Only show active users (deactivated users should not appear in dropdowns)
   const [honorsRes, teachersRes, directorsRes, locationsRes, timeslotsRes] = await Promise.all([
     fetchWithAuth('/api/classes/honors'),
-    fetchWithAuth(`/api/users?role=Teacher&eventId=${eventId}`),
-    fetchWithAuth(`/api/users?role=ClubDirector&eventId=${eventId}`),
+    fetchWithAuth(`/api/users?role=Teacher&eventId=${eventId}&active=1`),
+    fetchWithAuth(`/api/users?role=ClubDirector&eventId=${eventId}&active=1`),
     fetchWithAuth(`/api/events/${eventId}/locations`),
     fetchWithAuth(`/api/events/${eventId}/timeslots`)
   ]);
