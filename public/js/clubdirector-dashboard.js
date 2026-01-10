@@ -571,22 +571,7 @@ function normalizeActive(active) {
   return Boolean(active);
 }
 
-// Helper function to check if a class is taught by a club member
-function isClassTaughtByClubMember(cls) {
-  if (!cls.TeacherID || !clubDirectorUsers.length) {
-    return false;
-  }
-  
-  // Find users in the club who are Teachers or ClubDirectors
-  const clubTeachers = clubDirectorUsers.filter(user => 
-    (user.Role === 'Teacher' || user.Role === 'ClubDirector') && 
-    user.ID === cls.TeacherID
-  );
-  
-  return clubTeachers.length > 0;
-}
-
-// Override renderClasses to filter by their club's event and only show classes taught by club members
+// Override renderClasses to filter by their club's event (shows all classes for the event)
 async function renderClasses() {
   const container = document.getElementById('classesList');
   if (!container) {
@@ -616,15 +601,14 @@ async function renderClasses() {
     clubDirectorClasses = await response.json();
     console.log('[ClubDirector] Classes response:', clubDirectorClasses);
     
-    // Filter to only show classes where club members (Teachers or ClubDirectors) are teaching
-    const classesTaughtByClubMembers = clubDirectorClasses.filter(cls => isClassTaughtByClubMember(cls));
-    
-    if (classesTaughtByClubMembers.length === 0) {
-      container.innerHTML = '<p class="text-center">No classes are being taught by your club members for this event.</p>';
+    // API already filters to only active classes with active honors for Club Directors
+    // Show all classes for the selected event
+    if (clubDirectorClasses.length === 0) {
+      container.innerHTML = '<p class="text-center">No active classes found for this event</p>';
       return;
     }
     
-    const activeClasses = classesTaughtByClubMembers;
+    const activeClasses = clubDirectorClasses;
     const hasActive = activeClasses.length > 0;
     const hasInactive = false; // Club Directors never see inactive classes
 
