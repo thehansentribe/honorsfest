@@ -17,7 +17,134 @@ let clubDirectorFilters = {};
 let clubDirectorSortColumn = null;
 let clubDirectorSortDirection = 'asc';
 
+// Summary section state
+let summaryExpanded = true;
+
 // Define functions BEFORE they're called in DOMContentLoaded
+
+// Render summary section
+async function renderSummarySection() {
+  const container = document.getElementById('summarySection');
+  if (!container) return;
+
+  if (!clubDirectorClubId || !clubDirectorSelectedEventId) {
+    container.innerHTML = '';
+    return;
+  }
+
+  try {
+    const response = await fetchWithAuth(`/api/clubs/${clubDirectorClubId}/summary?eventId=${clubDirectorSelectedEventId}`);
+    
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      throw new Error(`Failed to load summary: ${response.status}${errorBody.error ? ` - ${errorBody.error}` : ''}`);
+    }
+
+    const data = await response.json();
+    const { userCounts, classes, totalClasses, totalSeats } = data;
+
+    const toggleIcon = summaryExpanded ? '▼' : '▶';
+    const toggleText = summaryExpanded ? 'Hide Summary' : 'Show Summary';
+
+    const summaryContent = summaryExpanded ? `
+      <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
+          <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Club Directors</div>
+            <div style="font-size: 2rem; font-weight: bold; color: #333;">${userCounts.ClubDirector || 0}</div>
+          </div>
+          <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Teachers</div>
+            <div style="font-size: 2rem; font-weight: bold; color: #333;">${userCounts.Teacher || 0}</div>
+          </div>
+          <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Staff</div>
+            <div style="font-size: 2rem; font-weight: bold; color: #333;">${userCounts.Staff || 0}</div>
+          </div>
+          <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Students</div>
+            <div style="font-size: 2rem; font-weight: bold; color: #333;">${userCounts.Student || 0}</div>
+          </div>
+          <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Classes Being Offered</div>
+            <div style="font-size: 2rem; font-weight: bold; color: #333;">${totalClasses || 0}</div>
+          </div>
+          <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Total Seats</div>
+            <div style="font-size: 2rem; font-weight: bold; color: #333;">${totalSeats || 0}</div>
+          </div>
+        </div>
+        
+        ${classes.length > 0 ? `
+          <h3 style="margin-bottom: 15px; color: #333;">Classes Being Taught by Club Members</h3>
+          <div style="overflow-x: auto;">
+            <table class="data-table" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th style="padding: 12px 8px; text-align: left;">Class</th>
+                  <th style="padding: 12px 8px; text-align: left;">Teacher</th>
+                  <th style="padding: 12px 8px; text-align: center;">Enrolled</th>
+                  <th style="padding: 12px 8px; text-align: center;">Waitlisted</th>
+                  <th style="padding: 12px 8px; text-align: center;">Capacity</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${classes.map(cls => `
+                  <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 12px 8px; text-align: left;"><strong>${cls.HonorName || 'N/A'}</strong></td>
+                    <td style="padding: 12px 8px; text-align: left;">${cls.TeacherFirstName && cls.TeacherLastName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : 'Unassigned'}</td>
+                    <td style="padding: 12px 8px; text-align: center;">${cls.EnrolledCount || 0}</td>
+                    <td style="padding: 12px 8px; text-align: center;">${cls.WaitlistCount || 0}</td>
+                    <td style="padding: 12px 8px; text-align: center;">${cls.ActualMaxCapacity || cls.MaxCapacity || 0}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        ` : '<p style="text-align: center; color: #666; padding: 20px;">No classes are being taught by club members for this event.</p>'}
+      </div>
+    ` : '';
+
+    container.innerHTML = `
+      <div class="card" style="margin-bottom: 20px;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleSummarySection()">
+          <h2 class="card-title" style="margin: 0;">Club Summary</h2>
+          <button class="btn btn-outline summary-toggle" style="display: flex; align-items: center; gap: 8px;">
+            <span style="display: inline-block; transition: transform 0.3s; ${summaryExpanded ? 'transform: rotate(0deg);' : 'transform: rotate(-90deg);'}">${toggleIcon}</span>
+            ${toggleText}
+          </button>
+        </div>
+        ${summaryContent}
+      </div>
+    `;
+  } catch (error) {
+    console.error('Error loading summary:', error);
+    const errorToggleIcon = summaryExpanded ? '▼' : '▶';
+    const errorToggleText = summaryExpanded ? 'Hide Summary' : 'Show Summary';
+    container.innerHTML = `
+      <div class="card" style="margin-bottom: 20px;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleSummarySection()">
+          <h2 class="card-title" style="margin: 0;">Club Summary</h2>
+          <button class="btn btn-outline summary-toggle" style="display: flex; align-items: center; gap: 8px;">
+            <span style="display: inline-block; transition: transform 0.3s; ${summaryExpanded ? 'transform: rotate(0deg);' : 'transform: rotate(-90deg);'}">${errorToggleIcon}</span>
+            ${errorToggleText}
+          </button>
+        </div>
+        ${summaryExpanded ? `
+          <div style="padding: 20px; color: red;">
+            Error loading summary: ${error.message}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+}
+
+// Toggle summary section
+function toggleSummarySection() {
+  summaryExpanded = !summaryExpanded;
+  renderSummarySection();
+}
 
 // Override switchTab
 async function clubdirectorSwitchTab(tabName, clickedElement = null) {
@@ -440,7 +567,22 @@ function normalizeActive(active) {
   return Boolean(active);
 }
 
-// Override renderClasses to filter by their club's event
+// Helper function to check if a class is taught by a club member
+function isClassTaughtByClubMember(cls) {
+  if (!cls.TeacherID || !clubDirectorUsers.length) {
+    return false;
+  }
+  
+  // Find users in the club who are Teachers or ClubDirectors
+  const clubTeachers = clubDirectorUsers.filter(user => 
+    (user.Role === 'Teacher' || user.Role === 'ClubDirector') && 
+    user.ID === cls.TeacherID
+  );
+  
+  return clubTeachers.length > 0;
+}
+
+// Override renderClasses to filter by their club's event and only show classes taught by club members
 async function renderClasses() {
   const container = document.getElementById('classesList');
   if (!container) {
@@ -470,14 +612,15 @@ async function renderClasses() {
     clubDirectorClasses = await response.json();
     console.log('[ClubDirector] Classes response:', clubDirectorClasses);
     
-    // API already filters to only active classes with active honors for Club Directors
-    // So we just use all returned classes
-    if (clubDirectorClasses.length === 0) {
-      container.innerHTML = '<p class="text-center">No active classes found for this event</p>';
+    // Filter to only show classes where club members (Teachers or ClubDirectors) are teaching
+    const classesTaughtByClubMembers = clubDirectorClasses.filter(cls => isClassTaughtByClubMember(cls));
+    
+    if (classesTaughtByClubMembers.length === 0) {
+      container.innerHTML = '<p class="text-center">No classes are being taught by your club members for this event.</p>';
       return;
     }
     
-    const activeClasses = clubDirectorClasses;
+    const activeClasses = classesTaughtByClubMembers;
     const hasActive = activeClasses.length > 0;
     const hasInactive = false; // Club Directors never see inactive classes
 
@@ -1523,8 +1666,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load data
   await loadUsers();
   
+  // Render summary section
+  await renderSummarySection();
+  
   // Override functions - expose to window so they can be called from HTML
   window.switchTab = clubdirectorSwitchTab;
+  window.toggleSummarySection = toggleSummarySection;
   window.showCreateUserForm = showCreateUserFormClubDirector;
   window.editUser = editUserClubDirector;
   window.showCreateClassForm = showCreateClassFormClubDirector;
@@ -2499,6 +2646,9 @@ Thank you!`;
     
     // Update UI
     setupEventSelector();
+    
+    // Reload summary section for new event
+    await renderSummarySection();
     
     // Reload data for the selected event based on current tab
     switch (clubDirectorTab) {
