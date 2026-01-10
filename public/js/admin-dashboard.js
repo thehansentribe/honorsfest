@@ -1503,6 +1503,7 @@ async function loadEventDashboard(eventId) {
               <div><strong>Registrations:</strong> ${statistics.registrations}</div>
               <div><strong>Enrolled:</strong> ${statistics.enrolled}</div>
               <div><strong>Waitlisted:</strong> ${statistics.waitlisted}</div>
+              <div><strong>Offered Seats:</strong> ${statistics.offeredSeats || 0}</div>
               <div><strong>Unique Users:</strong> ${statistics.users}</div>
               <div><strong>Clubs:</strong> ${statistics.clubs}</div>
               <div><strong>Locations:</strong> ${statistics.locations}</div>
@@ -1538,6 +1539,7 @@ async function loadEventDashboard(eventId) {
       'Registrations': statistics.registrations,
       'Enrolled': statistics.enrolled,
       'Waitlisted': statistics.waitlisted,
+      'Offered Seats': statistics.offeredSeats || 0,
       'Unique Users': statistics.users,
       'Clubs': statistics.clubs,
       'Locations': statistics.locations,
@@ -1754,6 +1756,16 @@ async function loadSystemStats() {
               <div style="padding: 8px 0;">
                 <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Total Waitlisted</div>
                 <div style="font-size: 1.3rem; color: #ffc107; font-weight: bold;">${stats.waitlisted}</div>
+              </div>
+            </td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>
+              <div style="padding: 8px 0;">
+                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Total Offered Seats</div>
+                <div style="font-size: 1.3rem; color: #007bff; font-weight: bold;">${stats.offeredSeats || 0}</div>
               </div>
             </td>
             <td></td>

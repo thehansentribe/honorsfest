@@ -122,6 +122,20 @@ router.get('/system-stats', (req, res) => {
       WHERE c.Active = 1 AND r.Status = 'Waitlisted'
     `).get().count;
     
+    // Calculate total offered seats across all events
+    const offeredSeatsResult = db.prepare(`
+      SELECT COALESCE(SUM(
+        CASE 
+          WHEN l.MaxCapacity IS NOT NULL THEN MIN(l.MaxCapacity, c.TeacherMaxStudents)
+          ELSE c.TeacherMaxStudents
+        END
+      ), 0) as totalSeats
+      FROM Classes c
+      LEFT JOIN Locations l ON c.LocationID = l.ID
+      WHERE c.Active = 1
+    `).get();
+    const offeredSeats = offeredSeatsResult.totalSeats || 0;
+    
     res.json({
       users: {
         admin: adminCount,
@@ -134,7 +148,115 @@ router.get('/system-stats', (req, res) => {
       },
       classes: totalClassesCount,
       enrolled: totalEnrolledCount,
-      waitlisted: totalWaitlistedCount
+      waitlisted: totalWaitlistedCount,
+      offeredSeats: offeredSeats
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/events/:eventId/system-stats - Get system statistics filtered to a specific event
+router.get('/:eventId/system-stats', (req, res) => {
+  try {
+    const { db } = require('../config/db');
+    const eventId = parseInt(req.params.eventId);
+    const event = Event.findById(eventId);
+    
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    
+    // Count users by role for this event only (users in clubs linked to this event)
+    const adminCount = db.prepare(`
+      SELECT COUNT(*) as count FROM Users 
+      WHERE Role IN ('Admin', 'AdminViewOnly') AND Active = 1
+    `).get().count;
+    
+    const eventAdminCount = db.prepare(`
+      SELECT COUNT(*) as count FROM Users 
+      WHERE Role = 'EventAdmin' AND EventID = ? AND Active = 1
+    `).get(eventId).count;
+    
+    const clubDirectorCount = db.prepare(`
+      SELECT COUNT(DISTINCT u.ID) as count FROM Users u
+      INNER JOIN ClubEvents ce ON u.ClubID = ce.ClubID
+      WHERE ce.EventID = ? AND u.Role = 'ClubDirector' AND u.Active = 1
+    `).get(eventId).count;
+    
+    const teacherCount = db.prepare(`
+      SELECT COUNT(DISTINCT u.ID) as count FROM Users u
+      INNER JOIN ClubEvents ce ON u.ClubID = ce.ClubID
+      WHERE ce.EventID = ? AND u.Role = 'Teacher' AND u.Active = 1
+    `).get(eventId).count;
+    
+    const staffCount = db.prepare(`
+      SELECT COUNT(DISTINCT u.ID) as count FROM Users u
+      INNER JOIN ClubEvents ce ON u.ClubID = ce.ClubID
+      WHERE ce.EventID = ? AND u.Role = 'Staff' AND u.Active = 1
+    `).get(eventId).count;
+    
+    const studentCount = db.prepare(`
+      SELECT COUNT(DISTINCT u.ID) as count FROM Users u
+      INNER JOIN ClubEvents ce ON u.ClubID = ce.ClubID
+      WHERE ce.EventID = ? AND u.Role = 'Student' AND u.Active = 1
+    `).get(eventId).count;
+    
+    const totalUsersCount = db.prepare(`
+      SELECT COUNT(DISTINCT u.ID) as count FROM Users u
+      INNER JOIN ClubEvents ce ON u.ClubID = ce.ClubID
+      WHERE ce.EventID = ? AND u.Role IN ('Student', 'Teacher', 'Staff', 'ClubDirector', 'EventAdmin') AND u.Active = 1
+    `).get(eventId).count;
+    
+    // Count active classes for this event
+    const totalClassesCount = db.prepare(`
+      SELECT COUNT(*) as count FROM Classes WHERE EventID = ? AND Active = 1
+    `).get(eventId).count;
+    
+    // Count enrolled registrations for this event
+    const totalEnrolledCount = db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM Registrations r
+      JOIN Classes c ON r.ClassID = c.ID
+      WHERE c.EventID = ? AND c.Active = 1 AND r.Status = 'Enrolled'
+    `).get(eventId).count;
+    
+    // Count waitlisted registrations for this event
+    const totalWaitlistedCount = db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM Registrations r
+      JOIN Classes c ON r.ClassID = c.ID
+      WHERE c.EventID = ? AND c.Active = 1 AND r.Status = 'Waitlisted'
+    `).get(eventId).count;
+    
+    // Calculate total offered seats for this event
+    const offeredSeatsResult = db.prepare(`
+      SELECT COALESCE(SUM(
+        CASE 
+          WHEN l.MaxCapacity IS NOT NULL THEN MIN(l.MaxCapacity, c.TeacherMaxStudents)
+          ELSE c.TeacherMaxStudents
+        END
+      ), 0) as totalSeats
+      FROM Classes c
+      LEFT JOIN Locations l ON c.LocationID = l.ID
+      WHERE c.EventID = ? AND c.Active = 1
+    `).get(eventId);
+    const offeredSeats = offeredSeatsResult.totalSeats || 0;
+    
+    res.json({
+      users: {
+        admin: adminCount,
+        eventAdmin: eventAdminCount,
+        clubDirector: clubDirectorCount,
+        teacher: teacherCount,
+        staff: staffCount,
+        student: studentCount,
+        total: totalUsersCount
+      },
+      classes: totalClassesCount,
+      enrolled: totalEnrolledCount,
+      waitlisted: totalWaitlistedCount,
+      offeredSeats: offeredSeats
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -196,6 +318,21 @@ router.get('/:id/dashboard', (req, res) => {
       WHERE ce.EventID = ? AND u.Role IN ('Student', 'Teacher', 'Staff', 'ClubDirector') AND u.Active = 1
     `).get(eventId);
     
+    // Calculate total offered seats (sum of ActualMaxCapacity)
+    // ActualMaxCapacity = MIN(LocationMaxCapacity, TeacherMaxStudents) OR TeacherMaxStudents if no location
+    const offeredSeatsResult = db.prepare(`
+      SELECT COALESCE(SUM(
+        CASE 
+          WHEN l.MaxCapacity IS NOT NULL THEN MIN(l.MaxCapacity, c.TeacherMaxStudents)
+          ELSE c.TeacherMaxStudents
+        END
+      ), 0) as totalSeats
+      FROM Classes c
+      LEFT JOIN Locations l ON c.LocationID = l.ID
+      WHERE c.EventID = ? AND c.Active = 1
+    `).get(eventId);
+    const offeredSeats = offeredSeatsResult.totalSeats || 0;
+    
     // Get clubs linked to this event
     const clubs = Club.findByEvent(eventId);
     
@@ -240,7 +377,8 @@ router.get('/:id/dashboard', (req, res) => {
         clubs: clubCount.count,
         locations: locationCount.count,
         timeslots: timeslotCount.count,
-        users: userCount.count
+        users: userCount.count,
+        offeredSeats: offeredSeats
       },
       clubs: clubsWithCounts,
       locations,
