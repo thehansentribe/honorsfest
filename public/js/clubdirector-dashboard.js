@@ -17,7 +17,7 @@ let clubDirectorFilters = {};
 let clubDirectorSortColumn = null;
 let clubDirectorSortDirection = 'asc';
 
-// Summary section state
+// Summary section state (classes table expanded by default)
 let summaryExpanded = true;
 
 // Define functions BEFORE they're called in DOMContentLoaded
@@ -44,97 +44,101 @@ async function renderSummarySection() {
     const { userCounts, classes, totalClasses, totalSeats } = data;
 
     const toggleIcon = summaryExpanded ? '▼' : '▶';
-    const toggleText = summaryExpanded ? 'Hide Summary' : 'Show Summary';
+    const toggleText = summaryExpanded ? 'Hide Classes' : 'Show Classes';
 
-    const summaryContent = summaryExpanded ? `
-      <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px;">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
-          <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Club Directors</div>
-            <div style="font-size: 2rem; font-weight: bold; color: #333;">${userCounts.ClubDirector || 0}</div>
-          </div>
-          <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Teachers</div>
-            <div style="font-size: 2rem; font-weight: bold; color: #333;">${userCounts.Teacher || 0}</div>
-          </div>
-          <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Staff</div>
-            <div style="font-size: 2rem; font-weight: bold; color: #333;">${userCounts.Staff || 0}</div>
-          </div>
-          <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Students</div>
-            <div style="font-size: 2rem; font-weight: bold; color: #333;">${userCounts.Student || 0}</div>
-          </div>
-          <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Classes Being Offered</div>
-            <div style="font-size: 2rem; font-weight: bold; color: #333;">${totalClasses || 0}</div>
-          </div>
-          <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Total Seats</div>
-            <div style="font-size: 2rem; font-weight: bold; color: #333;">${totalSeats || 0}</div>
-          </div>
+    // Statistics cards - always visible
+    const statsCards = `
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
+        <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Club Directors</div>
+          <div style="font-size: 2rem; font-weight: bold; color: #333;">${userCounts.ClubDirector || 0}</div>
         </div>
-        
-        ${classes.length > 0 ? `
-          <h3 style="margin-bottom: 15px; color: #333;">Classes Being Taught by Club Members</h3>
-          <div style="overflow-x: auto;">
-            <table class="data-table" style="width: 100%;">
-              <thead>
-                <tr>
-                  <th style="padding: 12px 8px; text-align: left;">Class</th>
-                  <th style="padding: 12px 8px; text-align: left;">Teacher</th>
-                  <th style="padding: 12px 8px; text-align: center;">Enrolled</th>
-                  <th style="padding: 12px 8px; text-align: center;">Waitlisted</th>
-                  <th style="padding: 12px 8px; text-align: center;">Capacity</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${classes.map(cls => `
-                  <tr style="border-bottom: 1px solid #e0e0e0;">
-                    <td style="padding: 12px 8px; text-align: left;"><strong>${cls.HonorName || 'N/A'}</strong></td>
-                    <td style="padding: 12px 8px; text-align: left;">${cls.TeacherFirstName && cls.TeacherLastName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : 'Unassigned'}</td>
-                    <td style="padding: 12px 8px; text-align: center;">${cls.EnrolledCount || 0}</td>
-                    <td style="padding: 12px 8px; text-align: center;">${cls.WaitlistCount || 0}</td>
-                    <td style="padding: 12px 8px; text-align: center;">${cls.ActualMaxCapacity || cls.MaxCapacity || 0}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-        ` : '<p style="text-align: center; color: #666; padding: 20px;">No classes are being taught by club members for this event.</p>'}
+        <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Teachers</div>
+          <div style="font-size: 2rem; font-weight: bold; color: #333;">${userCounts.Teacher || 0}</div>
+        </div>
+        <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Staff</div>
+          <div style="font-size: 2rem; font-weight: bold; color: #333;">${userCounts.Staff || 0}</div>
+        </div>
+        <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Students</div>
+          <div style="font-size: 2rem; font-weight: bold; color: #333;">${userCounts.Student || 0}</div>
+        </div>
+        <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Classes Being Offered</div>
+          <div style="font-size: 2rem; font-weight: bold; color: #333;">${totalClasses || 0}</div>
+        </div>
+        <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <div style="color: #666; font-size: 0.875rem; margin-bottom: 5px;">Total Seats</div>
+          <div style="font-size: 2rem; font-weight: bold; color: #333;">${totalSeats || 0}</div>
+        </div>
       </div>
+    `;
+
+    // Classes table - expandable section
+    const classesSection = summaryExpanded ? `
+      ${classes.length > 0 ? `
+        <div style="overflow-x: auto;">
+          <table class="data-table" style="width: 100%;">
+            <thead>
+              <tr>
+                <th style="padding: 12px 8px; text-align: left;">Class</th>
+                <th style="padding: 12px 8px; text-align: left;">Teacher</th>
+                <th style="padding: 12px 8px; text-align: center;">Enrolled</th>
+                <th style="padding: 12px 8px; text-align: center;">Waitlisted</th>
+                <th style="padding: 12px 8px; text-align: center;">Capacity</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${classes.map(cls => `
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                  <td style="padding: 12px 8px; text-align: left;"><strong>${cls.HonorName || 'N/A'}</strong></td>
+                  <td style="padding: 12px 8px; text-align: left;">${cls.TeacherFirstName && cls.TeacherLastName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : 'Unassigned'}</td>
+                  <td style="padding: 12px 8px; text-align: center;">${cls.EnrolledCount || 0}</td>
+                  <td style="padding: 12px 8px; text-align: center;">${cls.WaitlistCount || 0}</td>
+                  <td style="padding: 12px 8px; text-align: center;">${cls.ActualMaxCapacity || cls.MaxCapacity || 0}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : '<p style="text-align: center; color: #666; padding: 20px;">No classes are being taught by club members for this event.</p>'}
     ` : '';
 
     container.innerHTML = `
       <div class="card" style="margin-bottom: 20px;">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleSummarySection()">
+        <div class="card-header">
           <h2 class="card-title" style="margin: 0;">Club Summary</h2>
-          <button class="btn btn-outline summary-toggle" style="display: flex; align-items: center; gap: 8px;">
-            <span style="display: inline-block; transition: transform 0.3s; ${summaryExpanded ? 'transform: rotate(0deg);' : 'transform: rotate(-90deg);'}">${toggleIcon}</span>
-            ${toggleText}
-          </button>
         </div>
-        ${summaryContent}
+        <div style="padding: 20px;">
+          ${statsCards}
+          
+          ${classes.length > 0 ? `
+            <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; cursor: pointer;" onclick="toggleSummarySection()">
+                <h3 style="margin: 0; color: #333;">Classes Being Taught by Club Members</h3>
+                <button class="btn btn-outline summary-toggle" style="display: flex; align-items: center; gap: 8px; border: none; background: transparent; padding: 5px 10px;">
+                  <span style="display: inline-block; transition: transform 0.3s; ${summaryExpanded ? 'transform: rotate(0deg);' : 'transform: rotate(-90deg);'}">${toggleIcon}</span>
+                  ${toggleText}
+                </button>
+              </div>
+              ${classesSection}
+            </div>
+          ` : ''}
+        </div>
       </div>
     `;
   } catch (error) {
     console.error('Error loading summary:', error);
-    const errorToggleIcon = summaryExpanded ? '▼' : '▶';
-    const errorToggleText = summaryExpanded ? 'Hide Summary' : 'Show Summary';
     container.innerHTML = `
       <div class="card" style="margin-bottom: 20px;">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleSummarySection()">
+        <div class="card-header">
           <h2 class="card-title" style="margin: 0;">Club Summary</h2>
-          <button class="btn btn-outline summary-toggle" style="display: flex; align-items: center; gap: 8px;">
-            <span style="display: inline-block; transition: transform 0.3s; ${summaryExpanded ? 'transform: rotate(0deg);' : 'transform: rotate(-90deg);'}">${errorToggleIcon}</span>
-            ${errorToggleText}
-          </button>
         </div>
-        ${summaryExpanded ? `
-          <div style="padding: 20px; color: red;">
-            Error loading summary: ${error.message}
-          </div>
-        ` : ''}
+        <div style="padding: 20px; color: red;">
+          Error loading summary: ${error.message}
+        </div>
       </div>
     `;
   }
