@@ -191,7 +191,6 @@ function initializeDatabase() {
 
       CREATE INDEX IF NOT EXISTS idx_club_events_club ON ClubEvents(ClubID);
       CREATE INDEX IF NOT EXISTS idx_club_events_event ON ClubEvents(EventID);
-      CREATE INDEX IF NOT EXISTS idx_classes_group ON Classes(ClassGroupID);
     `;
 
     db.exec(schema);
