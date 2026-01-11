@@ -158,16 +158,70 @@ router.get('/details/:id', (req, res) => {
 });
 
 // POST /api/classes - Create class (Admin, EventAdmin, ClubDirector)
+// Supports both single-session and multi-session class creation
 router.post('/', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) => {
   try {
+    const { TimeslotIDs, isMultiSession, ...classData } = req.body;
+    
     // Set CreatedBy from authenticated user
-    const classData = Class.create({
-      ...req.body,
-      CreatedBy: req.user.id
-    });
-    res.status(201).json(classData);
+    classData.CreatedBy = req.user.id;
+    
+    // Check if this is a multi-session class creation request
+    if (TimeslotIDs && Array.isArray(TimeslotIDs) && TimeslotIDs.length > 0) {
+      if (isMultiSession && TimeslotIDs.length > 1) {
+        // Create linked multi-session class
+        const createdClasses = Class.createMultiSession(classData, TimeslotIDs);
+        res.status(201).json({
+          message: `Created multi-session class with ${createdClasses.length} sessions`,
+          classes: createdClasses,
+          isMultiSession: true,
+          classGroupId: createdClasses[0]?.ClassGroupID
+        });
+      } else {
+        // Create separate independent classes for each timeslot (legacy behavior)
+        const createdClasses = [];
+        for (const timeslotId of TimeslotIDs) {
+          const created = Class.create({
+            ...classData,
+            TimeslotID: timeslotId
+          });
+          createdClasses.push(created);
+        }
+        res.status(201).json({
+          message: `Created ${createdClasses.length} separate class(es)`,
+          classes: createdClasses,
+          isMultiSession: false
+        });
+      }
+    } else if (req.body.TimeslotID) {
+      // Single timeslot provided (original behavior)
+      const created = Class.create(classData);
+      res.status(201).json(created);
+    } else {
+      res.status(400).json({ error: 'TimeslotID or TimeslotIDs is required' });
+    }
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+// GET /api/classes/group/:groupId - Get all sessions in a multi-session class group
+router.get('/group/:groupId', (req, res) => {
+  try {
+    const groupId = req.params.groupId;
+    const classes = Class.findByGroup(groupId);
+    
+    if (classes.length === 0) {
+      return res.status(404).json({ error: 'Class group not found' });
+    }
+    
+    res.json({
+      groupId,
+      sessionCount: classes.length,
+      classes
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

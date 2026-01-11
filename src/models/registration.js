@@ -5,19 +5,6 @@ const User = require('./user');
 class Registration {
   static async register(userId, classId) {
     return db.transaction(() => {
-      // Check if already registered
-      const existing = db.prepare('SELECT * FROM Registrations WHERE UserID = ? AND ClassID = ?').get(userId, classId);
-      if (existing) {
-        throw new Error('Already registered for this class');
-      }
-
-      // Get user's role for student priority logic
-      const user = User.findById(userId);
-      if (!user) {
-        throw new Error('User not found');
-      }
-      const userRole = user.Role;
-
       // Get class details
       const classData = Class.findById(classId);
       if (!classData) {
@@ -28,13 +15,40 @@ class Registration {
         throw new Error('Class is not active');
       }
 
-      // Check capacity - handle null LocationMaxCapacity (when LocationID is null)
-      const enrolledCount = Class.getEnrolledCount(classId);
-      let maxCapacity;
-      if (classData.LocationMaxCapacity != null) {
-        maxCapacity = Math.min(classData.LocationMaxCapacity, classData.TeacherMaxStudents);
-      } else {
-        maxCapacity = classData.TeacherMaxStudents;
+      // Check if this is a multi-session class
+      const isMultiSession = classData.ClassGroupID != null;
+      const groupClasses = isMultiSession ? Class.findByGroup(classData.ClassGroupID) : [classData];
+
+      // Check if already registered for any class in the group
+      for (const cls of groupClasses) {
+        const existing = db.prepare('SELECT * FROM Registrations WHERE UserID = ? AND ClassID = ?').get(userId, cls.ID);
+        if (existing) {
+          throw new Error(isMultiSession ? 'Already registered for this multi-session class' : 'Already registered for this class');
+        }
+      }
+
+      // Get user's role for student priority logic
+      const user = User.findById(userId);
+      if (!user) {
+        throw new Error('User not found');
+      }
+      const userRole = user.Role;
+
+      // For multi-session classes, check capacity across ALL sessions
+      // If ANY session is full, the whole registration goes to waitlist
+      let allSessionsHaveSpace = true;
+      for (const cls of groupClasses) {
+        const enrolledCount = Class.getEnrolledCount(cls.ID);
+        let maxCapacity;
+        if (cls.LocationMaxCapacity != null) {
+          maxCapacity = Math.min(cls.LocationMaxCapacity, cls.TeacherMaxStudents);
+        } else {
+          maxCapacity = cls.TeacherMaxStudents;
+        }
+        if (enrolledCount >= maxCapacity) {
+          allSessionsHaveSpace = false;
+          break;
+        }
       }
       
       const stmt = db.prepare(`
@@ -42,59 +56,74 @@ class Registration {
         VALUES (?, ?, ?, ?)
       `);
 
-      if (enrolledCount < maxCapacity) {
-        // Enroll directly
-        const result = stmt.run(userId, classId, 'Enrolled', null);
-        // Create attendance record
-        db.prepare('INSERT INTO Attendance (ClassID, UserID) VALUES (?, ?)').run(classId, userId);
-        return { id: result.lastInsertRowid, status: 'Enrolled' };
+      if (allSessionsHaveSpace) {
+        // Enroll in all sessions
+        const results = [];
+        for (const cls of groupClasses) {
+          const result = stmt.run(userId, cls.ID, 'Enrolled', null);
+          // Create attendance record
+          db.prepare('INSERT INTO Attendance (ClassID, UserID) VALUES (?, ?)').run(cls.ID, userId);
+          results.push({ id: result.lastInsertRowid, classId: cls.ID });
+        }
+        return { 
+          id: results[0].id, 
+          status: 'Enrolled', 
+          sessionsEnrolled: results.length,
+          isMultiSession 
+        };
       } else {
-        // Class is full - implement student priority logic
+        // At least one session is full - implement student priority logic
         const isStudent = userRole === 'Student';
         
         if (isStudent) {
-          // Students go to waitlist when class is full
-          const waitlistCount = Class.getWaitlistCount(classId);
-          const result = stmt.run(userId, classId, 'Waitlisted', waitlistCount + 1);
-          return { id: result.lastInsertRowid, status: 'Waitlisted', position: waitlistCount + 1 };
-        } else {
-          // Non-students (Teacher, ClubDirector, Staff) - find last enrolled non-student and move to waitlist
-          const lastNonStudent = db.prepare(`
-            SELECT r.ID, r.UserID
-            FROM Registrations r
-            JOIN Users u ON r.UserID = u.ID
-            WHERE r.ClassID = ? AND r.Status = 'Enrolled' AND u.Role IN ('Teacher', 'ClubDirector', 'Staff')
-            ORDER BY r.ID DESC
-            LIMIT 1
-          `).get(classId);
-          
-          if (lastNonStudent) {
-            // Move last non-student to waitlist
-            const waitlistCount = Class.getWaitlistCount(classId);
-            db.prepare(`
-              UPDATE Registrations
-              SET Status = 'Waitlisted', WaitlistOrder = ?
-              WHERE ID = ?
-            `).run(waitlistCount + 1, lastNonStudent.ID);
-            
-            // Delete attendance record for moved non-student
-            db.prepare('DELETE FROM Attendance WHERE ClassID = ? AND UserID = ?').run(classId, lastNonStudent.UserID);
-            
-            // Enroll the new non-student
-            const result = stmt.run(userId, classId, 'Enrolled', null);
-            // Create attendance record for new non-student
-            db.prepare('INSERT INTO Attendance (ClassID, UserID) VALUES (?, ?)').run(classId, userId);
-            
-            // Recalculate waitlist positions
-            this.recalculateWaitlistPositions(classId);
-            
-            return { id: result.lastInsertRowid, status: 'Enrolled' };
-          } else {
-            // No non-students enrolled, so add to waitlist normally
-            const waitlistCount = Class.getWaitlistCount(classId);
-            const result = stmt.run(userId, classId, 'Waitlisted', waitlistCount + 1);
-            return { id: result.lastInsertRowid, status: 'Waitlisted', position: waitlistCount + 1 };
+          // Students go to waitlist when any session is full
+          const results = [];
+          for (const cls of groupClasses) {
+            const waitlistCount = Class.getWaitlistCount(cls.ID);
+            const result = stmt.run(userId, cls.ID, 'Waitlisted', waitlistCount + 1);
+            results.push({ id: result.lastInsertRowid, classId: cls.ID, position: waitlistCount + 1 });
           }
+          return { 
+            id: results[0].id, 
+            status: 'Waitlisted', 
+            position: results[0].position,
+            sessionsWaitlisted: results.length,
+            isMultiSession 
+          };
+        } else {
+          // Non-students (Teacher, ClubDirector, Staff) - try to bump non-students from all sessions
+          // For simplicity with multi-session, we'll just waitlist non-students too if any session is full
+          // This avoids complex cascading bumps across multiple sessions
+          const results = [];
+          for (const cls of groupClasses) {
+            const enrolledCount = Class.getEnrolledCount(cls.ID);
+            let maxCapacity;
+            if (cls.LocationMaxCapacity != null) {
+              maxCapacity = Math.min(cls.LocationMaxCapacity, cls.TeacherMaxStudents);
+            } else {
+              maxCapacity = cls.TeacherMaxStudents;
+            }
+            
+            if (enrolledCount < maxCapacity) {
+              const result = stmt.run(userId, cls.ID, 'Enrolled', null);
+              db.prepare('INSERT INTO Attendance (ClassID, UserID) VALUES (?, ?)').run(cls.ID, userId);
+              results.push({ id: result.lastInsertRowid, classId: cls.ID, status: 'Enrolled' });
+            } else {
+              const waitlistCount = Class.getWaitlistCount(cls.ID);
+              const result = stmt.run(userId, cls.ID, 'Waitlisted', waitlistCount + 1);
+              results.push({ id: result.lastInsertRowid, classId: cls.ID, status: 'Waitlisted', position: waitlistCount + 1 });
+            }
+          }
+          
+          // Determine overall status - if any session is waitlisted, report as waitlisted
+          const anyWaitlisted = results.some(r => r.status === 'Waitlisted');
+          return { 
+            id: results[0].id, 
+            status: anyWaitlisted ? 'Waitlisted' : 'Enrolled',
+            sessionsEnrolled: results.filter(r => r.status === 'Enrolled').length,
+            sessionsWaitlisted: results.filter(r => r.status === 'Waitlisted').length,
+            isMultiSession 
+          };
         }
       }
     })();
@@ -108,18 +137,43 @@ class Registration {
         throw new Error('Registration not found');
       }
 
-      // Delete registration
-      db.prepare('DELETE FROM Registrations WHERE UserID = ? AND ClassID = ?').run(userId, classId);
+      // Check if this is a multi-session class
+      const classData = db.prepare('SELECT ClassGroupID FROM Classes WHERE ID = ?').get(classId);
+      const isMultiSession = classData && classData.ClassGroupID != null;
       
-      // Delete attendance record
-      db.prepare('DELETE FROM Attendance WHERE UserID = ? AND ClassID = ?').run(userId, classId);
+      if (isMultiSession) {
+        // Get all classes in the group
+        const groupClasses = db.prepare('SELECT ID FROM Classes WHERE ClassGroupID = ?').all(classData.ClassGroupID);
+        const droppedSessions = [];
+        
+        for (const cls of groupClasses) {
+          const reg = db.prepare('SELECT * FROM Registrations WHERE UserID = ? AND ClassID = ?').get(userId, cls.ID);
+          if (reg) {
+            // Delete registration
+            db.prepare('DELETE FROM Registrations WHERE UserID = ? AND ClassID = ?').run(userId, cls.ID);
+            // Delete attendance record
+            db.prepare('DELETE FROM Attendance WHERE UserID = ? AND ClassID = ?').run(userId, cls.ID);
+            
+            // Process waitlist if user was enrolled
+            if (reg.Status === 'Enrolled') {
+              this.processWaitlist(cls.ID);
+            }
+            droppedSessions.push(cls.ID);
+          }
+        }
+        
+        return { success: true, droppedSessions: droppedSessions.length, isMultiSession: true };
+      } else {
+        // Single-session class - original behavior
+        db.prepare('DELETE FROM Registrations WHERE UserID = ? AND ClassID = ?').run(userId, classId);
+        db.prepare('DELETE FROM Attendance WHERE UserID = ? AND ClassID = ?').run(userId, classId);
 
-      // Process waitlist if user was enrolled
-      if (registration.Status === 'Enrolled') {
-        this.processWaitlist(classId);
+        if (registration.Status === 'Enrolled') {
+          this.processWaitlist(classId);
+        }
+
+        return { success: true, isMultiSession: false };
       }
-
-      return { success: true };
     })();
   }
 
@@ -236,6 +290,7 @@ class Registration {
     let query = `
       SELECT r.*,
              c.HonorID, c.LocationID, c.TimeslotID, c.MaxCapacity as ClassMaxCapacity,
+             c.ClassGroupID, c.SessionNumber,
              h.Name as HonorName, h.Category as HonorCategory,
              t.FirstName as TeacherFirstName, t.LastName as TeacherLastName,
              l.Name as LocationName,
@@ -260,9 +315,26 @@ class Registration {
       params.push(filters.eventId);
     }
 
-    query += ' ORDER BY r.Status, ts.Date, ts.StartTime';
+    query += ' ORDER BY r.Status, c.ClassGroupID, c.SessionNumber, ts.Date, ts.StartTime';
 
-    return db.prepare(query).all(...params);
+    const registrations = db.prepare(query).all(...params);
+    
+    // Add session count info for multi-session classes
+    const sessionCountCache = {};
+    return registrations.map(reg => {
+      if (reg.ClassGroupID) {
+        if (!sessionCountCache[reg.ClassGroupID]) {
+          const count = db.prepare('SELECT COUNT(*) as count FROM Classes WHERE ClassGroupID = ?').get(reg.ClassGroupID);
+          sessionCountCache[reg.ClassGroupID] = count.count;
+        }
+        reg.TotalSessions = sessionCountCache[reg.ClassGroupID];
+        reg.IsMultiSession = true;
+      } else {
+        reg.TotalSessions = 1;
+        reg.IsMultiSession = false;
+      }
+      return reg;
+    });
   }
 
   static getClassRoster(classId) {
@@ -298,18 +370,47 @@ class Registration {
       throw new Error('You can only drop your own registrations');
     }
     
-    // Delete registration
-    db.prepare('DELETE FROM Registrations WHERE ID = ?').run(id);
+    // Use the drop method which handles multi-session classes
+    return this.drop(registration.UserID, registration.ClassID);
+  }
+
+  /**
+   * Check if a user is registered for any session in a multi-session class group
+   * @param {number} userId - The user ID
+   * @param {string} classGroupId - The class group ID
+   * @returns {boolean} True if registered for any session in the group
+   */
+  static isRegisteredForGroup(userId, classGroupId) {
+    if (!classGroupId) return false;
     
-    // Delete attendance record
-    db.prepare('DELETE FROM Attendance WHERE ClassID = ? AND UserID = ?').run(registration.ClassID, registration.UserID);
+    const result = db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM Registrations r
+      JOIN Classes c ON r.ClassID = c.ID
+      WHERE r.UserID = ? AND c.ClassGroupID = ?
+    `).get(userId, classGroupId);
     
-    // If user was enrolled (not waitlisted), process waitlist
-    if (registration.Status === 'Enrolled') {
-      this.processWaitlist(registration.ClassID);
-    }
+    return result.count > 0;
+  }
+
+  /**
+   * Get all registrations for a user in a specific class group
+   * @param {number} userId - The user ID
+   * @param {string} classGroupId - The class group ID
+   * @returns {Array} Array of registration records
+   */
+  static getGroupRegistrations(userId, classGroupId) {
+    if (!classGroupId) return [];
     
-    return { success: true };
+    return db.prepare(`
+      SELECT r.*, c.SessionNumber, c.TimeslotID,
+             ts.Date as TimeslotDate, ts.StartTime as TimeslotStartTime, ts.EndTime as TimeslotEndTime
+      FROM Registrations r
+      JOIN Classes c ON r.ClassID = c.ID
+      LEFT JOIN Timeslots ts ON c.TimeslotID = ts.ID
+      WHERE r.UserID = ? AND c.ClassGroupID = ?
+      ORDER BY c.SessionNumber
+    `).all(userId, classGroupId);
   }
 }
 

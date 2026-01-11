@@ -93,6 +93,14 @@ function renderRegistrations() {
     return;
   }
   
+  // Helper function to format multi-session badge
+  const getMultiSessionBadge = (reg) => {
+    if (reg.IsMultiSession && reg.TotalSessions > 1) {
+      return `<span class="badge bg-info" style="font-size: 0.7em; margin-left: 5px;" title="Session ${reg.SessionNumber} of ${reg.TotalSessions}">Session ${reg.SessionNumber}/${reg.TotalSessions}</span>`;
+    }
+    return '';
+  };
+  
   container.innerHTML = `
     <table class="table">
       <thead>
@@ -106,12 +114,15 @@ function renderRegistrations() {
       </thead>
       <tbody>
         ${myRegistrations.map(reg => `
-          <tr>
-            <td>${reg.HonorName || 'N/A'}</td>
+          <tr style="${reg.IsMultiSession ? 'background: linear-gradient(to right, #e3f2fd 0%, transparent 100%);' : ''}">
+            <td>
+              ${reg.HonorName || 'N/A'}
+              ${getMultiSessionBadge(reg)}
+            </td>
             <td>${reg.TeacherFirstName ? `${reg.TeacherFirstName} ${reg.TeacherLastName}` : 'N/A'}</td>
             <td>${reg.LocationName || 'N/A'}</td>
             <td>${reg.TimeslotDate || 'N/A'} ${reg.TimeslotStartTime ? convertTo12Hour(reg.TimeslotStartTime) : ''}${reg.TimeslotEndTime ? ' - ' + convertTo12Hour(reg.TimeslotEndTime) : ''}</td>
-            <td>${reg.status === 'enrolled' ? '<span class="badge bg-success">Enrolled</span>' : '<span class="badge bg-warning">Waitlisted</span>'}</td>
+            <td>${reg.status === 'enrolled' || reg.Status === 'Enrolled' ? '<span class="badge bg-success">Enrolled</span>' : '<span class="badge bg-warning">Waitlisted</span>'}</td>
           </tr>
         `).join('')}
       </tbody>

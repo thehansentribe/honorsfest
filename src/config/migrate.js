@@ -206,6 +206,37 @@ function migrateDatabase() {
       console.log('✓ Unique index on Username added');
     }
     
+    // Multi-session class support migration
+    const classesTableInfoForGroup = db.prepare("PRAGMA table_info(Classes)").all();
+    const hasClassGroupID = classesTableInfoForGroup.some(col => col.name === 'ClassGroupID');
+    const hasSessionNumber = classesTableInfoForGroup.some(col => col.name === 'SessionNumber');
+
+    if (!hasClassGroupID) {
+      console.log('Adding ClassGroupID column to Classes table for multi-session support...');
+      db.exec('ALTER TABLE Classes ADD COLUMN ClassGroupID TEXT');
+      console.log('✓ ClassGroupID column added');
+    }
+
+    if (!hasSessionNumber) {
+      console.log('Adding SessionNumber column to Classes table for multi-session support...');
+      db.exec('ALTER TABLE Classes ADD COLUMN SessionNumber INTEGER DEFAULT 1');
+      console.log('✓ SessionNumber column added');
+    }
+
+    // Create index for ClassGroupID if not exists
+    const classGroupIndexCheck = db.prepare(`
+      SELECT name FROM sqlite_master 
+      WHERE type='index' 
+      AND tbl_name='Classes' 
+      AND name='idx_classes_group'
+    `).get();
+
+    if (!classGroupIndexCheck) {
+      console.log('Creating index on ClassGroupID column...');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_classes_group ON Classes(ClassGroupID)');
+      console.log('✓ ClassGroupID index created');
+    }
+    
   } catch (error) {
     console.error('Migration error:', error);
     // Don't throw, just log

@@ -1130,3 +1130,83 @@ body {
   pointer-events: none;
 }
 
+/* Summary Section */
+.summary-section {
+  margin: 20px 0;
+}
+
+.summary-section .card {
+  margin-bottom: 20px;
+}
+
+.summary-section .card-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.summary-section .card-header:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 0.5rem;
+  margin: -1rem;
+  padding: 1rem;
+}
+
+.summary-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.summary-toggle span {
+  display: inline-block;
+  transition: transform 0.3s ease;
+  font-size: 0.875rem;
+}
+
+.summary-section .card-header h2 {
+  margin: 0;
+}
+
+/* Summary Statistics Grid */
+.summary-section .card > div[style*="grid-template-columns"] {
+  margin-top: 20px;
+}
+
+/* Summary Table */
+.summary-section .data-table {
+  margin-top: 0;
+}
+
+.summary-section .data-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  color: var(--text);
+  padding: 12px 8px;
+}
+
+.summary-section .data-table td {
+  padding: 12px 8px;
+  vertical-align: middle;
+}
+
+.summary-section .data-table tr:hover {
+  background-color: #f8f9fa;
+}
+
+/* Responsive Summary Section */
+@media (max-width: 768px) {
+  .summary-section .card-header {
+    padding: 1rem;
+  }
+
+  .summary-toggle {
+    width: 100%;
+    justify-content: space-between;
+    margin-top: 0.5rem;
+  }
+
+  .summary-section .card > div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+}

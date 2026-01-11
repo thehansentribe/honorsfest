@@ -812,6 +812,14 @@ async function renderClasses() {
     const hasActive = activeClasses.length > 0;
     const hasInactive = false; // Club Directors never see inactive classes
 
+    // Helper function to format multi-session badge
+    const getMultiSessionBadge = (cls) => {
+      if (cls.IsMultiSession && cls.TotalSessions > 1) {
+        return `<span class="badge bg-info" style="font-size: 0.7em; margin-left: 5px;" title="Session ${cls.SessionNumber} of ${cls.TotalSessions}">Session ${cls.SessionNumber}/${cls.TotalSessions}</span>`;
+      }
+      return '';
+    };
+
     const tableHtml = `
       <table class="data-table">
         <thead>
@@ -831,8 +839,11 @@ async function renderClasses() {
               const isActive = normalizeActive(cls.Active);
               const canEdit = isActive && cls.CreatedBy === clubDirectorUser?.id;
               return `
-          <tr style="border-bottom: 1px solid #e0e0e0;">
-            <td style="padding: 12px 8px; text-align: left;"><strong>${cls.HonorName || 'N/A'}</strong></td>
+          <tr style="border-bottom: 1px solid #e0e0e0;${cls.IsMultiSession ? ' background: linear-gradient(to right, #e3f2fd 0%, transparent 100%);' : ''}">
+            <td style="padding: 12px 8px; text-align: left;">
+              <strong>${cls.HonorName || 'N/A'}</strong>
+              ${getMultiSessionBadge(cls)}
+            </td>
             <td style="padding: 12px 8px; text-align: left;">${cls.ClubName || '<span style="color: #999;">N/A</span>'}</td>
             <td style="padding: 12px 8px; text-align: left;">${cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
             <td style="padding: 12px 8px; text-align: left;">${cls.LocationName || 'N/A'}</td>
@@ -880,6 +891,10 @@ async function renderClasses() {
         ? `${cls.TimeslotDate}<br><small style="color: var(--text-light);">${cls.TimeslotStartTime ? convertTo12Hour(cls.TimeslotStartTime) : ''} - ${cls.TimeslotEndTime ? convertTo12Hour(cls.TimeslotEndTime) : ''}</small>`
         : 'N/A';
 
+      const sessionInfo = cls.IsMultiSession && cls.TotalSessions > 1 
+        ? `Session ${cls.SessionNumber}/${cls.TotalSessions}`
+        : '';
+
       const actionsHtml = cls.Active
         ? `
           <button onclick="viewClassStudents(${cls.ID})" class="btn btn-sm btn-info">Manage Students</button>
@@ -887,7 +902,7 @@ async function renderClasses() {
         `
         : `<span style="color: #999;">Inactive class</span>`;
 
-      return createMobileCard({
+      const cardData = {
         'Honor': cls.HonorName || 'N/A',
         'Club': cls.ClubName || 'N/A',
         'Teacher': cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : 'Unassigned',
@@ -895,7 +910,13 @@ async function renderClasses() {
         'Date/Time': dateTime,
         'Capacity': `${cls.EnrolledCount || 0}/${cls.WaitlistCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}`,
         'Status': isActive ? 'Active' : 'Inactive'
-      }, cls.HonorName || 'N/A', actionsHtml);
+      };
+      
+      if (sessionInfo) {
+        cardData['Session'] = sessionInfo;
+      }
+
+      return createMobileCard(cardData, cls.HonorName || 'N/A', actionsHtml);
     }).join('');
     
     container.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
@@ -1177,7 +1198,7 @@ async function showCreateClassFormClubDirector() {
           <small style="color: var(--text-light);">Admin will assign location later</small>
         </div>
         <div class="form-group">
-          <label>Select Timeslots (Sessions) for this Class *</label>
+          <label>Select Timeslots for this Class *</label>
           <div style="border: 1px solid #ddd; padding: 15px; border-radius: 5px; max-height: 300px; overflow-y: auto;">
             ${timeslots.map(slot => `
               <label style="display: block; padding: 8px; margin-bottom: 4px; border: 1px solid #eee; border-radius: 3px; cursor: pointer; transition: background 0.2s;" 
@@ -1187,7 +1208,19 @@ async function showCreateClassFormClubDirector() {
               </label>
             `).join('')}
           </div>
-          <small style="color: var(--text-light); display: block; margin-top: 5px;">Select all timeslots (sessions) when this class will be offered</small>
+          <small style="color: var(--text-light); display: block; margin-top: 5px;">Select timeslots when this class will be offered</small>
+        </div>
+        <div class="form-group" style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef;">
+          <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; margin: 0;">
+            <input type="checkbox" id="isMultiSession" name="isMultiSession" style="margin-top: 3px; width: auto;">
+            <div>
+              <strong style="display: block; margin-bottom: 4px;">Link as multi-session class</strong>
+              <small style="color: var(--text-light); display: block;">
+                When checked: Creates ONE class spanning all selected timeslots. Students must attend ALL sessions.<br>
+                When unchecked: Creates SEPARATE independent classes for each timeslot (default).
+              </small>
+            </div>
+          </label>
         </div>
         <div class="form-actions">
           <button type="submit" class="btn btn-primary">Create Class</button>
@@ -1989,10 +2022,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
     const form = e.target;
     
-    const selectedTimeslots = Array.from(form.querySelectorAll('input[name="classTimeslots"]:checked')).map(cb => cb.value);
+    const selectedTimeslots = Array.from(form.querySelectorAll('input[name="classTimeslots"]:checked')).map(cb => parseInt(cb.value));
+    const isMultiSession = form.isMultiSession?.checked || false;
     
     if (selectedTimeslots.length === 0) {
-      showNotification('Please select at least one timeslot (session) for this class', 'error');
+      showNotification('Please select at least one timeslot for this class', 'error');
+      return;
+    }
+    
+    // Validate multi-session selection
+    if (isMultiSession && selectedTimeslots.length < 2) {
+      showNotification('Multi-session classes require at least 2 timeslots', 'error');
       return;
     }
     
@@ -2001,7 +2041,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       HonorID: form.classHonor?.value,
       TeacherID: form.classTeacher?.value || null, // Teacher is optional
       LocationID: null, // Club Directors don't set location - admins do this
-      TeacherMaxStudents: parseInt(form.classMaxCapacity?.value) || 0
+      TeacherMaxStudents: parseInt(form.classMaxCapacity?.value) || 0,
+      TimeslotIDs: selectedTimeslots,
+      isMultiSession: isMultiSession
     };
     
     if (!classData.HonorID || !classData.TeacherMaxStudents) {
@@ -2010,31 +2052,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     try {
-      // Create a separate class for each selected timeslot
-      const results = [];
-      for (const timeslotId of selectedTimeslots) {
-        const classDataForTimeslot = {
-          ...classData,
-          TimeslotID: timeslotId
-        };
-        
-        const response = await fetchWithAuth(`/api/classes`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(classDataForTimeslot)
-        });
-        
-        const result = await response.json();
-        results.push(result);
+      const response = await fetchWithAuth(`/api/classes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(classData)
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create class');
       }
       
-      if (results.length > 0 && results[0].ID) {
-        showNotification(`Created ${results.length} class session(s) successfully. Admin will assign location later.`, 'success');
-        closeModal('createClassModal');
-        await renderClasses(); // Reload classes list
+      if (isMultiSession) {
+        showNotification(`Created multi-session class with ${result.classes?.length || selectedTimeslots.length} sessions. Admin will assign location later.`, 'success');
       } else {
-        showNotification('Error creating classes', 'error');
+        showNotification(`Created ${result.classes?.length || 1} class(es) successfully. Admin will assign location later.`, 'success');
       }
+      
+      closeModal('createClassModal');
+      await renderClasses(); // Reload classes list
     } catch (error) {
       showNotification('Error creating class: ' + error.message, 'error');
     }

@@ -110,6 +110,8 @@ function initializeDatabase() {
         TeacherMaxStudents INTEGER NOT NULL,
         Active BOOLEAN NOT NULL DEFAULT 1,
         CreatedBy INTEGER,
+        ClassGroupID TEXT, -- Links sessions of same multi-session class (NULL for single-session)
+        SessionNumber INTEGER DEFAULT 1, -- Order within group: 1, 2, 3...
         FOREIGN KEY (EventID) REFERENCES Events(ID),
         FOREIGN KEY (HonorID) REFERENCES Honors(ID),
         FOREIGN KEY (TeacherID) REFERENCES Users(ID),
@@ -189,6 +191,7 @@ function initializeDatabase() {
 
       CREATE INDEX IF NOT EXISTS idx_club_events_club ON ClubEvents(ClubID);
       CREATE INDEX IF NOT EXISTS idx_club_events_event ON ClubEvents(EventID);
+      CREATE INDEX IF NOT EXISTS idx_classes_group ON Classes(ClassGroupID);
     `;
 
     db.exec(schema);
