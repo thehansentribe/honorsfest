@@ -414,6 +414,54 @@ class Class {
     }
   }
 
+  /**
+   * Permanently delete a class and all related data
+   * @param {number} id - The class ID to delete
+   * @returns {boolean} True if deletion was successful
+   */
+  static delete(id) {
+    const cls = db.prepare('SELECT ClassGroupID FROM Classes WHERE ID = ?').get(id);
+    
+    if (!cls) {
+      throw new Error('Class not found');
+    }
+
+    if (cls.ClassGroupID) {
+      // Multi-session class - delete all sessions in the group
+      return db.transaction(() => {
+        const groupClasses = db.prepare('SELECT ID FROM Classes WHERE ClassGroupID = ?').all(cls.ClassGroupID);
+        
+        // Delete all related data for each class in the group
+        for (const groupCls of groupClasses) {
+          // Delete all registrations for this class
+          db.prepare('DELETE FROM Registrations WHERE ClassID = ?').run(groupCls.ID);
+          
+          // Delete all attendance records for this class
+          db.prepare('DELETE FROM Attendance WHERE ClassID = ?').run(groupCls.ID);
+          
+          // Delete the class itself
+          db.prepare('DELETE FROM Classes WHERE ID = ?').run(groupCls.ID);
+        }
+        
+        return true;
+      })();
+    } else {
+      // Single-session class
+      return db.transaction(() => {
+        // Delete all registrations for this class
+        db.prepare('DELETE FROM Registrations WHERE ClassID = ?').run(id);
+        
+        // Delete all attendance records for this class
+        db.prepare('DELETE FROM Attendance WHERE ClassID = ?').run(id);
+        
+        // Delete the class itself
+        db.prepare('DELETE FROM Classes WHERE ID = ?').run(id);
+        
+        return true;
+      })();
+    }
+  }
+
   static getTeacherlessClasses(eventId) {
     return db.prepare(`
       SELECT c.*, h.Name as HonorName

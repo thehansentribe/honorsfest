@@ -2283,18 +2283,51 @@ async function deactivateClass(classId) {
 
 async function activateClass(classId) {
   if (!confirm('Activate this class? The class will be available for student registration. (No students will be registered from previous enrollment.)')) return;
-  
+
   try {
     const response = await fetchWithAuth(`/api/classes/${classId}/activate`, {
       method: 'POST'
     });
-    
+
     if (response.ok) {
       showNotification('Class activated successfully.', 'success');
       await renderClasses();
     }
   } catch (error) {
     showNotification('Error activating class', 'error');
+  }
+}
+
+async function removeClass(classId) {
+  // Get class info to check if it's multi-session
+  try {
+    const classResponse = await fetchWithAuth(`/api/classes/details/${classId}`);
+    if (!classResponse.ok) {
+      showNotification('Error loading class details', 'error');
+      return;
+    }
+    const classData = await classResponse.json();
+    
+    const isMultiSession = classData.IsMultiSession && classData.TotalSessions > 1;
+    const confirmMessage = isMultiSession
+      ? `Are you sure you want to permanently remove this class and all ${classData.TotalSessions} sessions? This action cannot be undone. All registrations and attendance records will be deleted.`
+      : 'Are you sure you want to permanently remove this class? This action cannot be undone. All registrations and attendance records will be deleted.';
+    
+    if (!confirm(confirmMessage)) return;
+
+    const response = await fetchWithAuth(`/api/classes/${classId}/remove`, {
+      method: 'DELETE'
+    });
+
+    if (response.ok) {
+      showNotification('Class removed successfully.', 'success');
+      await renderClasses();
+    } else {
+      const errorData = await response.json();
+      showNotification(errorData.error || 'Error removing class', 'error');
+    }
+  } catch (error) {
+    showNotification('Error removing class', 'error');
   }
 }
 
@@ -3938,6 +3971,7 @@ window.toggleEventActive = toggleEventActive;
 window.toggleUserStatus = toggleUserStatus;
 window.deactivateClass = deactivateClass;
 window.activateClass = activateClass;
+window.removeClass = removeClass;
 window.editClass = editClass;
 window.editEvent = editEvent;
 window.handleEditEvent = handleEditEvent;
@@ -4484,6 +4518,7 @@ async function renderClasses() {
             <td style="padding: 12px 8px; text-align: left;"><span class="badge bg-danger">Inactive</span></td>
             <td style="padding: 12px 8px; text-align: left;">
               <button onclick="activateClass(${cls.ID})" class="btn btn-sm btn-success">Activate</button>
+              <button onclick="removeClass(${cls.ID})" class="btn btn-sm btn-danger" style="margin-left: 5px;">Remove</button>
             </td>
           </tr>
         `).join('')}
@@ -4506,6 +4541,7 @@ async function renderClasses() {
         `
         : `
           <button onclick="activateClass(${cls.ID})" class="btn btn-sm btn-success">Activate</button>
+          <button onclick="removeClass(${cls.ID})" class="btn btn-sm btn-danger" style="margin-left: 5px;">Remove</button>
         `;
       
       return createMobileCard({

@@ -287,6 +287,28 @@ router.post('/:id/activate', requireRole('Admin', 'EventAdmin'), (req, res) => {
   }
 });
 
+// DELETE /api/classes/:id/remove - Permanently delete a deactivated class
+router.delete('/:id/remove', requireRole('Admin', 'EventAdmin'), (req, res) => {
+  try {
+    const classId = parseInt(req.params.id);
+    const existingClass = Class.findById(classId);
+    
+    if (!existingClass) {
+      return res.status(404).json({ error: 'Class not found' });
+    }
+    
+    // Only allow deletion of inactive classes
+    if (existingClass.Active) {
+      return res.status(400).json({ error: 'Cannot delete an active class. Please deactivate it first.' });
+    }
+    
+    Class.delete(classId);
+    res.json({ message: 'Class removed successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/classes/teacherless/:eventId - Get teacherless classes
 router.get('/teacherless/:eventId', requireRole('Admin', 'AdminViewOnly', 'EventAdmin', 'ClubDirector'), (req, res) => {
   try {
