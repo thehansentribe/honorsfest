@@ -65,14 +65,15 @@ class Class {
              u.FirstName as TeacherFirstName, u.LastName as TeacherLastName,
              l.Name as LocationName, l.MaxCapacity as LocationMaxCapacity,
              t.Date as TimeslotDate, t.StartTime as TimeslotStartTime, t.EndTime as TimeslotEndTime,
-             cl.Name as ClubName
+             COALESCE(creatorClub.Name, teacherClub.Name) as ClubName
       FROM Classes c
       LEFT JOIN Honors h ON c.HonorID = h.ID
       LEFT JOIN Users u ON c.TeacherID = u.ID
       LEFT JOIN Locations l ON c.LocationID = l.ID
       LEFT JOIN Timeslots t ON c.TimeslotID = t.ID
       LEFT JOIN Users creator ON c.CreatedBy = creator.ID
-      LEFT JOIN Clubs cl ON creator.ClubID = cl.ID
+      LEFT JOIN Clubs creatorClub ON creator.ClubID = creatorClub.ID
+      LEFT JOIN Clubs teacherClub ON u.ClubID = teacherClub.ID
       WHERE c.ID = ?
     `).get(id);
 
@@ -98,14 +99,15 @@ class Class {
              u.FirstName as TeacherFirstName, u.LastName as TeacherLastName,
              l.Name as LocationName, l.MaxCapacity as LocationMaxCapacity,
              t.Date as TimeslotDate, t.StartTime as TimeslotStartTime, t.EndTime as TimeslotEndTime,
-             cl.Name as ClubName
+             COALESCE(creatorClub.Name, teacherClub.Name) as ClubName
       FROM Classes c
       LEFT JOIN Honors h ON c.HonorID = h.ID
       LEFT JOIN Users u ON c.TeacherID = u.ID
       LEFT JOIN Locations l ON c.LocationID = l.ID
       LEFT JOIN Timeslots t ON c.TimeslotID = t.ID
       LEFT JOIN Users creator ON c.CreatedBy = creator.ID
-      LEFT JOIN Clubs cl ON creator.ClubID = cl.ID
+      LEFT JOIN Clubs creatorClub ON creator.ClubID = creatorClub.ID
+      LEFT JOIN Clubs teacherClub ON u.ClubID = teacherClub.ID
       WHERE c.EventID = ?
     `;
     const params = [eventId];
