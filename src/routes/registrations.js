@@ -69,36 +69,69 @@ router.post('/', (req, res) => {
     }
     const isFull = enrolledCount >= maxCapacity;
 
+    // Check if this is a multi-session class and get all timeslots to check for conflicts
+    const isMultiSession = classData.ClassGroupID != null;
+    let timeslotsToCheck = [classData.TimeslotID];
+    
+    if (isMultiSession) {
+      // Get all timeslots for the multi-session class
+      const groupClasses = Class.findByGroup(classData.ClassGroupID);
+      timeslotsToCheck = groupClasses.map(c => c.TimeslotID);
+    }
+
     // If trying to register when full, check timeslot conflicts
     if (!isFull) {
-      // Trying to enroll: check if already enrolled in this timeslot
-      const conflictCheck = db.prepare(`
-        SELECT r.ID as RegistrationID, c.ID as ClassID, h.Name as HonorName, c.TimeslotID
+      // Trying to enroll: check if already enrolled in ANY of the timeslots (for multi-session)
+      const conflicts = db.prepare(`
+        SELECT r.ID as RegistrationID, c.ID as ClassID, h.Name as HonorName, c.TimeslotID,
+               t.Date as TimeslotDate, t.StartTime, t.EndTime
         FROM Registrations r
         JOIN Classes c ON r.ClassID = c.ID
         LEFT JOIN Honors h ON c.HonorID = h.ID
-        WHERE r.UserID = ? AND c.TimeslotID = ? AND c.EventID = ? AND r.Status = 'Enrolled'
-      `).get(userId, classData.TimeslotID, classData.EventID);
+        LEFT JOIN Timeslots t ON c.TimeslotID = t.ID
+        WHERE r.UserID = ? AND c.TimeslotID IN (${timeslotsToCheck.map(() => '?').join(',')}) AND c.EventID = ? AND r.Status = 'Enrolled'
+      `).all(userId, ...timeslotsToCheck, classData.EventID);
       
-      if (conflictCheck) {
-        // Return conflict details instead of error
-        return res.status(409).json({ 
-          conflict: true,
-          conflictClassId: conflictCheck.ClassID,
-          conflictClassName: conflictCheck.HonorName || 'Unknown Class',
-          conflictRegistrationId: conflictCheck.RegistrationID
-        });
+      if (conflicts.length > 0) {
+        // Return ALL conflict details for multi-session classes
+        if (isMultiSession && conflicts.length > 0) {
+          return res.status(409).json({ 
+            conflict: true,
+            isMultiSession: true,
+            totalSessions: timeslotsToCheck.length,
+            conflicts: conflicts.map(c => ({
+              conflictClassId: c.ClassID,
+              conflictClassName: c.HonorName || 'Unknown Class',
+              conflictRegistrationId: c.RegistrationID,
+              timeslotDate: c.TimeslotDate,
+              startTime: c.StartTime,
+              endTime: c.EndTime
+            })),
+            // For backward compatibility, also include first conflict as primary
+            conflictClassId: conflicts[0].ClassID,
+            conflictClassName: conflicts[0].HonorName || 'Unknown Class',
+            conflictRegistrationId: conflicts[0].RegistrationID
+          });
+        } else {
+          // Single class conflict (original behavior)
+          return res.status(409).json({ 
+            conflict: true,
+            conflictClassId: conflicts[0].ClassID,
+            conflictClassName: conflicts[0].HonorName || 'Unknown Class',
+            conflictRegistrationId: conflicts[0].RegistrationID
+          });
+        }
       }
     } else {
-      // Trying to waitlist when full: check if already waitlisted in this timeslot
+      // Trying to waitlist when full: check if already waitlisted in any of the timeslots
       const existingWaitlisted = db.prepare(`
         SELECT COUNT(*) as count FROM Registrations r
         JOIN Classes c ON r.ClassID = c.ID
-        WHERE r.UserID = ? AND c.TimeslotID = ? AND c.EventID = ? AND r.Status = 'Waitlisted'
-      `).get(userId, classData.TimeslotID, classData.EventID);
+        WHERE r.UserID = ? AND c.TimeslotID IN (${timeslotsToCheck.map(() => '?').join(',')}) AND c.EventID = ? AND r.Status = 'Waitlisted'
+      `).get(userId, ...timeslotsToCheck, classData.EventID);
       
       if (existingWaitlisted.count > 0) {
-        return res.status(400).json({ error: 'You already have a waitlist spot for another class during this timeslot. You can only waitlist for one class per timeslot.' });
+        return res.status(400).json({ error: 'You already have a waitlist spot for another class during one of these timeslots. You can only waitlist for one class per timeslot.' });
       }
     }
 
