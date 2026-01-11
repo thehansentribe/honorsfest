@@ -40,6 +40,14 @@
   <div class="container">
     <div id="notifications"></div>
 
+    <!-- Tabs for Staff users -->
+    <div id="staffTabs" class="tabs" style="display: none;">
+      <button class="tab active" data-tab="student" onclick="switchStudentTab('student', this)">Student View</button>
+      <button class="tab" data-tab="myclasses" onclick="switchStudentTab('myclasses', this)">My Classes</button>
+    </div>
+
+    <!-- Student View Content -->
+    <div id="studentViewContent">
     <div class="dashboard-split">
       <!-- Left Panel: Class Browser -->
       <div>
@@ -85,6 +93,27 @@
         </div>
       </div>
     </div>
+    </div>
+
+    <!-- My Classes Tab Content (for Staff) -->
+    <div id="myClassesTabContent" style="display: none;">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">My Classes</h2>
+        </div>
+        <div id="myTeachingClassesContent">
+          <p class="text-center">Loading classes...</p>
+        </div>
+      </div>
+      <div class="card" id="teachingRosterCard" style="display: none; margin-top: 20px;">
+        <div class="card-header">
+          <h2 class="card-title">Class Roster</h2>
+        </div>
+        <div id="teachingRosterContent">
+          <p class="text-center">Select a class to view roster</p>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="/js/utils.js"></script>
@@ -105,6 +134,12 @@
       currentUserId = user.id;
       document.getElementById('userDisplayName').textContent = `${user.firstName} ${user.lastName}`;
 
+      // Show tabs for Staff users
+      if (user.role === 'Staff') {
+        const staffTabs = document.getElementById('staffTabs');
+        if (staffTabs) staffTabs.style.display = 'flex';
+      }
+
       // Load user details to get check-in number
       try {
         const userResponse = await fetchWithAuth(`/api/users/${user.id}`);
@@ -121,6 +156,183 @@
       await loadEvents();
       await loadData();
     });
+
+    // Tab switching for Staff users
+    function switchStudentTab(tabName, clickedElement) {
+      // Update tab UI
+      document.querySelectorAll('#staffTabs .tab').forEach(t => t.classList.remove('active'));
+      if (clickedElement) {
+        clickedElement.classList.add('active');
+      }
+
+      // Show/hide content
+      const studentView = document.getElementById('studentViewContent');
+      const myClassesView = document.getElementById('myClassesTabContent');
+      
+      if (tabName === 'student') {
+        if (studentView) studentView.style.display = 'block';
+        if (myClassesView) myClassesView.style.display = 'none';
+      } else if (tabName === 'myclasses') {
+        if (studentView) studentView.style.display = 'none';
+        if (myClassesView) myClassesView.style.display = 'block';
+        renderMyTeachingClasses();
+      }
+    }
+
+    // Render My Classes tab for Staff users
+    async function renderMyTeachingClasses() {
+      const container = document.getElementById('myTeachingClassesContent');
+      if (!container || !currentEventId || !currentUserId) {
+        if (container) container.innerHTML = '<p class="text-center">Please select an event first.</p>';
+        return;
+      }
+      
+      try {
+        const classesResponse = await fetchWithAuth(`/api/classes/${currentEventId}?teacherId=${currentUserId}`);
+        const myClasses = await classesResponse.json();
+        
+        if (myClasses.length === 0) {
+          container.innerHTML = '<p class="text-center">No classes assigned to you as a teacher.</p>';
+          return;
+        }
+        
+        container.innerHTML = `
+          <div class="form-group">
+            <label for="teachingClassSelect">Select Class:</label>
+            <select id="teachingClassSelect" class="form-control" onchange="loadTeachingRoster(this.value)">
+              <option value="">-- Select a class --</option>
+              ${myClasses.map(c => `<option value="${c.ID}">${c.HonorName} - ${c.TimeslotDate} ${c.TimeslotStartTime}</option>`).join('')}
+            </select>
+          </div>
+        `;
+      } catch (error) {
+        console.error('Error loading my classes:', error);
+        container.innerHTML = '<p class="text-center" style="color: #d32f2f;">Error loading classes</p>';
+      }
+    }
+
+    // Load roster for selected class
+    async function loadTeachingRoster(classId) {
+      if (!classId) {
+        const rosterCard = document.getElementById('teachingRosterCard');
+        if (rosterCard) rosterCard.style.display = 'none';
+        return;
+      }
+      
+      const rosterContainer = document.getElementById('teachingRosterContent');
+      const rosterCard = document.getElementById('teachingRosterCard');
+      if (!rosterContainer || !rosterCard) return;
+      
+      try {
+        const response = await fetchWithAuth(`/api/registrations/class/${classId}/roster`);
+        const roster = await response.json();
+        
+        rosterCard.style.display = 'block';
+        
+        // Check event status to determine if attendance can be edited
+        const currentEvent = availableEvents.find(e => e.ID === currentEventId);
+        const isEventClosed = currentEvent && currentEvent.Status === 'Closed';
+        const disabledAttr = isEventClosed ? 'disabled' : '';
+        
+        const tableHtml = `
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Student Name</th>
+                <th>Club</th>
+                <th>Investiture Level</th>
+                <th>Attended</th>
+                <th>Completed</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${roster.map(student => `
+                <tr>
+                  <td>${student.FirstName} ${student.LastName}</td>
+                  <td>${student.ClubName || 'No Club'}</td>
+                  <td>${student.InvestitureLevel || 'None'}</td>
+                  <td>
+                    <input type="checkbox" ${student.Attended ? 'checked' : ''} ${disabledAttr}
+                      onchange="updateTeachingAttendance(${classId}, ${student.UserID}, 'Attended', this.checked)">
+                  </td>
+                  <td>
+                    <input type="checkbox" ${student.Completed ? 'checked' : ''} ${disabledAttr}
+                      onchange="updateTeachingAttendance(${classId}, ${student.UserID}, 'Completed', this.checked)">
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+        
+        const mobileCards = roster.map(student => {
+          const attendedChecked = student.Attended ? 'checked' : '';
+          const completedChecked = student.Completed ? 'checked' : '';
+          
+          const actionsHtml = `
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+              <label style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" ${attendedChecked} ${disabledAttr}
+                  onchange="updateTeachingAttendance(${classId}, ${student.UserID}, 'Attended', this.checked)">
+                <span>Attended</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" ${completedChecked} ${disabledAttr}
+                  onchange="updateTeachingAttendance(${classId}, ${student.UserID}, 'Completed', this.checked)">
+                <span>Completed</span>
+              </label>
+            </div>
+          `;
+          
+          return createMobileCard({
+            'Student Name': `${student.FirstName} ${student.LastName}`,
+            'Club': student.ClubName || 'No Club',
+            'Investiture Level': student.InvestitureLevel || 'None'
+          }, `${student.FirstName} ${student.LastName}`, actionsHtml);
+        }).join('');
+        
+        rosterContainer.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
+        
+        if (isEventClosed) {
+          const banner = document.createElement('div');
+          banner.className = 'status-banner status-banner-closed';
+          banner.style.marginBottom = '15px';
+          banner.innerHTML = '<strong>⚠ Event Closed:</strong> Attendance cannot be edited for closed events.';
+          rosterContainer.insertBefore(banner, rosterContainer.firstChild);
+        }
+      } catch (error) {
+        console.error('Error loading roster:', error);
+        rosterContainer.innerHTML = '<p class="text-center" style="color: #d32f2f;">Error loading roster</p>';
+      }
+    }
+
+    // Update attendance for a student in a class
+    async function updateTeachingAttendance(classId, userId, field, value) {
+      try {
+        const updateData = {};
+        updateData[field] = value;
+
+        const response = await fetchWithAuth(`/api/attendance/${classId}/${userId}`, {
+          method: 'PUT',
+          body: JSON.stringify(updateData)
+        });
+
+        if (response.ok) {
+          showNotification('Attendance updated', 'success');
+        } else {
+          const error = await response.json().catch(() => ({ error: 'Failed to update attendance' }));
+          showNotification(error.error || 'Error updating attendance', 'error');
+        }
+      } catch (error) {
+        console.error('Error updating attendance:', error);
+        showNotification('Error updating attendance', 'error');
+      }
+    }
+
+    // Make functions globally available
+    window.switchStudentTab = switchStudentTab;
+    window.loadTeachingRoster = loadTeachingRoster;
+    window.updateTeachingAttendance = updateTeachingAttendance;
 
     async function loadEvents() {
       try {

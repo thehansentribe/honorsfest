@@ -7,7 +7,7 @@ const router = express.Router();
 router.use(verifyToken);
 
 // PUT /api/attendance/:classId/:userId - Update attendance
-router.put('/:classId/:userId', requireRole('Teacher', 'Admin', 'ClubDirector'), (req, res) => {
+router.put('/:classId/:userId', requireRole('Teacher', 'Admin', 'ClubDirector', 'Staff'), (req, res) => {
   try {
     const { Attended, Completed } = req.body;
     const classId = parseInt(req.params.classId);

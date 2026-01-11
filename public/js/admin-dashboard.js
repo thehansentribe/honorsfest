@@ -2475,19 +2475,21 @@ async function editClass(classId) {
   
   // Load honors, teachers, locations for dropdowns
   // Only show active users (deactivated users should not appear in dropdowns)
-  const [honorsRes, locationsRes, teachersRes, directorsRes] = await Promise.all([
+  const [honorsRes, locationsRes, teachersRes, staffRes, directorsRes] = await Promise.all([
     fetchWithAuth('/api/classes/honors'),
     fetchWithAuth(`/api/events/${eventId}/locations`),
     fetchWithAuth(`/api/users?role=Teacher&eventId=${eventId}&active=1`),
+    fetchWithAuth(`/api/users?role=Staff&eventId=${eventId}&active=1`),
     fetchWithAuth(`/api/users?role=ClubDirector&eventId=${eventId}&active=1`)
   ]);
   
   const honors = await honorsRes.json();
   const locations = await locationsRes.json();
   const teachers = await teachersRes.json();
+  const staff = await staffRes.json();
   const directors = await directorsRes.json();
-  // Merge teachers and club directors for teacher selection
-  const allTeachers = [...teachers, ...directors].sort((a, b) => {
+  // Merge teachers, staff, and club directors for teacher selection
+  const allTeachers = [...teachers, ...staff, ...directors].sort((a, b) => {
     if (a.LastName !== b.LastName) return a.LastName.localeCompare(b.LastName);
     return a.FirstName.localeCompare(b.FirstName);
   });

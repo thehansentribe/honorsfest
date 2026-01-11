@@ -213,6 +213,10 @@ async function clubdirectorSwitchTab(tabName, clickedElement = null) {
         }
       }
       break;
+    case 'myclasses':
+      content.innerHTML = getMyClassesTab();
+      await renderMyClasses();
+      break;
   }
 }
 
@@ -349,6 +353,202 @@ function getReportsTab() {
       <button id="generateReportBtn" onclick="generateClubDirectorReport()" class="btn btn-primary">Generate CSV Report</button>
     </div>
   `;
+}
+
+// Get My Classes Tab HTML for Club Director
+function getMyClassesTab() {
+  if (clubDirectorEvents.length === 0) {
+    return `
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">My Classes</h2>
+        </div>
+        <p class="text-center" style="color: #d32f2f;">No events assigned to your club. Please contact an administrator to be assigned to an event.</p>
+      </div>
+    `;
+  }
+  
+  if (!clubDirectorSelectedEventId) {
+    return `
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">My Classes</h2>
+        </div>
+        <p class="text-center" style="color: #d32f2f;">Please select an event first using the dropdown above</p>
+      </div>
+    `;
+  }
+  
+  return `
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">My Classes</h2>
+      </div>
+      <div id="myClassesContent">
+        <p class="text-center">Loading classes...</p>
+      </div>
+    </div>
+    <div class="card" id="rosterCard" style="display: none; margin-top: 20px;">
+      <div class="card-header">
+        <h2 class="card-title">Class Roster</h2>
+      </div>
+      <div id="rosterContent">
+        <p class="text-center">Select a class to view roster</p>
+      </div>
+    </div>
+  `;
+}
+
+// Render My Classes tab - shows classes where current user is the teacher
+async function renderMyClasses() {
+  const container = document.getElementById('myClassesContent');
+  if (!container) return;
+  
+  if (!clubDirectorSelectedEventId || !clubDirectorUser) {
+    container.innerHTML = '<p class="text-center">Please select an event first.</p>';
+    return;
+  }
+  
+  try {
+    const classesResponse = await fetchWithAuth(`/api/classes/${clubDirectorSelectedEventId}?teacherId=${clubDirectorUser.id}`);
+    const myClasses = await classesResponse.json();
+    
+    if (myClasses.length === 0) {
+      container.innerHTML = '<p class="text-center">No classes assigned to you as a teacher.</p>';
+      return;
+    }
+    
+    container.innerHTML = `
+      <div class="form-group">
+        <label for="classSelect">Select Class:</label>
+        <select id="classSelect" class="form-control" onchange="loadMyClassRoster(this.value)">
+          <option value="">-- Select a class --</option>
+          ${myClasses.map(c => `<option value="${c.ID}">${c.HonorName} - ${c.TimeslotDate} ${c.TimeslotStartTime}</option>`).join('')}
+        </select>
+      </div>
+    `;
+  } catch (error) {
+    console.error('Error loading my classes:', error);
+    container.innerHTML = '<p class="text-center" style="color: #d32f2f;">Error loading classes</p>';
+  }
+}
+
+// Load roster for selected class
+async function loadMyClassRoster(classId) {
+  if (!classId) {
+    const rosterCard = document.getElementById('rosterCard');
+    if (rosterCard) rosterCard.style.display = 'none';
+    return;
+  }
+  
+  const rosterContainer = document.getElementById('rosterContent');
+  const rosterCard = document.getElementById('rosterCard');
+  if (!rosterContainer || !rosterCard) return;
+  
+  try {
+    const response = await fetchWithAuth(`/api/registrations/class/${classId}/roster`);
+    const roster = await response.json();
+    
+    rosterCard.style.display = 'block';
+    
+    // Check event status to determine if attendance can be edited
+    const currentEvent = clubDirectorEvents.find(e => e.ID === clubDirectorSelectedEventId);
+    const isEventClosed = currentEvent && currentEvent.Status === 'Closed';
+    const disabledAttr = isEventClosed ? 'disabled' : '';
+    
+    const tableHtml = `
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Student Name</th>
+            <th>Club</th>
+            <th>Investiture Level</th>
+            <th>Attended</th>
+            <th>Completed</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${roster.map(student => `
+            <tr>
+              <td>${student.FirstName} ${student.LastName}</td>
+              <td>${student.ClubName || 'No Club'}</td>
+              <td>${student.InvestitureLevel || 'None'}</td>
+              <td>
+                <input type="checkbox" ${student.Attended ? 'checked' : ''} ${disabledAttr}
+                  onchange="updateMyClassAttendance(${classId}, ${student.UserID}, 'Attended', this.checked)">
+              </td>
+              <td>
+                <input type="checkbox" ${student.Completed ? 'checked' : ''} ${disabledAttr}
+                  onchange="updateMyClassAttendance(${classId}, ${student.UserID}, 'Completed', this.checked)">
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+    
+    const mobileCards = roster.map(student => {
+      const attendedChecked = student.Attended ? 'checked' : '';
+      const completedChecked = student.Completed ? 'checked' : '';
+      
+      const actionsHtml = `
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+          <label style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="checkbox" ${attendedChecked} ${disabledAttr}
+              onchange="updateMyClassAttendance(${classId}, ${student.UserID}, 'Attended', this.checked)">
+            <span>Attended</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="checkbox" ${completedChecked} ${disabledAttr}
+              onchange="updateMyClassAttendance(${classId}, ${student.UserID}, 'Completed', this.checked)">
+            <span>Completed</span>
+          </label>
+        </div>
+      `;
+      
+      return createMobileCard({
+        'Student Name': `${student.FirstName} ${student.LastName}`,
+        'Club': student.ClubName || 'No Club',
+        'Investiture Level': student.InvestitureLevel || 'None'
+      }, `${student.FirstName} ${student.LastName}`, actionsHtml);
+    }).join('');
+    
+    rosterContainer.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
+    
+    if (isEventClosed) {
+      const banner = document.createElement('div');
+      banner.className = 'status-banner status-banner-closed';
+      banner.style.marginBottom = '15px';
+      banner.innerHTML = '<strong>⚠ Event Closed:</strong> Attendance cannot be edited for closed events.';
+      rosterContainer.insertBefore(banner, rosterContainer.firstChild);
+    }
+  } catch (error) {
+    console.error('Error loading roster:', error);
+    rosterContainer.innerHTML = '<p class="text-center" style="color: #d32f2f;">Error loading roster</p>';
+  }
+}
+
+// Update attendance for a student in a class
+async function updateMyClassAttendance(classId, userId, field, value) {
+  try {
+    const updateData = {};
+    updateData[field] = value;
+
+    const response = await fetchWithAuth(`/api/attendance/${classId}/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData)
+    });
+
+    if (response.ok) {
+      showNotification('Attendance updated', 'success');
+    } else {
+      const error = await response.json().catch(() => ({ error: 'Failed to update attendance' }));
+      showNotification(error.error || 'Error updating attendance', 'error');
+    }
+  } catch (error) {
+    console.error('Error updating attendance:', error);
+    showNotification('Error updating attendance', 'error');
+  }
 }
 
 // Override renderUsers
@@ -928,16 +1128,18 @@ async function showCreateClassFormClubDirector() {
     return a.Name.localeCompare(b.Name);
   });
   
-  // Load teachers and club directors from the same club for this event
+  // Load teachers, staff, and club directors from the same club for this event
   // Only show active users (deactivated users should not appear in dropdowns)
-  const [teachersResponse, directorsResponse] = await Promise.all([
+  const [teachersResponse, staffResponse, directorsResponse] = await Promise.all([
     fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Teacher&eventId=${eventId}&active=1`),
+    fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Staff&eventId=${eventId}&active=1`),
     fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=ClubDirector&eventId=${eventId}&active=1`)
   ]);
   const teachers = await teachersResponse.json();
+  const staff = await staffResponse.json();
   const directors = await directorsResponse.json();
-  // Merge teachers and club directors for teacher selection
-  const allTeachers = [...teachers, ...directors].sort((a, b) => {
+  // Merge teachers, staff, and club directors for teacher selection
+  const allTeachers = [...teachers, ...staff, ...directors].sort((a, b) => {
     if (a.LastName !== b.LastName) return a.LastName.localeCompare(b.LastName);
     return a.FirstName.localeCompare(b.FirstName);
   });
@@ -1670,6 +1872,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.generateSampleCSV = generateSampleCSV;
   window.importValidUsers = importValidUsers;
   window.downloadImportedUsersCSV = downloadImportedUsersCSV;
+  window.loadMyClassRoster = loadMyClassRoster;
+  window.updateMyClassAttendance = updateMyClassAttendance;
   
   // Restore last active tab or default to users
   const savedTab = localStorage.getItem('directorCurrentTab') || 'users';
@@ -1683,19 +1887,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     const eventId = clubDirectorSelectedEventId;
     
     // Load honors, teachers, locations for dropdowns
-    const [honorsRes, locationsRes, teachersRes, directorsRes] = await Promise.all([
+    const [honorsRes, locationsRes, teachersRes, staffRes, directorsRes] = await Promise.all([
       fetchWithAuth('/api/classes/honors'),
       fetchWithAuth(`/api/events/${eventId}/locations`),
       fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Teacher&eventId=${eventId}&active=1`),
+      fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=Staff&eventId=${eventId}&active=1`),
       fetchWithAuth(`/api/users?clubId=${clubDirectorClubId}&role=ClubDirector&eventId=${eventId}&active=1`)
     ]);
     
     const honors = await honorsRes.json();
     const locations = await locationsRes.json();
     const teachers = await teachersRes.json();
+    const staff = await staffRes.json();
     const directors = await directorsRes.json();
-    // Merge teachers and club directors for teacher selection
-    const allTeachers = [...teachers, ...directors].sort((a, b) => {
+    // Merge teachers, staff, and club directors for teacher selection
+    const allTeachers = [...teachers, ...staff, ...directors].sort((a, b) => {
       if (a.LastName !== b.LastName) return a.LastName.localeCompare(b.LastName);
       return a.FirstName.localeCompare(b.FirstName);
     });
