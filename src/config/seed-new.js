@@ -298,8 +298,8 @@ function seedDatabase() {
           const timeslotId = timeslotIds[0]; // Use first timeslot
           
           const insertClass = db.prepare(`
-            INSERT INTO Classes (EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents, Active, CreatedBy)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+            INSERT INTO Classes (EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents, Active, CreatedBy, ClubID)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
           `);
           
           const classResult = insertClass.run(
@@ -310,7 +310,8 @@ function seedDatabase() {
             timeslotId,
             20,
             20,
-            directorId // Created by the club director
+            directorId, // Created by the club director
+            clubId // Club offering this class
           );
           console.log(`      Created class: ${selectedHonor.Name} (ID: ${classResult.lastInsertRowid})`);
         }

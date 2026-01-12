@@ -2485,14 +2485,15 @@ async function editClass(classId) {
   const select = document.getElementById('classEventFilter');
   const eventId = select?.value || cls.EventID;
   
-  // Load honors, teachers, locations for dropdowns
+  // Load honors, teachers, locations, and clubs for dropdowns
   // Only show active users (deactivated users should not appear in dropdowns)
-  const [honorsRes, locationsRes, teachersRes, staffRes, directorsRes] = await Promise.all([
+  const [honorsRes, locationsRes, teachersRes, staffRes, directorsRes, clubsRes] = await Promise.all([
     fetchWithAuth('/api/classes/honors'),
     fetchWithAuth(`/api/events/${eventId}/locations`),
     fetchWithAuth(`/api/users?role=Teacher&eventId=${eventId}&active=1`),
     fetchWithAuth(`/api/users?role=Staff&eventId=${eventId}&active=1`),
-    fetchWithAuth(`/api/users?role=ClubDirector&eventId=${eventId}&active=1`)
+    fetchWithAuth(`/api/users?role=ClubDirector&eventId=${eventId}&active=1`),
+    fetchWithAuth(`/api/clubs/event/${eventId}`)
   ]);
   
   const honors = await honorsRes.json();
@@ -2500,6 +2501,7 @@ async function editClass(classId) {
   const teachers = await teachersRes.json();
   const staff = await staffRes.json();
   const directors = await directorsRes.json();
+  const clubs = await clubsRes.json();
   // Merge teachers, staff, and club directors for teacher selection
   const allTeachers = [...teachers, ...staff, ...directors].sort((a, b) => {
     if (a.LastName !== b.LastName) return a.LastName.localeCompare(b.LastName);
@@ -2521,6 +2523,14 @@ async function editClass(classId) {
           <label>Honor</label>
           <input type="text" value="${cls.HonorName || 'Unknown'}" class="form-control" disabled>
           <small style="color: var(--text-light);">Cannot change honor after creation</small>
+        </div>
+        <div class="form-group">
+          <label for="editClassClub">Club</label>
+          <select id="editClassClub" name="editClassClub" class="form-control">
+            <option value="">No Club</option>
+            ${clubs.map(c => `<option value="${c.ID}" ${cls.ClubID === c.ID ? 'selected' : ''}>${c.Name}</option>`).join('')}
+          </select>
+          <small style="color: var(--text-light);">The club offering this class</small>
         </div>
         <div class="form-group">
           <label for="editClassTeacher">Teacher</label>
@@ -2571,6 +2581,7 @@ async function handleEditClass(e, classId) {
   const form = e.target;
   
   const classData = {
+    ClubID: form.editClassClub?.value || null,
     TeacherID: form.editClassTeacher?.value || null,
     LocationID: form.editClassLocation?.value || null,
     TeacherMaxStudents: parseInt(form.editClassMaxCapacity?.value) || 0,
@@ -4614,14 +4625,15 @@ async function showCreateClassForm() {
     return;
   }
   
-  // Load honors, teachers, locations, and timeslots for the event
+  // Load honors, teachers, locations, timeslots, and clubs for the event
   // Only show active users (deactivated users should not appear in dropdowns)
-  const [honorsRes, teachersRes, directorsRes, locationsRes, timeslotsRes] = await Promise.all([
+  const [honorsRes, teachersRes, directorsRes, locationsRes, timeslotsRes, clubsRes] = await Promise.all([
     fetchWithAuth('/api/classes/honors'),
     fetchWithAuth(`/api/users?role=Teacher&eventId=${eventId}&active=1`),
     fetchWithAuth(`/api/users?role=ClubDirector&eventId=${eventId}&active=1`),
     fetchWithAuth(`/api/events/${eventId}/locations`),
-    fetchWithAuth(`/api/events/${eventId}/timeslots`)
+    fetchWithAuth(`/api/events/${eventId}/timeslots`),
+    fetchWithAuth(`/api/clubs/event/${eventId}`)
   ]);
   
   if (!honorsRes.ok) {
@@ -4647,6 +4659,7 @@ async function showCreateClassForm() {
   const directors = await directorsRes.json();
   const locations = await locationsRes.json();
   const timeslots = await timeslotsRes.json();
+  const clubs = await clubsRes.json();
   
   // Merge teachers and club directors for teacher selection
   const allTeachers = [...teachers, ...directors].sort((a, b) => {
@@ -4671,6 +4684,14 @@ async function showCreateClassForm() {
             <option value="">Select Honor</option>
             ${sortedHonors.map(h => `<option value="${h.ID}">${h.Category}: ${h.Name}</option>`).join('')}
           </select>
+        </div>
+        <div class="form-group">
+          <label for="classClub">Club *</label>
+          <select id="classClub" name="classClub" class="form-control" required>
+            <option value="">Select Club</option>
+            ${clubs.map(c => `<option value="${c.ID}">${c.Name}</option>`).join('')}
+          </select>
+          <small style="color: var(--text-light);">The club offering this class</small>
         </div>
         <div class="form-group">
           <label for="classTeacher">Teacher</label>
@@ -4765,6 +4786,7 @@ async function handleCreateClass(e) {
   const classData = {
     EventID: eventId,
     HonorID: form.classHonor?.value,
+    ClubID: form.classClub?.value,
     TeacherID: form.classTeacher?.value || null, // Teacher is optional
     LocationID: form.classLocation?.value,
     TeacherMaxStudents: parseInt(form.classMaxCapacity?.value) || 0,
@@ -4772,8 +4794,8 @@ async function handleCreateClass(e) {
     TimeslotIDs: selectedTimeslots,
     isMultiSession: isMultiSession
   };
-  
-  if (!classData.HonorID || !classData.LocationID || !classData.TeacherMaxStudents) {
+
+  if (!classData.HonorID || !classData.ClubID || !classData.LocationID || !classData.TeacherMaxStudents) {
     showNotification('Please fill in all required fields', 'error');
     return;
   }

@@ -36,7 +36,7 @@ class Class {
   }
 
   static create(classData) {
-    const { EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents, CreatedBy, ClassGroupID, SessionNumber, MinimumLevel } = classData;
+    const { EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents, CreatedBy, ClubID, ClassGroupID, SessionNumber, MinimumLevel } = classData;
     
     // Validate no duplicate honor in same timeslot
     // If TeacherID is provided, check for duplicate with same teacher
@@ -74,8 +74,8 @@ class Class {
     }
 
     const stmt = db.prepare(`
-      INSERT INTO Classes (EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents, CreatedBy, ClassGroupID, SessionNumber, MinimumLevel)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO Classes (EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents, CreatedBy, ClubID, ClassGroupID, SessionNumber, MinimumLevel)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -87,6 +87,7 @@ class Class {
       actualCapacity,
       TeacherMaxStudents,
       CreatedBy || null,
+      ClubID || null,
       ClassGroupID || null,
       SessionNumber || 1,
       MinimumLevel || null
@@ -152,15 +153,13 @@ class Class {
              u.FirstName as TeacherFirstName, u.LastName as TeacherLastName,
              l.Name as LocationName, l.MaxCapacity as LocationMaxCapacity,
              t.Date as TimeslotDate, t.StartTime as TimeslotStartTime, t.EndTime as TimeslotEndTime,
-             COALESCE(creatorClub.Name, teacherClub.Name) as ClubName
+             club.Name as ClubName
       FROM Classes c
       LEFT JOIN Honors h ON c.HonorID = h.ID
       LEFT JOIN Users u ON c.TeacherID = u.ID
       LEFT JOIN Locations l ON c.LocationID = l.ID
       LEFT JOIN Timeslots t ON c.TimeslotID = t.ID
-      LEFT JOIN Users creator ON c.CreatedBy = creator.ID
-      LEFT JOIN Clubs creatorClub ON creator.ClubID = creatorClub.ID
-      LEFT JOIN Clubs teacherClub ON u.ClubID = teacherClub.ID
+      LEFT JOIN Clubs club ON c.ClubID = club.ID
       WHERE c.ClassGroupID = ?
       ORDER BY c.SessionNumber ASC
     `).all(classGroupId);
@@ -243,15 +242,13 @@ class Class {
              u.FirstName as TeacherFirstName, u.LastName as TeacherLastName,
              l.Name as LocationName, l.MaxCapacity as LocationMaxCapacity,
              t.Date as TimeslotDate, t.StartTime as TimeslotStartTime, t.EndTime as TimeslotEndTime,
-             COALESCE(creatorClub.Name, teacherClub.Name) as ClubName
+             club.Name as ClubName
       FROM Classes c
       LEFT JOIN Honors h ON c.HonorID = h.ID
       LEFT JOIN Users u ON c.TeacherID = u.ID
       LEFT JOIN Locations l ON c.LocationID = l.ID
       LEFT JOIN Timeslots t ON c.TimeslotID = t.ID
-      LEFT JOIN Users creator ON c.CreatedBy = creator.ID
-      LEFT JOIN Clubs creatorClub ON creator.ClubID = creatorClub.ID
-      LEFT JOIN Clubs teacherClub ON u.ClubID = teacherClub.ID
+      LEFT JOIN Clubs club ON c.ClubID = club.ID
       WHERE c.ID = ?
     `).get(id);
 
@@ -287,15 +284,13 @@ class Class {
              u.FirstName as TeacherFirstName, u.LastName as TeacherLastName,
              l.Name as LocationName, l.MaxCapacity as LocationMaxCapacity,
              t.Date as TimeslotDate, t.StartTime as TimeslotStartTime, t.EndTime as TimeslotEndTime,
-             COALESCE(creatorClub.Name, teacherClub.Name) as ClubName
+             club.Name as ClubName
       FROM Classes c
       LEFT JOIN Honors h ON c.HonorID = h.ID
       LEFT JOIN Users u ON c.TeacherID = u.ID
       LEFT JOIN Locations l ON c.LocationID = l.ID
       LEFT JOIN Timeslots t ON c.TimeslotID = t.ID
-      LEFT JOIN Users creator ON c.CreatedBy = creator.ID
-      LEFT JOIN Clubs creatorClub ON creator.ClubID = creatorClub.ID
-      LEFT JOIN Clubs teacherClub ON u.ClubID = teacherClub.ID
+      LEFT JOIN Clubs club ON c.ClubID = club.ID
       WHERE c.EventID = ?
     `;
     const params = [eventId];
@@ -335,6 +330,11 @@ class Class {
     if (filters.teacherId) {
       query += ' AND c.TeacherID = ?';
       params.push(filters.teacherId);
+    }
+
+    if (filters.clubId) {
+      query += ' AND c.ClubID = ?';
+      params.push(filters.clubId);
     }
 
     query += ' ORDER BY t.Date, t.StartTime, h.Name';
@@ -383,7 +383,7 @@ class Class {
   }
 
   static update(id, updates) {
-    const allowedUpdates = ['TeacherID', 'LocationID', 'MaxCapacity', 'TeacherMaxStudents', 'Active', 'MinimumLevel'];
+    const allowedUpdates = ['TeacherID', 'LocationID', 'MaxCapacity', 'TeacherMaxStudents', 'Active', 'MinimumLevel', 'ClubID'];
     const setClause = [];
     const values = [];
 

@@ -110,6 +110,7 @@ function initializeDatabase() {
         TeacherMaxStudents INTEGER NOT NULL,
         Active BOOLEAN NOT NULL DEFAULT 1,
         CreatedBy INTEGER,
+        ClubID INTEGER, -- Explicit club association for proper attribution
         ClassGroupID TEXT, -- Links sessions of same multi-session class (NULL for single-session)
         SessionNumber INTEGER DEFAULT 1, -- Order within group: 1, 2, 3...
         MinimumLevel TEXT CHECK(MinimumLevel IN ('Friend', 'Companion', 'Explorer', 'Ranger', 'Voyager', 'Guide', 'MasterGuide', NULL)),
@@ -118,7 +119,8 @@ function initializeDatabase() {
         FOREIGN KEY (TeacherID) REFERENCES Users(ID),
         FOREIGN KEY (LocationID) REFERENCES Locations(ID),
         FOREIGN KEY (TimeslotID) REFERENCES Timeslots(ID),
-        FOREIGN KEY (CreatedBy) REFERENCES Users(ID)
+        FOREIGN KEY (CreatedBy) REFERENCES Users(ID),
+        FOREIGN KEY (ClubID) REFERENCES Clubs(ID)
       );
 
       CREATE TABLE IF NOT EXISTS Registrations (
@@ -192,6 +194,7 @@ function initializeDatabase() {
 
       CREATE INDEX IF NOT EXISTS idx_club_events_club ON ClubEvents(ClubID);
       CREATE INDEX IF NOT EXISTS idx_club_events_event ON ClubEvents(EventID);
+      CREATE INDEX IF NOT EXISTS idx_classes_club ON Classes(ClubID);
     `;
 
     db.exec(schema);

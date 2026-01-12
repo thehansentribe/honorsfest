@@ -2077,6 +2077,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const classData = {
       EventID: clubDirectorSelectedEventId, // Use the director's event
       HonorID: form.classHonor?.value,
+      ClubID: clubDirectorClubId, // Use the director's club
       TeacherID: form.classTeacher?.value || null, // Teacher is optional
       LocationID: null, // Club Directors don't set location - admins do this
       TeacherMaxStudents: parseInt(form.classMaxCapacity?.value) || 0,

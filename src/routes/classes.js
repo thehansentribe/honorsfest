@@ -179,6 +179,22 @@ router.post('/', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) 
     // Set CreatedBy from authenticated user
     classData.CreatedBy = req.user.id;
     
+    // Handle ClubID assignment
+    const User = require('../models/user');
+    const userData = User.findById(req.user.id);
+    
+    // For ClubDirectors, automatically use their club if not specified
+    if (req.user.role === 'ClubDirector') {
+      if (!classData.ClubID && userData && userData.ClubID) {
+        classData.ClubID = userData.ClubID;
+      }
+    }
+    
+    // Validate ClubID is provided (required for proper class attribution)
+    if (!classData.ClubID) {
+      return res.status(400).json({ error: 'ClubID is required to create a class' });
+    }
+    
     // Check if this is a multi-session class creation request
     if (TimeslotIDs && Array.isArray(TimeslotIDs) && TimeslotIDs.length > 0) {
       if (isMultiSession && TimeslotIDs.length > 1) {
