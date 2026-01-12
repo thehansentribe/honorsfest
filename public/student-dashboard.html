@@ -531,10 +531,47 @@
       const currentEvent = availableEvents.find(e => e.ID === currentEventId);
       const isEventLive = currentEvent && currentEvent.Status === 'Live';
 
+      // Get user's level for filtering
+      const user = getCurrentUser();
+      const userLevel = user?.investitureLevel || null;
+      
+      // Level hierarchy for comparison (lowest to highest)
+      const LEVEL_HIERARCHY = ['Friend', 'Companion', 'Explorer', 'Ranger', 'Voyager', 'Guide', 'MasterGuide'];
+      
+      // Helper function to check if user meets level requirement
+      const meetsLevelRequirement = (userLevel, classMinLevel) => {
+        // If class has no level restriction, everyone can see it
+        if (!classMinLevel) {
+          return true;
+        }
+        
+        // If user has no level (None/null), they can only see unrestricted classes
+        if (!userLevel || userLevel === 'None') {
+          return false;
+        }
+        
+        // Get index in hierarchy - higher index = higher level
+        const userIndex = LEVEL_HIERARCHY.indexOf(userLevel);
+        const minIndex = LEVEL_HIERARCHY.indexOf(classMinLevel);
+        
+        // If level not found in hierarchy, deny access
+        if (userIndex === -1 || minIndex === -1) {
+          return false;
+        }
+        
+        // User must be at or above the minimum level
+        return userIndex >= minIndex;
+      };
+      
       // Filter classes - make sure we're not deduplicating
       const filtered = allClasses.filter(c => {
         // Always filter out inactive classes from student view
         if (!c.Active) return false;
+        
+        // Filter by level requirement
+        if (!meetsLevelRequirement(userLevel, c.MinimumLevel)) {
+          return false;
+        }
         
         if (timeslotFilter && c.TimeslotID && c.TimeslotID.toString() !== timeslotFilter) return false;
         if (teacherFilter && c.TeacherID && c.TeacherID.toString() !== teacherFilter) return false;

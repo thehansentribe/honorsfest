@@ -100,6 +100,10 @@ router.get('/:eventId', (req, res) => {
       return res.status(404).json({ error: 'Event not found' });
     }
     
+    // Get user data for all roles (needed for level filtering and club checks)
+    const User = require('../models/user');
+    const userData = User.findById(user.id);
+    
     // Non-admins can only see active events
     if (user.role !== 'Admin' && user.role !== 'AdminViewOnly' && user.role !== 'EventAdmin') {
       if (!event.Active && user.role !== 'ClubDirector') {
@@ -107,9 +111,6 @@ router.get('/:eventId', (req, res) => {
       }
 
       // Check if user's club participates in this event
-      const User = require('../models/user');
-      const userData = User.findById(user.id);
-      
       if (userData && userData.ClubID) {
         const Club = require('../models/club');
         if (!Club.isInEvent(userData.ClubID, eventId)) {
@@ -137,7 +138,19 @@ router.get('/:eventId', (req, res) => {
       filters.active = req.query.active === 'true';
     }
     
-    const classes = Class.findByEvent(eventId, filters);
+    let classes = Class.findByEvent(eventId, filters);
+    
+    // Filter classes by level requirement for students and staff (non-admin roles that browse classes)
+    // Admins, EventAdmins, and ClubDirectors see all classes regardless of level for management purposes
+    if ((user.role === 'Student' || user.role === 'Staff') && userData) {
+      const userLevel = userData.InvestitureLevel || null;
+      
+      classes = classes.filter(cls => {
+        // Use the Class model's helper method to check level eligibility
+        return Class.meetsLevelRequirement(userLevel, cls.MinimumLevel);
+      });
+    }
+    
     res.json(classes);
   } catch (error) {
     res.status(500).json({ error: error.message });
