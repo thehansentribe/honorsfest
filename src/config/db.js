@@ -112,6 +112,7 @@ function initializeDatabase() {
         CreatedBy INTEGER,
         ClassGroupID TEXT, -- Links sessions of same multi-session class (NULL for single-session)
         SessionNumber INTEGER DEFAULT 1, -- Order within group: 1, 2, 3...
+        MinimumLevel TEXT CHECK(MinimumLevel IN ('Friend', 'Companion', 'Explorer', 'Ranger', 'Voyager', 'Guide', 'MasterGuide', NULL)),
         FOREIGN KEY (EventID) REFERENCES Events(ID),
         FOREIGN KEY (HonorID) REFERENCES Honors(ID),
         FOREIGN KEY (TeacherID) REFERENCES Users(ID),

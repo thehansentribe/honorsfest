@@ -237,6 +237,17 @@ function migrateDatabase() {
       console.log('✓ ClassGroupID index created');
     }
     
+    // Check Classes table for MinimumLevel column
+    const classesTableInfoForLevel = db.prepare("PRAGMA table_info(Classes)").all();
+    const hasMinimumLevel = classesTableInfoForLevel.some(col => col.name === 'MinimumLevel');
+    
+    if (!hasMinimumLevel) {
+      console.log('Adding MinimumLevel column to Classes table for level restrictions...');
+      db.exec('ALTER TABLE Classes ADD COLUMN MinimumLevel TEXT CHECK(MinimumLevel IN (\'Friend\', \'Companion\', \'Explorer\', \'Ranger\', \'Voyager\', \'Guide\', \'MasterGuide\', NULL))');
+      // All existing classes will have NULL (no restriction) by default
+      console.log('✓ MinimumLevel column added (existing classes set to NULL - all levels welcome)');
+    }
+    
   } catch (error) {
     console.error('Migration error:', error);
     // Don't throw, just log

@@ -1,9 +1,42 @@
 const { db } = require('../config/db');
 const crypto = require('crypto');
 
+// Level hierarchy (lowest to highest)
+const LEVEL_HIERARCHY = ['Friend', 'Companion', 'Explorer', 'Ranger', 'Voyager', 'Guide', 'MasterGuide'];
+
 class Class {
+  /**
+   * Check if a user's level meets the class minimum level requirement
+   * @param {string|null} userLevel - User's InvestitureLevel (can be null/None)
+   * @param {string|null} classMinLevel - Class's MinimumLevel (null means no restriction)
+   * @returns {boolean} True if user can register, false otherwise
+   */
+  static meetsLevelRequirement(userLevel, classMinLevel) {
+    // If class has no level restriction, everyone can register
+    if (!classMinLevel) {
+      return true;
+    }
+    
+    // If user has no level (None/null), they can only register for unrestricted classes
+    if (!userLevel || userLevel === 'None') {
+      return false;
+    }
+    
+    // Get index in hierarchy - higher index = higher level
+    const userIndex = LEVEL_HIERARCHY.indexOf(userLevel);
+    const minIndex = LEVEL_HIERARCHY.indexOf(classMinLevel);
+    
+    // If level not found in hierarchy, deny access
+    if (userIndex === -1 || minIndex === -1) {
+      return false;
+    }
+    
+    // User must be at or above the minimum level
+    return userIndex >= minIndex;
+  }
+
   static create(classData) {
-    const { EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents, CreatedBy, ClassGroupID, SessionNumber } = classData;
+    const { EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents, CreatedBy, ClassGroupID, SessionNumber, MinimumLevel } = classData;
     
     // Validate no duplicate honor in same timeslot
     // If TeacherID is provided, check for duplicate with same teacher
@@ -41,8 +74,8 @@ class Class {
     }
 
     const stmt = db.prepare(`
-      INSERT INTO Classes (EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents, CreatedBy, ClassGroupID, SessionNumber)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO Classes (EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents, CreatedBy, ClassGroupID, SessionNumber, MinimumLevel)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -55,7 +88,8 @@ class Class {
       TeacherMaxStudents,
       CreatedBy || null,
       ClassGroupID || null,
-      SessionNumber || 1
+      SessionNumber || 1,
+      MinimumLevel || null
     );
 
     return this.findById(result.lastInsertRowid);
@@ -349,7 +383,7 @@ class Class {
   }
 
   static update(id, updates) {
-    const allowedUpdates = ['TeacherID', 'LocationID', 'MaxCapacity', 'TeacherMaxStudents', 'Active'];
+    const allowedUpdates = ['TeacherID', 'LocationID', 'MaxCapacity', 'TeacherMaxStudents', 'Active', 'MinimumLevel'];
     const setClause = [];
     const values = [];
 
@@ -359,7 +393,8 @@ class Class {
         let dbValue = value;
         if (typeof value === 'boolean') {
           dbValue = value ? 1 : 0;
-        } else if (value === null || value === undefined) {
+        } else if (value === null || value === undefined || value === '') {
+          // For MinimumLevel, empty string means no restriction (NULL)
           dbValue = null;
         }
         

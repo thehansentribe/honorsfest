@@ -49,6 +49,15 @@ router.post('/', (req, res) => {
       return res.status(403).json({ error: 'Your club is not participating in this event. Please contact your club director.' });
     }
 
+    // Check if user meets the class level requirement
+    if (!Class.meetsLevelRequirement(user.InvestitureLevel, classData.MinimumLevel)) {
+      const userLevelDisplay = user.InvestitureLevel || 'None';
+      const minLevelDisplay = classData.MinimumLevel || 'Unknown';
+      return res.status(403).json({ 
+        error: `This class requires ${minLevelDisplay} level or above. Your current level is ${userLevelDisplay}.` 
+      });
+    }
+
     // Check if user already registered for this specific class
     const alreadyRegistered = db.prepare(`
       SELECT COUNT(*) as count FROM Registrations r
@@ -286,6 +295,15 @@ router.post('/admin', requireRole('Admin', 'EventAdmin', 'ClubDirector'), async 
     if (!Club.isInEvent(student.ClubID, classData.EventID)) {
       return res.status(403).json({ 
         error: `Student's club is not participating in this event. Students can only be added to classes for events their club is associated with.` 
+      });
+    }
+
+    // Check if student meets the class level requirement
+    if (!Class.meetsLevelRequirement(student.InvestitureLevel, classData.MinimumLevel)) {
+      const studentLevelDisplay = student.InvestitureLevel || 'None';
+      const minLevelDisplay = classData.MinimumLevel || 'Unknown';
+      return res.status(403).json({ 
+        error: `This class requires ${minLevelDisplay} level or above. Student's current level is ${studentLevelDisplay}.` 
       });
     }
 

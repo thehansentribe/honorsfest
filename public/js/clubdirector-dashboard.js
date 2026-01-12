@@ -819,6 +819,14 @@ async function renderClasses() {
       }
       return '';
     };
+    
+    // Helper function to format level restriction badge
+    const getLevelBadge = (cls) => {
+      if (cls.MinimumLevel) {
+        return `<span class="badge bg-warning" style="font-size: 0.7em; margin-left: 5px;" title="Minimum level required: ${cls.MinimumLevel}">Min: ${cls.MinimumLevel}+</span>`;
+      }
+      return '';
+    };
 
     const tableHtml = `
       <table class="data-table">
@@ -843,6 +851,7 @@ async function renderClasses() {
             <td style="padding: 12px 8px; text-align: left;">
               <strong>${cls.HonorName || 'N/A'}</strong>
               ${getMultiSessionBadge(cls)}
+              ${getLevelBadge(cls)}
             </td>
             <td style="padding: 12px 8px; text-align: left;">${cls.ClubName || '<span style="color: #999;">N/A</span>'}</td>
             <td style="padding: 12px 8px; text-align: left;">${cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
@@ -1196,6 +1205,20 @@ async function showCreateClassFormClubDirector() {
           <label for="classMaxCapacity">Max Capacity *</label>
           <input type="number" id="classMaxCapacity" name="classMaxCapacity" class="form-control" min="1" required>
           <small style="color: var(--text-light);">Admin will assign location later</small>
+        </div>
+        <div class="form-group">
+          <label for="classMinimumLevel">Minimum Level Requirement</label>
+          <select id="classMinimumLevel" name="classMinimumLevel" class="form-control">
+            <option value="">All Levels Welcome</option>
+            <option value="Friend">Friend and above</option>
+            <option value="Companion">Companion and above</option>
+            <option value="Explorer">Explorer and above</option>
+            <option value="Ranger">Ranger and above</option>
+            <option value="Voyager">Voyager and above</option>
+            <option value="Guide">Guide and above</option>
+            <option value="MasterGuide">Master Guide only</option>
+          </select>
+          <small style="color: var(--text-light);">Leave as "All Levels" if no restriction needed</small>
         </div>
         <div class="form-group">
           <label>Select Timeslots for this Class *</label>
@@ -1975,6 +1998,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             <input type="number" id="editClassMaxCapacity" name="editClassMaxCapacity" class="form-control" min="1" value="${cls.TeacherMaxStudents || cls.MaxCapacity}">
             <small style="color: var(--text-light);">Will be limited by location capacity</small>
           </div>
+          <div class="form-group">
+            <label for="editClassMinimumLevel">Minimum Level Requirement</label>
+            <select id="editClassMinimumLevel" name="editClassMinimumLevel" class="form-control">
+              <option value="" ${!cls.MinimumLevel ? 'selected' : ''}>All Levels Welcome</option>
+              <option value="Friend" ${cls.MinimumLevel === 'Friend' ? 'selected' : ''}>Friend and above</option>
+              <option value="Companion" ${cls.MinimumLevel === 'Companion' ? 'selected' : ''}>Companion and above</option>
+              <option value="Explorer" ${cls.MinimumLevel === 'Explorer' ? 'selected' : ''}>Explorer and above</option>
+              <option value="Ranger" ${cls.MinimumLevel === 'Ranger' ? 'selected' : ''}>Ranger and above</option>
+              <option value="Voyager" ${cls.MinimumLevel === 'Voyager' ? 'selected' : ''}>Voyager and above</option>
+              <option value="Guide" ${cls.MinimumLevel === 'Guide' ? 'selected' : ''}>Guide and above</option>
+              <option value="MasterGuide" ${cls.MinimumLevel === 'MasterGuide' ? 'selected' : ''}>Master Guide only</option>
+            </select>
+            <small style="color: var(--text-light);">Leave as "All Levels" if no restriction needed</small>
+          </div>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">Update Class</button>
             <button type="button" onclick="closeModal('editClassModal')" class="btn btn-outline">Cancel</button>
@@ -1989,10 +2026,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       e.preventDefault();
       const form = e.target;
       
-      // Club Directors can only edit TeacherID and TeacherMaxStudents
+      // Club Directors can only edit TeacherID, TeacherMaxStudents, and MinimumLevel
       const classData = {
         TeacherID: form.editClassTeacher?.value || null,
-        TeacherMaxStudents: parseInt(form.editClassMaxCapacity?.value) || 0
+        TeacherMaxStudents: parseInt(form.editClassMaxCapacity?.value) || 0,
+        MinimumLevel: form.editClassMinimumLevel?.value || null
       };
       
       try {
@@ -2042,6 +2080,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       TeacherID: form.classTeacher?.value || null, // Teacher is optional
       LocationID: null, // Club Directors don't set location - admins do this
       TeacherMaxStudents: parseInt(form.classMaxCapacity?.value) || 0,
+      MinimumLevel: form.classMinimumLevel?.value || null,
       TimeslotIDs: selectedTimeslots,
       isMultiSession: isMultiSession
     };
