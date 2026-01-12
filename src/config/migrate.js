@@ -248,6 +248,45 @@ function migrateDatabase() {
       console.log('✓ MinimumLevel column added (existing classes set to NULL - all levels welcome)');
     }
     
+    // Check Classes table for ClubID column (explicit club attribution)
+    const classesTableInfoForClub = db.prepare("PRAGMA table_info(Classes)").all();
+    const hasClubID = classesTableInfoForClub.some(col => col.name === 'ClubID');
+    
+    if (!hasClubID) {
+      console.log('Adding ClubID column to Classes table for explicit club attribution...');
+      db.exec('ALTER TABLE Classes ADD COLUMN ClubID INTEGER REFERENCES Clubs(ID)');
+      
+      // Backfill ClubID based on existing data (creator's club or teacher's club)
+      console.log('Backfilling ClubID for existing classes...');
+      const classesToBackfill = db.prepare(`
+        SELECT 
+          c.ID,
+          creator.ClubID as CreatorClubID,
+          teacher.ClubID as TeacherClubID
+        FROM Classes c
+        LEFT JOIN Users creator ON c.CreatedBy = creator.ID
+        LEFT JOIN Users teacher ON c.TeacherID = teacher.ID
+        WHERE c.ClubID IS NULL
+      `).all();
+      
+      const updateStmt = db.prepare('UPDATE Classes SET ClubID = ? WHERE ID = ?');
+      let updated = 0;
+      
+      for (const cls of classesToBackfill) {
+        const clubId = cls.CreatorClubID || cls.TeacherClubID;
+        if (clubId) {
+          updateStmt.run(clubId, cls.ID);
+          updated++;
+        }
+      }
+      
+      console.log(`✓ ClubID column added and backfilled ${updated} classes`);
+      
+      // Create index for ClubID
+      db.exec('CREATE INDEX IF NOT EXISTS idx_classes_club ON Classes(ClubID)');
+      console.log('✓ ClubID index created');
+    }
+    
   } catch (error) {
     console.error('Migration error:', error);
     // Don't throw, just log
