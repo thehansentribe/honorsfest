@@ -35,6 +35,11 @@
 
           <form id="regForm" onsubmit="handleInviteRegistration(event)">
             <div class="form-group">
+              <label for="dateOfBirth">Date of Birth *</label>
+              <input type="date" id="dateOfBirth" class="form-control" required>
+            </div>
+
+            <div class="form-group">
               <label for="password">Password *</label>
               <input type="password" id="password" class="form-control" required minlength="8" oninput="validatePasswordStrength()">
               <small style="color: var(--text-light);">Minimum 8 characters</small>
@@ -180,6 +185,7 @@
 
       const codeInput = document.getElementById('inviteCode');
       const code = codeInput.value.trim().toUpperCase();
+      const dateOfBirth = document.getElementById('dateOfBirth').value;
       const password = document.getElementById('password').value;
       const confirmPassword = document.getElementById('confirmPassword').value;
 
@@ -188,7 +194,7 @@
         return;
       }
 
-      if (!code || !password) {
+      if (!code || !password || !dateOfBirth) {
         showError('Please fill in all required fields');
         return;
       }
@@ -221,7 +227,7 @@
         const response = await fetch('/api/invites/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code, password })
+          body: JSON.stringify({ code, password, dateOfBirth })
         });
 
         const data = await response.json();

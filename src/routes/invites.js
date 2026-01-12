@@ -125,15 +125,12 @@ router.post('/', verifyToken, requireRole('Admin', 'EventAdmin'), (req, res) => 
     );
     
     // Create the user record immediately but mark as invited and not active
-    // DateOfBirth is optional for AdminViewOnly, use default for other roles
-    const defaultDateOfBirth = new Date(new Date().getFullYear() - 30, 0, 1).toISOString().split('T')[0];
-    const dateOfBirth = role === 'AdminViewOnly' ? null : defaultDateOfBirth;
-    
+    // DateOfBirth will be collected when user accepts invite and registers
     try {
       User.create({
         FirstName: firstName,
         LastName: lastName,
-        DateOfBirth: dateOfBirth, // Optional for AdminViewOnly, default for other roles
+        DateOfBirth: null, // Will be set when user completes registration
         Email: email,
         PasswordHash: '', // Empty for invited users until they set password
         Role: role,
@@ -224,10 +221,26 @@ router.get('/:code', (req, res) => {
 // POST /api/invites/register - Create user from invite code (public)
 router.post('/register', async (req, res) => {
   try {
-    const { code, password } = req.body;
+    const { code, password, dateOfBirth } = req.body;
     
     if (!code || !password) {
       return res.status(400).json({ error: 'code and password are required' });
+    }
+    
+    if (!dateOfBirth) {
+      return res.status(400).json({ error: 'Date of birth is required' });
+    }
+    
+    // Validate date format
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(dateOfBirth)) {
+      return res.status(400).json({ error: 'Invalid date format. Please use YYYY-MM-DD format.' });
+    }
+    
+    // Validate it's a valid date
+    const parsedDate = new Date(dateOfBirth);
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date of birth' });
     }
     
     // Validate password
@@ -301,10 +314,11 @@ router.post('/register', async (req, res) => {
       passwordHash = bcrypt.hashSync(password, 10);
     }
     
-    // Update existing user with password and activate them
+    // Update existing user with password, birthdate, and activate them
     db.prepare(`
       UPDATE Users 
       SET PasswordHash = ?,
+          DateOfBirth = ?,
           Active = 1,
           InviteAccepted = 1,
           stytch_user_id = ?,
@@ -312,6 +326,7 @@ router.post('/register', async (req, res) => {
       WHERE Email = ?
     `).run(
       passwordHash,
+      dateOfBirth,
       stytchUserId || null,
       authMethod,
       codeData.Email

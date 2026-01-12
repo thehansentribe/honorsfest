@@ -73,6 +73,22 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     
+    if (!dateOfBirth) {
+      return res.status(400).json({ error: 'Date of birth is required' });
+    }
+    
+    // Validate date format
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(dateOfBirth)) {
+      return res.status(400).json({ error: 'Invalid date format. Please use YYYY-MM-DD format.' });
+    }
+    
+    // Validate it's a valid date
+    const parsedDate = new Date(dateOfBirth);
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date of birth' });
+    }
+    
     // Validate password
     if (password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters long' });
