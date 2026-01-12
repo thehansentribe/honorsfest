@@ -353,11 +353,57 @@ router.get('/:id/dashboard', (req, res) => {
         WHERE ClubID = ? AND Role = 'Student' AND EventID = ? AND Active = 1
       `).get(club.ID, eventId).count;
       
+      // Count Club Directors
+      const directorCount = db.prepare(`
+        SELECT COUNT(*) as count FROM Users 
+        WHERE ClubID = ? AND Role = 'ClubDirector' AND Active = 1
+      `).get(club.ID).count;
+      
+      // Count classes where the teacher is from this club
+      const classCount = db.prepare(`
+        SELECT COUNT(DISTINCT c.ID) as count
+        FROM Classes c
+        JOIN Users u ON c.TeacherID = u.ID
+        WHERE c.EventID = ? AND c.Active = 1 
+          AND u.ClubID = ? AND u.Role IN ('Teacher', 'ClubDirector')
+      `).get(eventId, club.ID).count;
+      
+      // Calculate total seats offered (sum of ActualMaxCapacity for classes taught by club members)
+      const seatsOfferedResult = db.prepare(`
+        SELECT COALESCE(SUM(
+          CASE 
+            WHEN l.MaxCapacity IS NOT NULL THEN MIN(l.MaxCapacity, c.TeacherMaxStudents)
+            ELSE c.TeacherMaxStudents
+          END
+        ), 0) as totalSeats
+        FROM Classes c
+        JOIN Users u ON c.TeacherID = u.ID
+        LEFT JOIN Locations l ON c.LocationID = l.ID
+        WHERE c.EventID = ? AND c.Active = 1 
+          AND u.ClubID = ? AND u.Role IN ('Teacher', 'ClubDirector')
+      `).get(eventId, club.ID);
+      const seatsOffered = seatsOfferedResult.totalSeats || 0;
+      
+      // Count distinct classes where students from this club have completed
+      const classesCompletedCount = db.prepare(`
+        SELECT COUNT(DISTINCT a.ClassID) as count
+        FROM Attendance a
+        JOIN Classes c ON a.ClassID = c.ID
+        JOIN Users u ON a.UserID = u.ID
+        WHERE c.EventID = ? 
+          AND u.ClubID = ? 
+          AND a.Completed = 1
+      `).get(eventId, club.ID).count;
+      
       return {
         ...club,
         TeacherCount: teacherCount,
         StaffCount: staffCount,
-        StudentCount: studentCount
+        StudentCount: studentCount,
+        DirectorCount: directorCount,
+        ClassCount: classCount,
+        SeatsOffered: seatsOffered,
+        ClassesCompletedCount: classesCompletedCount
       };
     });
     

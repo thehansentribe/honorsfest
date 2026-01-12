@@ -1565,9 +1565,13 @@ async function loadEventDashboard(eventId) {
                 <tr>
                   <th>Club Name</th>
                   <th>Director</th>
+                  <th>Directors</th>
                   <th>Teachers</th>
                   <th>Staff</th>
                   <th>Students</th>
+                  <th>Classes</th>
+                  <th>Seats</th>
+                  <th>Classes Completed</th>
                 </tr>
               </thead>
               <tbody>
@@ -1575,9 +1579,13 @@ async function loadEventDashboard(eventId) {
                   <tr>
                     <td><strong>${club.Name}</strong></td>
                     <td>${club.DirectorFirstName && club.DirectorLastName ? `${club.DirectorFirstName} ${club.DirectorLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
+                    <td>${club.DirectorCount || 0}</td>
                     <td>${club.TeacherCount || 0}</td>
                     <td>${club.StaffCount || 0}</td>
                     <td>${club.StudentCount || 0}</td>
+                    <td>${club.ClassCount || 0}</td>
+                    <td>${club.SeatsOffered || 0}</td>
+                    <td>${club.ClassesCompletedCount || 0}</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -1585,9 +1593,13 @@ async function loadEventDashboard(eventId) {
           `, clubs.map(club => createMobileCard({
             'Club Name': club.Name,
             'Director': club.DirectorFirstName && club.DirectorLastName ? `${club.DirectorFirstName} ${club.DirectorLastName}` : 'Unassigned',
+            'Directors': club.DirectorCount || 0,
             'Teachers': club.TeacherCount || 0,
             'Staff': club.StaffCount || 0,
-            'Students': club.StudentCount || 0
+            'Students': club.StudentCount || 0,
+            'Classes': club.ClassCount || 0,
+            'Seats': club.SeatsOffered || 0,
+            'Classes Completed': club.ClassesCompletedCount || 0
           }, club.Name)).join(''))}
         </div>
       ` : ''}
