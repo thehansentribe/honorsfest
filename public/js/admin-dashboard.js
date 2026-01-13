@@ -92,6 +92,11 @@ let userSortColumn = null;
 let userSortDirection = 'asc';
 let showDeactivatedUsers = false;
 
+// Filter state for classes table
+let classFilters = {};
+let classSortColumn = null;
+let classSortDirection = 'asc';
+
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', async () => {
   const isAdminPage = window.location.pathname.includes('admin-dashboard');
@@ -726,11 +731,18 @@ function getClubsTab() {
 }
 
 function getClassesTab() {
+  const hasActiveFilters = Object.keys(classFilters).length > 0;
   return `
     <div class="card">
       <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
         <h2 class="card-title" style="margin: 0;">Classes</h2>
-        <button onclick="showCreateClassForm()" class="btn btn-primary" id="createClassBtn" disabled>Create Class</button>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button onclick="toggleClassFilters()" class="btn btn-outline ${hasActiveFilters ? 'btn-primary' : ''}" id="toggleClassFiltersBtn" title="Toggle filter row">
+            ${hasActiveFilters ? '🔍 Filters Active' : '🔍 Filter'}
+          </button>
+          ${hasActiveFilters ? `<button onclick="clearClassFilters()" class="btn btn-outline" title="Clear all filters">Clear Filters</button>` : ''}
+          <button onclick="showCreateClassForm()" class="btn btn-primary" id="createClassBtn" disabled>Create Class</button>
+        </div>
       </div>
       <select id="classEventFilter" class="form-control mb-2" onchange="renderClasses()">
         <option value="">Select Event</option>
@@ -4847,8 +4859,126 @@ async function renderClasses() {
     }
     
     // Separate active and inactive classes
-    const activeClasses = allClasses.filter(c => c.Active);
-    const inactiveClasses = allClasses.filter(c => !c.Active);
+    let activeClasses = allClasses.filter(c => c.Active);
+    let inactiveClasses = allClasses.filter(c => !c.Active);
+    
+    // Apply filters
+    if (Object.keys(classFilters).length > 0) {
+      const filterFunction = (cls) => {
+        return Object.entries(classFilters).every(([column, filterValue]) => {
+          if (!filterValue) return true;
+          const lowerFilter = filterValue.toLowerCase();
+          
+          switch(column) {
+            case 'honor':
+              return (cls.HonorName || 'N/A').toLowerCase().includes(lowerFilter);
+            case 'club':
+              return (cls.ClubName || 'N/A').toLowerCase().includes(lowerFilter);
+            case 'teacher':
+              const teacherName = cls.TeacherFirstName && cls.TeacherLastName 
+                ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` 
+                : 'Unassigned';
+              return teacherName.toLowerCase().includes(lowerFilter);
+            case 'location':
+              return (cls.LocationName || 'N/A').toLowerCase().includes(lowerFilter);
+            case 'datetime':
+              const dateStr = (cls.TimeslotDate || 'N/A').toLowerCase();
+              const timeStr = cls.TimeslotStartTime 
+                ? convertTo12Hour(cls.TimeslotStartTime).toLowerCase() 
+                : '';
+              const endTimeStr = cls.TimeslotEndTime 
+                ? convertTo12Hour(cls.TimeslotEndTime).toLowerCase() 
+                : '';
+              return dateStr.includes(lowerFilter) || timeStr.includes(lowerFilter) || endTimeStr.includes(lowerFilter);
+            case 'capacity':
+              const capacityStr = `${cls.EnrolledCount || 0}/${cls.WaitlistCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}`;
+              return capacityStr.includes(lowerFilter);
+            case 'status':
+              const statusText = cls.Active ? 'Active' : 'Inactive';
+              return statusText.toLowerCase().includes(lowerFilter);
+            default:
+              return true;
+          }
+        });
+      };
+      
+      activeClasses = activeClasses.filter(filterFunction);
+      inactiveClasses = inactiveClasses.filter(filterFunction);
+    }
+    
+    // Combine for sorting
+    let allFilteredClasses = [...activeClasses, ...inactiveClasses];
+    
+    // Apply sorting
+    if (classSortColumn) {
+      allFilteredClasses.sort((a, b) => {
+        let aVal, bVal;
+        
+        switch(classSortColumn) {
+          case 'honor':
+            aVal = (a.HonorName || 'N/A').toLowerCase();
+            bVal = (b.HonorName || 'N/A').toLowerCase();
+            break;
+          case 'club':
+            aVal = (a.ClubName || 'N/A').toLowerCase();
+            bVal = (b.ClubName || 'N/A').toLowerCase();
+            break;
+          case 'teacher':
+            aVal = (a.TeacherFirstName && a.TeacherLastName 
+              ? `${a.TeacherFirstName} ${a.TeacherLastName}` 
+              : 'Unassigned').toLowerCase();
+            bVal = (b.TeacherFirstName && b.TeacherLastName 
+              ? `${b.TeacherFirstName} ${b.TeacherLastName}` 
+              : 'Unassigned').toLowerCase();
+            break;
+          case 'location':
+            aVal = (a.LocationName || 'N/A').toLowerCase();
+            bVal = (b.LocationName || 'N/A').toLowerCase();
+            break;
+          case 'datetime':
+            // Sort by date first, then time
+            const aDate = a.TimeslotDate ? new Date(a.TimeslotDate) : new Date(0);
+            const bDate = b.TimeslotDate ? new Date(b.TimeslotDate) : new Date(0);
+            if (aDate.getTime() !== bDate.getTime()) {
+              return classSortDirection === 'asc' 
+                ? aDate.getTime() - bDate.getTime()
+                : bDate.getTime() - aDate.getTime();
+            }
+            // If same date, sort by start time
+            aVal = a.TimeslotStartTime || '00:00';
+            bVal = b.TimeslotStartTime || '00:00';
+            break;
+          case 'capacity':
+            // Sort by enrolled count
+            aVal = a.EnrolledCount || 0;
+            bVal = b.EnrolledCount || 0;
+            break;
+          case 'status':
+            aVal = a.Active ? 1 : 0;
+            bVal = b.Active ? 1 : 0;
+            break;
+          default:
+            return 0;
+        }
+        
+        if (classSortColumn === 'datetime' && a.TimeslotDate && b.TimeslotDate) {
+          // Already handled above
+          return 0;
+        }
+        
+        if (typeof aVal === 'string') {
+          return classSortDirection === 'asc'
+            ? aVal.localeCompare(bVal)
+            : bVal.localeCompare(aVal);
+        } else {
+          return classSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+        }
+      });
+      
+      // Re-separate after sorting (maintain active/inactive grouping but sorted)
+      activeClasses = allFilteredClasses.filter(c => c.Active);
+      inactiveClasses = allFilteredClasses.filter(c => !c.Active);
+    }
     
     // Helper function to format multi-session badge
     const getMultiSessionBadge = (cls) => {
@@ -4870,17 +5000,42 @@ async function renderClasses() {
       <table class="data-table">
         <thead>
           <tr>
-            <th style="width: 18%; padding: 12px 8px; text-align: left;">Honor</th>
-            <th style="width: 12%; padding: 12px 8px; text-align: left;">Club</th>
-            <th style="width: 13%; padding: 12px 8px; text-align: left;">Teacher</th>
-            <th style="width: 13%; padding: 12px 8px; text-align: left;">Location</th>
-            <th style="width: 16%; padding: 12px 8px; text-align: left;">Date/Time</th>
-            <th style="width: 13%; padding: 12px 8px; text-align: left;">Capacity</th>
-            <th style="width: 8%; padding: 12px 8px; text-align: left;">Status</th>
+            <th class="filterable ${classFilters.honor ? 'filter-active' : ''} ${classSortColumn === 'honor' ? 'sort-active' : ''}" onclick="toggleClassColumnFilter('honor')" style="width: 18%; padding: 12px 8px; text-align: left;">Honor</th>
+            <th class="filterable ${classFilters.club ? 'filter-active' : ''} ${classSortColumn === 'club' ? 'sort-active' : ''}" onclick="toggleClassColumnFilter('club')" style="width: 12%; padding: 12px 8px; text-align: left;">Club</th>
+            <th class="filterable ${classFilters.teacher ? 'filter-active' : ''} ${classSortColumn === 'teacher' ? 'sort-active' : ''}" onclick="toggleClassColumnFilter('teacher')" style="width: 13%; padding: 12px 8px; text-align: left;">Teacher</th>
+            <th class="filterable ${classFilters.location ? 'filter-active' : ''} ${classSortColumn === 'location' ? 'sort-active' : ''}" onclick="toggleClassColumnFilter('location')" style="width: 13%; padding: 12px 8px; text-align: left;">Location</th>
+            <th class="filterable ${classFilters.datetime ? 'filter-active' : ''} ${classSortColumn === 'datetime' ? 'sort-active' : ''}" onclick="toggleClassColumnFilter('datetime')" style="width: 16%; padding: 12px 8px; text-align: left;">Date/Time</th>
+            <th class="filterable ${classFilters.capacity ? 'filter-active' : ''} ${classSortColumn === 'capacity' ? 'sort-active' : ''}" onclick="toggleClassColumnFilter('capacity')" style="width: 13%; padding: 12px 8px; text-align: left;">Capacity</th>
+            <th class="filterable ${classFilters.status ? 'filter-active' : ''} ${classSortColumn === 'status' ? 'sort-active' : ''}" onclick="toggleClassColumnFilter('status')" style="width: 8%; padding: 12px 8px; text-align: left;">Status</th>
             <th style="width: 10%; padding: 12px 8px; text-align: left;">Actions</th>
+          </tr>
+          <tr class="filter-row" id="classFilterRow" style="display: ${Object.keys(classFilters).length > 0 ? 'table-row' : 'none'}; background-color: #f8fafc;">
+            <td class="filter-cell">
+              <input type="text" class="filter-input" id="filter-honor" value="${classFilters.honor || ''}" oninput="debouncedUpdateClassFilter('honor', this.value)" placeholder="Filter by honor...">
+            </td>
+            <td class="filter-cell">
+              <input type="text" class="filter-input" id="filter-club" value="${classFilters.club || ''}" oninput="debouncedUpdateClassFilter('club', this.value)" placeholder="Filter by club...">
+            </td>
+            <td class="filter-cell">
+              <input type="text" class="filter-input" id="filter-teacher" value="${classFilters.teacher || ''}" oninput="debouncedUpdateClassFilter('teacher', this.value)" placeholder="Filter by teacher...">
+            </td>
+            <td class="filter-cell">
+              <input type="text" class="filter-input" id="filter-location" value="${classFilters.location || ''}" oninput="debouncedUpdateClassFilter('location', this.value)" placeholder="Filter by location...">
+            </td>
+            <td class="filter-cell">
+              <input type="text" class="filter-input" id="filter-datetime" value="${classFilters.datetime || ''}" oninput="debouncedUpdateClassFilter('datetime', this.value)" placeholder="Filter by date/time...">
+            </td>
+            <td class="filter-cell">
+              <input type="text" class="filter-input" id="filter-capacity" value="${classFilters.capacity || ''}" oninput="debouncedUpdateClassFilter('capacity', this.value)" placeholder="Filter by capacity...">
+            </td>
+            <td class="filter-cell">
+              <input type="text" class="filter-input" id="filter-status" value="${classFilters.status || ''}" oninput="debouncedUpdateClassFilter('status', this.value)" placeholder="Filter by status...">
+            </td>
+            <td class="filter-cell"></td>
           </tr>
         </thead>
         <tbody>
+          ${activeClasses.length === 0 && inactiveClasses.length === 0 ? '<tr><td colspan="8" class="text-center">No classes match the current filters</td></tr>' : ''}
           ${activeClasses.map(cls => `
           <tr style="border-bottom: 1px solid #e0e0e0;${cls.IsMultiSession ? ' background: linear-gradient(to right, #e3f2fd 0%, transparent 100%);' : ''}">
             <td style="padding: 12px 8px; text-align: left;">
@@ -4934,7 +5089,7 @@ async function renderClasses() {
       </table>
     `;
     
-    const allClassesForMobile = [...activeClasses, ...inactiveClasses];
+    const allClassesForMobile = allFilteredClasses.length > 0 ? allFilteredClasses : [...activeClasses, ...inactiveClasses];
     const mobileCards = allClassesForMobile.map(cls => {
       const dateTime = cls.TimeslotDate 
         ? `${cls.TimeslotDate}<br><small style="color: var(--text-light);">${cls.TimeslotStartTime ? convertTo12Hour(cls.TimeslotStartTime) : ''} - ${cls.TimeslotEndTime ? convertTo12Hour(cls.TimeslotEndTime) : ''}</small>`
@@ -4973,14 +5128,162 @@ async function renderClasses() {
     }).join('');
     
     document.getElementById('classesList').innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
+    
+    // Update filter button state after rendering
+    updateClassFilterButtonState();
   } catch (error) {
     console.error('Error loading classes:', error);
     showNotification('Error loading classes', 'error');
   }
 }
 
+function toggleClassColumnFilter(column) {
+  // Show filter row if hidden and add filter for this column
+  const filterRow = document.getElementById('classFilterRow');
+  if (filterRow && filterRow.style.display === 'none') {
+    filterRow.style.display = 'table-row';
+  }
+  
+  // Focus on the filter input for this column
+  const filterInput = document.getElementById(`filter-${column}`);
+  if (filterInput) {
+    filterInput.focus();
+  }
+  
+  // Update filter button state
+  const filterBtn = document.getElementById('toggleClassFiltersBtn');
+  if (filterBtn && filterRow && filterRow.style.display !== 'none') {
+    filterBtn.classList.add('btn-primary');
+    filterBtn.textContent = '🔍 Filters Active';
+  }
+  
+  // Toggle sorting
+  if (classSortColumn === column) {
+    classSortDirection = classSortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    classSortColumn = column;
+    classSortDirection = 'asc';
+  }
+  
+  renderClasses();
+}
+
+function updateClassFilter(column, value) {
+  if (value.trim()) {
+    classFilters[column] = value.trim();
+  } else {
+    delete classFilters[column];
+    // Hide filter row if no filters active
+    if (Object.keys(classFilters).length === 0) {
+      const filterRow = document.getElementById('classFilterRow');
+      if (filterRow) filterRow.style.display = 'none';
+      // Update filter button state
+      const filterBtn = document.getElementById('toggleClassFiltersBtn');
+      if (filterBtn) {
+        filterBtn.classList.remove('btn-primary');
+        filterBtn.textContent = '🔍 Filter';
+      }
+      // Remove clear filters button
+      const clearBtn = filterBtn?.nextElementSibling;
+      if (clearBtn && clearBtn.onclick?.toString().includes('clearClassFilters')) {
+        clearBtn.remove();
+      }
+    }
+  }
+  renderClasses();
+  // Update filter button state
+  updateClassFilterButtonState();
+}
+
+// Debounced version of updateClassFilter (400ms delay)
+const debouncedUpdateClassFilter = debounce(updateClassFilter, 400);
+
+function toggleClassFilters() {
+  const filterRow = document.getElementById('classFilterRow');
+  if (!filterRow) return;
+  
+  const isVisible = filterRow.style.display !== 'none';
+  filterRow.style.display = isVisible ? 'none' : 'table-row';
+  
+  // Update button text
+  const filterBtn = document.getElementById('toggleClassFiltersBtn');
+  if (filterBtn) {
+    if (isVisible) {
+      filterBtn.classList.remove('btn-primary');
+      filterBtn.textContent = '🔍 Filter';
+    } else {
+      filterBtn.classList.add('btn-primary');
+      filterBtn.textContent = '🔍 Filters Active';
+    }
+  }
+}
+
+function clearClassFilters() {
+  classFilters = {};
+  classSortColumn = null;
+  classSortDirection = 'asc';
+  
+  // Clear all filter inputs
+  const filterInputs = document.querySelectorAll('.filter-input');
+  filterInputs.forEach(input => input.value = '');
+  
+  // Hide filter row
+  const filterRow = document.getElementById('classFilterRow');
+  if (filterRow) filterRow.style.display = 'none';
+  
+  // Update filter button
+  const filterBtn = document.getElementById('toggleClassFiltersBtn');
+  if (filterBtn) {
+    filterBtn.classList.remove('btn-primary');
+    filterBtn.textContent = '🔍 Filter';
+  }
+  
+  // Remove clear filters button
+  const clearBtn = filterBtn?.nextElementSibling;
+  if (clearBtn && clearBtn.onclick?.toString().includes('clearClassFilters')) {
+    clearBtn.remove();
+  }
+  
+  renderClasses();
+}
+
+function updateClassFilterButtonState() {
+  const filterBtn = document.getElementById('toggleClassFiltersBtn');
+  if (!filterBtn) return;
+  
+  const hasActiveFilters = Object.keys(classFilters).length > 0;
+  if (hasActiveFilters) {
+    filterBtn.classList.add('btn-primary');
+    filterBtn.textContent = '🔍 Filters Active';
+    
+    // Add clear filters button if it doesn't exist
+    if (!filterBtn.nextElementSibling || !filterBtn.nextElementSibling.onclick?.toString().includes('clearClassFilters')) {
+      const clearBtn = document.createElement('button');
+      clearBtn.onclick = clearClassFilters;
+      clearBtn.className = 'btn btn-outline';
+      clearBtn.textContent = 'Clear Filters';
+      clearBtn.title = 'Clear all filters';
+      filterBtn.insertAdjacentElement('afterend', clearBtn);
+    }
+  } else {
+    filterBtn.classList.remove('btn-primary');
+    filterBtn.textContent = '🔍 Filter';
+    
+    // Remove clear filters button
+    const clearBtn = filterBtn.nextElementSibling;
+    if (clearBtn && clearBtn.onclick?.toString().includes('clearClassFilters')) {
+      clearBtn.remove();
+    }
+  }
+}
+
 window.renderClasses = renderClasses;
 window.renderTimeslots = renderTimeslots;
+window.toggleClassColumnFilter = toggleClassColumnFilter;
+window.updateClassFilter = updateClassFilter;
+window.debouncedUpdateClassFilter = debouncedUpdateClassFilter;
+window.toggleClassFilters = toggleClassFilters;
+window.clearClassFilters = clearClassFilters;
 
 // Club management functions
 async function renderClubs() {

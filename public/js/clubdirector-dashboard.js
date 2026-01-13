@@ -17,6 +17,11 @@ let clubDirectorFilters = {};
 let clubDirectorSortColumn = null;
 let clubDirectorSortDirection = 'asc';
 
+// Filter state for classes table
+let clubDirectorClassFilters = {};
+let clubDirectorClassSortColumn = null;
+let clubDirectorClassSortDirection = 'asc';
+
 // Summary section state (classes table expanded by default)
 let summaryExpanded = true;
 
@@ -237,11 +242,18 @@ function getUsersTab() {
 
 // Get Classes Tab HTML for Club Director
 function getClassesTabClubDirector() {
+  const hasActiveFilters = Object.keys(clubDirectorClassFilters).length > 0;
   return `
     <div class="card">
       <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
         <h2 class="card-title" style="margin: 0;">Classes</h2>
-        <button onclick="showCreateClassForm()" class="btn btn-primary" id="createClassBtn">Create Class</button>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button onclick="toggleClubDirectorClassFilters()" class="btn btn-outline ${hasActiveFilters ? 'btn-primary' : ''}" id="toggleClubDirectorClassFiltersBtn" title="Toggle filter row">
+            ${hasActiveFilters ? '🔍 Filters Active' : '🔍 Filter'}
+          </button>
+          ${hasActiveFilters ? `<button onclick="clearClubDirectorClassFilters()" class="btn btn-outline" title="Clear all filters">Clear Filters</button>` : ''}
+          <button onclick="showCreateClassForm()" class="btn btn-primary" id="createClassBtn">Create Class</button>
+        </div>
       </div>
       <div id="classesList">
         <p class="text-center">Loading classes...</p>
@@ -808,9 +820,120 @@ async function renderClasses() {
       return;
     }
     
-    const activeClasses = clubDirectorClasses;
-    const hasActive = activeClasses.length > 0;
+    let activeClasses = clubDirectorClasses;
     const hasInactive = false; // Club Directors never see inactive classes
+    
+    // Apply filters
+    if (Object.keys(clubDirectorClassFilters).length > 0) {
+      const filterFunction = (cls) => {
+        return Object.entries(clubDirectorClassFilters).every(([column, filterValue]) => {
+          if (!filterValue) return true;
+          const lowerFilter = filterValue.toLowerCase();
+          
+          switch(column) {
+            case 'honor':
+              return (cls.HonorName || 'N/A').toLowerCase().includes(lowerFilter);
+            case 'club':
+              return (cls.ClubName || 'N/A').toLowerCase().includes(lowerFilter);
+            case 'teacher':
+              const teacherName = cls.TeacherFirstName && cls.TeacherLastName 
+                ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` 
+                : 'Unassigned';
+              return teacherName.toLowerCase().includes(lowerFilter);
+            case 'location':
+              return (cls.LocationName || 'N/A').toLowerCase().includes(lowerFilter);
+            case 'datetime':
+              const dateStr = (cls.TimeslotDate || 'N/A').toLowerCase();
+              const timeStr = cls.TimeslotStartTime 
+                ? convertTo12Hour(cls.TimeslotStartTime).toLowerCase() 
+                : '';
+              const endTimeStr = cls.TimeslotEndTime 
+                ? convertTo12Hour(cls.TimeslotEndTime).toLowerCase() 
+                : '';
+              return dateStr.includes(lowerFilter) || timeStr.includes(lowerFilter) || endTimeStr.includes(lowerFilter);
+            case 'capacity':
+              const capacityStr = `${cls.EnrolledCount || 0}/${cls.WaitlistCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}`;
+              return capacityStr.includes(lowerFilter);
+            case 'status':
+              const statusText = cls.Active ? 'Active' : 'Inactive';
+              return statusText.toLowerCase().includes(lowerFilter);
+            default:
+              return true;
+          }
+        });
+      };
+      
+      activeClasses = activeClasses.filter(filterFunction);
+    }
+    
+    // Apply sorting
+    if (clubDirectorClassSortColumn) {
+      activeClasses.sort((a, b) => {
+        let aVal, bVal;
+        
+        switch(clubDirectorClassSortColumn) {
+          case 'honor':
+            aVal = (a.HonorName || 'N/A').toLowerCase();
+            bVal = (b.HonorName || 'N/A').toLowerCase();
+            break;
+          case 'club':
+            aVal = (a.ClubName || 'N/A').toLowerCase();
+            bVal = (b.ClubName || 'N/A').toLowerCase();
+            break;
+          case 'teacher':
+            aVal = (a.TeacherFirstName && a.TeacherLastName 
+              ? `${a.TeacherFirstName} ${a.TeacherLastName}` 
+              : 'Unassigned').toLowerCase();
+            bVal = (b.TeacherFirstName && b.TeacherLastName 
+              ? `${b.TeacherFirstName} ${b.TeacherLastName}` 
+              : 'Unassigned').toLowerCase();
+            break;
+          case 'location':
+            aVal = (a.LocationName || 'N/A').toLowerCase();
+            bVal = (b.LocationName || 'N/A').toLowerCase();
+            break;
+          case 'datetime':
+            // Sort by date first, then time
+            const aDate = a.TimeslotDate ? new Date(a.TimeslotDate) : new Date(0);
+            const bDate = b.TimeslotDate ? new Date(b.TimeslotDate) : new Date(0);
+            if (aDate.getTime() !== bDate.getTime()) {
+              return clubDirectorClassSortDirection === 'asc' 
+                ? aDate.getTime() - bDate.getTime()
+                : bDate.getTime() - aDate.getTime();
+            }
+            // If same date, sort by start time
+            aVal = a.TimeslotStartTime || '00:00';
+            bVal = b.TimeslotStartTime || '00:00';
+            break;
+          case 'capacity':
+            // Sort by enrolled count
+            aVal = a.EnrolledCount || 0;
+            bVal = b.EnrolledCount || 0;
+            break;
+          case 'status':
+            aVal = a.Active ? 1 : 0;
+            bVal = b.Active ? 1 : 0;
+            break;
+          default:
+            return 0;
+        }
+        
+        if (clubDirectorClassSortColumn === 'datetime' && a.TimeslotDate && b.TimeslotDate) {
+          // Already handled above
+          return 0;
+        }
+        
+        if (typeof aVal === 'string') {
+          return clubDirectorClassSortDirection === 'asc'
+            ? aVal.localeCompare(bVal)
+            : bVal.localeCompare(aVal);
+        } else {
+          return clubDirectorClassSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+        }
+      });
+    }
+    
+    const hasActive = activeClasses.length > 0;
 
     // Helper function to format multi-session badge
     const getMultiSessionBadge = (cls) => {
@@ -832,17 +955,42 @@ async function renderClasses() {
       <table class="data-table">
         <thead>
           <tr>
-            <th style="width: 18%; padding: 12px 8px; text-align: left;">Honor</th>
-            <th style="width: 12%; padding: 12px 8px; text-align: left;">Club</th>
-            <th style="width: 13%; padding: 12px 8px; text-align: left;">Teacher</th>
-            <th style="width: 13%; padding: 12px 8px; text-align: left;">Location</th>
-            <th style="width: 16%; padding: 12px 8px; text-align: left;">Date/Time</th>
-            <th style="width: 13%; padding: 12px 8px; text-align: left;">Capacity</th>
-            <th style="width: 8%; padding: 12px 8px; text-align: left;">Status</th>
+            <th class="filterable ${clubDirectorClassFilters.honor ? 'filter-active' : ''} ${clubDirectorClassSortColumn === 'honor' ? 'sort-active' : ''}" onclick="toggleClubDirectorClassColumnFilter('honor')" style="width: 18%; padding: 12px 8px; text-align: left;">Honor</th>
+            <th class="filterable ${clubDirectorClassFilters.club ? 'filter-active' : ''} ${clubDirectorClassSortColumn === 'club' ? 'sort-active' : ''}" onclick="toggleClubDirectorClassColumnFilter('club')" style="width: 12%; padding: 12px 8px; text-align: left;">Club</th>
+            <th class="filterable ${clubDirectorClassFilters.teacher ? 'filter-active' : ''} ${clubDirectorClassSortColumn === 'teacher' ? 'sort-active' : ''}" onclick="toggleClubDirectorClassColumnFilter('teacher')" style="width: 13%; padding: 12px 8px; text-align: left;">Teacher</th>
+            <th class="filterable ${clubDirectorClassFilters.location ? 'filter-active' : ''} ${clubDirectorClassSortColumn === 'location' ? 'sort-active' : ''}" onclick="toggleClubDirectorClassColumnFilter('location')" style="width: 13%; padding: 12px 8px; text-align: left;">Location</th>
+            <th class="filterable ${clubDirectorClassFilters.datetime ? 'filter-active' : ''} ${clubDirectorClassSortColumn === 'datetime' ? 'sort-active' : ''}" onclick="toggleClubDirectorClassColumnFilter('datetime')" style="width: 16%; padding: 12px 8px; text-align: left;">Date/Time</th>
+            <th class="filterable ${clubDirectorClassFilters.capacity ? 'filter-active' : ''} ${clubDirectorClassSortColumn === 'capacity' ? 'sort-active' : ''}" onclick="toggleClubDirectorClassColumnFilter('capacity')" style="width: 13%; padding: 12px 8px; text-align: left;">Capacity</th>
+            <th class="filterable ${clubDirectorClassFilters.status ? 'filter-active' : ''} ${clubDirectorClassSortColumn === 'status' ? 'sort-active' : ''}" onclick="toggleClubDirectorClassColumnFilter('status')" style="width: 8%; padding: 12px 8px; text-align: left;">Status</th>
             <th style="width: 10%; padding: 12px 8px; text-align: left;">Actions</th>
+          </tr>
+          <tr class="filter-row" id="clubDirectorClassFilterRow" style="display: ${Object.keys(clubDirectorClassFilters).length > 0 ? 'table-row' : 'none'}; background-color: #f8fafc;">
+            <td class="filter-cell">
+              <input type="text" class="filter-input" id="clubDirector-filter-honor" value="${clubDirectorClassFilters.honor || ''}" oninput="debouncedUpdateClubDirectorClassFilter('honor', this.value)" placeholder="Filter by honor...">
+            </td>
+            <td class="filter-cell">
+              <input type="text" class="filter-input" id="clubDirector-filter-club" value="${clubDirectorClassFilters.club || ''}" oninput="debouncedUpdateClubDirectorClassFilter('club', this.value)" placeholder="Filter by club...">
+            </td>
+            <td class="filter-cell">
+              <input type="text" class="filter-input" id="clubDirector-filter-teacher" value="${clubDirectorClassFilters.teacher || ''}" oninput="debouncedUpdateClubDirectorClassFilter('teacher', this.value)" placeholder="Filter by teacher...">
+            </td>
+            <td class="filter-cell">
+              <input type="text" class="filter-input" id="clubDirector-filter-location" value="${clubDirectorClassFilters.location || ''}" oninput="debouncedUpdateClubDirectorClassFilter('location', this.value)" placeholder="Filter by location...">
+            </td>
+            <td class="filter-cell">
+              <input type="text" class="filter-input" id="clubDirector-filter-datetime" value="${clubDirectorClassFilters.datetime || ''}" oninput="debouncedUpdateClubDirectorClassFilter('datetime', this.value)" placeholder="Filter by date/time...">
+            </td>
+            <td class="filter-cell">
+              <input type="text" class="filter-input" id="clubDirector-filter-capacity" value="${clubDirectorClassFilters.capacity || ''}" oninput="debouncedUpdateClubDirectorClassFilter('capacity', this.value)" placeholder="Filter by capacity...">
+            </td>
+            <td class="filter-cell">
+              <input type="text" class="filter-input" id="clubDirector-filter-status" value="${clubDirectorClassFilters.status || ''}" oninput="debouncedUpdateClubDirectorClassFilter('status', this.value)" placeholder="Filter by status...">
+            </td>
+            <td class="filter-cell"></td>
           </tr>
         </thead>
         <tbody>
+          ${!hasActive ? '<tr><td colspan="8" class="text-center">No classes match the current filters</td></tr>' : ''}
           ${hasActive ? activeClasses.map(cls => {
               const isActive = normalizeActive(cls.Active);
               const canEdit = isActive && cls.CreatedBy === clubDirectorUser?.id;
@@ -929,12 +1077,162 @@ async function renderClasses() {
     }).join('');
     
     container.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
+    
+    // Update filter button state after rendering
+    updateClubDirectorClassFilterButtonState();
   } catch (error) {
     console.error('Error loading classes:', error);
     container.innerHTML = `<p class="text-center" style="color: red;">Error loading classes: ${error.message}</p>`;
     showNotification('Error loading classes', 'error');
   }
 }
+
+function toggleClubDirectorClassColumnFilter(column) {
+  // Show filter row if hidden and add filter for this column
+  const filterRow = document.getElementById('clubDirectorClassFilterRow');
+  if (filterRow && filterRow.style.display === 'none') {
+    filterRow.style.display = 'table-row';
+  }
+  
+  // Focus on the filter input for this column
+  const filterInput = document.getElementById(`clubDirector-filter-${column}`);
+  if (filterInput) {
+    filterInput.focus();
+  }
+  
+  // Update filter button state
+  const filterBtn = document.getElementById('toggleClubDirectorClassFiltersBtn');
+  if (filterBtn && filterRow && filterRow.style.display !== 'none') {
+    filterBtn.classList.add('btn-primary');
+    filterBtn.textContent = '🔍 Filters Active';
+  }
+  
+  // Toggle sorting
+  if (clubDirectorClassSortColumn === column) {
+    clubDirectorClassSortDirection = clubDirectorClassSortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    clubDirectorClassSortColumn = column;
+    clubDirectorClassSortDirection = 'asc';
+  }
+  
+  renderClasses();
+}
+
+function updateClubDirectorClassFilter(column, value) {
+  if (value.trim()) {
+    clubDirectorClassFilters[column] = value.trim();
+  } else {
+    delete clubDirectorClassFilters[column];
+    // Hide filter row if no filters active
+    if (Object.keys(clubDirectorClassFilters).length === 0) {
+      const filterRow = document.getElementById('clubDirectorClassFilterRow');
+      if (filterRow) filterRow.style.display = 'none';
+      // Update filter button state
+      const filterBtn = document.getElementById('toggleClubDirectorClassFiltersBtn');
+      if (filterBtn) {
+        filterBtn.classList.remove('btn-primary');
+        filterBtn.textContent = '🔍 Filter';
+      }
+      // Remove clear filters button
+      const clearBtn = filterBtn?.nextElementSibling;
+      if (clearBtn && clearBtn.onclick?.toString().includes('clearClubDirectorClassFilters')) {
+        clearBtn.remove();
+      }
+    }
+  }
+  renderClasses();
+  // Update filter button state
+  updateClubDirectorClassFilterButtonState();
+}
+
+// Debounced version of updateClubDirectorClassFilter (400ms delay)
+const debouncedUpdateClubDirectorClassFilter = debounce(updateClubDirectorClassFilter, 400);
+
+function toggleClubDirectorClassFilters() {
+  const filterRow = document.getElementById('clubDirectorClassFilterRow');
+  if (!filterRow) return;
+  
+  const isVisible = filterRow.style.display !== 'none';
+  filterRow.style.display = isVisible ? 'none' : 'table-row';
+  
+  // Update button text
+  const filterBtn = document.getElementById('toggleClubDirectorClassFiltersBtn');
+  if (filterBtn) {
+    if (isVisible) {
+      filterBtn.classList.remove('btn-primary');
+      filterBtn.textContent = '🔍 Filter';
+    } else {
+      filterBtn.classList.add('btn-primary');
+      filterBtn.textContent = '🔍 Filters Active';
+    }
+  }
+}
+
+function clearClubDirectorClassFilters() {
+  clubDirectorClassFilters = {};
+  clubDirectorClassSortColumn = null;
+  clubDirectorClassSortDirection = 'asc';
+  
+  // Clear all filter inputs
+  const filterInputs = document.querySelectorAll('#clubDirectorClassFilterRow .filter-input');
+  filterInputs.forEach(input => input.value = '');
+  
+  // Hide filter row
+  const filterRow = document.getElementById('clubDirectorClassFilterRow');
+  if (filterRow) filterRow.style.display = 'none';
+  
+  // Update filter button
+  const filterBtn = document.getElementById('toggleClubDirectorClassFiltersBtn');
+  if (filterBtn) {
+    filterBtn.classList.remove('btn-primary');
+    filterBtn.textContent = '🔍 Filter';
+  }
+  
+  // Remove clear filters button
+  const clearBtn = filterBtn?.nextElementSibling;
+  if (clearBtn && clearBtn.onclick?.toString().includes('clearClubDirectorClassFilters')) {
+    clearBtn.remove();
+  }
+  
+  renderClasses();
+}
+
+function updateClubDirectorClassFilterButtonState() {
+  const filterBtn = document.getElementById('toggleClubDirectorClassFiltersBtn');
+  if (!filterBtn) return;
+  
+  const hasActiveFilters = Object.keys(clubDirectorClassFilters).length > 0;
+  if (hasActiveFilters) {
+    filterBtn.classList.add('btn-primary');
+    filterBtn.textContent = '🔍 Filters Active';
+    
+    // Add clear filters button if it doesn't exist
+    if (!filterBtn.nextElementSibling || !filterBtn.nextElementSibling.onclick?.toString().includes('clearClubDirectorClassFilters')) {
+      const clearBtn = document.createElement('button');
+      clearBtn.onclick = clearClubDirectorClassFilters;
+      clearBtn.className = 'btn btn-outline';
+      clearBtn.textContent = 'Clear Filters';
+      clearBtn.title = 'Clear all filters';
+      filterBtn.insertAdjacentElement('afterend', clearBtn);
+    }
+  } else {
+    filterBtn.classList.remove('btn-primary');
+    filterBtn.textContent = '🔍 Filter';
+    
+    // Remove clear filters button
+    const clearBtn = filterBtn.nextElementSibling;
+    if (clearBtn && clearBtn.onclick?.toString().includes('clearClubDirectorClassFilters')) {
+      clearBtn.remove();
+    }
+  }
+}
+
+// Export functions to window for onclick handlers
+window.toggleClubDirectorClassColumnFilter = toggleClubDirectorClassColumnFilter;
+window.updateClubDirectorClassFilter = updateClubDirectorClassFilter;
+window.debouncedUpdateClubDirectorClassFilter = debouncedUpdateClubDirectorClassFilter;
+window.toggleClubDirectorClassFilters = toggleClubDirectorClassFilters;
+window.clearClubDirectorClassFilters = clearClubDirectorClassFilters;
 
 // Override loadEvents to load events for this club
 async function loadEvents() {

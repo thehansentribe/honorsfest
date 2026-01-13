@@ -382,6 +382,11 @@ body {
   margin-left: 4px;
 }
 
+.table th.filterable.sort-active {
+  background-color: #e0e7ff;
+  font-weight: 600;
+}
+
 .filter-input {
   width: 100%;
   padding: 4px 8px;
