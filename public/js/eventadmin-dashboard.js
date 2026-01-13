@@ -1429,97 +1429,19 @@ async function loadSystemStats() {
     const stats = await response.json();
     
     statsContainer.innerHTML = `
-      <table class="table" style="margin-bottom: 0; background: white;">
-        <thead>
-          <tr>
-            <th>Overview</th>
-            <th>Administration</th>
-            <th>Participants</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>
-              <div style="padding: 8px 0;">
-                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Total Users</div>
-                <div style="font-size: 1.3rem; color: #007bff; font-weight: bold;">${stats.users.total}</div>
-              </div>
-            </td>
-            <td>
-              <div style="padding: 8px 0;">
-                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Admins</div>
-                <div style="font-size: 1.3rem; color: #6f42c1; font-weight: bold;">${stats.users.admin}</div>
-              </div>
-            </td>
-            <td>
-              <div style="padding: 8px 0;">
-                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Teachers</div>
-                <div style="font-size: 1.3rem; color: #20c997; font-weight: bold;">${stats.users.teacher}</div>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <div style="padding: 8px 0;">
-                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Total Classes</div>
-                <div style="font-size: 1.3rem; color: #007bff; font-weight: bold;">${stats.classes}</div>
-              </div>
-            </td>
-            <td>
-              <div style="padding: 8px 0;">
-                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Event Admins</div>
-                <div style="font-size: 1.3rem; color: #e83e8c; font-weight: bold;">${stats.users.eventAdmin}</div>
-              </div>
-            </td>
-            <td>
-              <div style="padding: 8px 0;">
-                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Staff</div>
-                <div style="font-size: 1.3rem; color: #17a2b8; font-weight: bold;">${stats.users.staff}</div>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <div style="padding: 8px 0;">
-                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Total Enrolled</div>
-                <div style="font-size: 1.3rem; color: #28a745; font-weight: bold;">${stats.enrolled}</div>
-              </div>
-            </td>
-            <td>
-              <div style="padding: 8px 0;">
-                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Club Directors</div>
-                <div style="font-size: 1.3rem; color: #fd7e14; font-weight: bold;">${stats.users.clubDirector}</div>
-              </div>
-            </td>
-            <td>
-              <div style="padding: 8px 0;">
-                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Students</div>
-                <div style="font-size: 1.3rem; color: #28a745; font-weight: bold;">${stats.users.student}</div>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <div style="padding: 8px 0;">
-                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Total Waitlisted</div>
-                <div style="font-size: 1.3rem; color: #ffc107; font-weight: bold;">${stats.waitlisted}</div>
-              </div>
-            </td>
-            <td></td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>
-              <div style="padding: 8px 0;">
-                <div style="font-weight: bold; margin-bottom: 4px; color: #495057; font-size: 0.9rem;">Total Offered Seats</div>
-                <div style="font-size: 1.3rem; color: #007bff; font-weight: bold;">${stats.offeredSeats || 0}</div>
-              </div>
-            </td>
-            <td></td>
-            <td></td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="stats-grid">
+        <div class="stat-item"><span class="stat-label">Total Users:</span><span class="stat-value" style="color:#007bff">${stats.users.total}</span></div>
+        <div class="stat-item"><span class="stat-label">Admins:</span><span class="stat-value" style="color:#6f42c1">${stats.users.admin}</span></div>
+        <div class="stat-item"><span class="stat-label">Teachers:</span><span class="stat-value" style="color:#20c997">${stats.users.teacher}</span></div>
+        <div class="stat-item"><span class="stat-label">Students:</span><span class="stat-value" style="color:#28a745">${stats.users.student}</span></div>
+        <div class="stat-item"><span class="stat-label">Total Classes:</span><span class="stat-value" style="color:#007bff">${stats.classes}</span></div>
+        <div class="stat-item"><span class="stat-label">Event Admins:</span><span class="stat-value" style="color:#e83e8c">${stats.users.eventAdmin}</span></div>
+        <div class="stat-item"><span class="stat-label">Staff:</span><span class="stat-value" style="color:#17a2b8">${stats.users.staff}</span></div>
+        <div class="stat-item"><span class="stat-label">Club Directors:</span><span class="stat-value" style="color:#fd7e14">${stats.users.clubDirector}</span></div>
+        <div class="stat-item"><span class="stat-label">Enrolled:</span><span class="stat-value" style="color:#28a745">${stats.enrolled}</span></div>
+        <div class="stat-item"><span class="stat-label">Waitlisted:</span><span class="stat-value" style="color:#ffc107">${stats.waitlisted}</span></div>
+        <div class="stat-item"><span class="stat-label">Offered Seats:</span><span class="stat-value" style="color:#007bff">${stats.offeredSeats || 0}</span></div>
+      </div>
     `;
   } catch (error) {
     statsContainer.innerHTML = `<div style="color: #dc3545;">Error loading system statistics: ${error.message}</div>`;

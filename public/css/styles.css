@@ -1135,6 +1135,32 @@ body {
   pointer-events: none;
 }
 
+/* Stats Grid - Compact Statistics Display */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px 16px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 0;
+  white-space: nowrap;
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: #495057;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
 /* Summary Section */
 .summary-section {
   margin: 20px 0;
