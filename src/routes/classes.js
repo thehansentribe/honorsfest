@@ -269,14 +269,14 @@ router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res
       return res.status(403).json({ error: 'You can only edit classes that you created' });
     }
     
-    // ClubDirectors can only edit TeacherID and TeacherMaxStudents (max capacity)
+    // ClubDirectors can only edit TeacherID, TeacherMaxStudents (max capacity), and MinimumLevel
     // They cannot edit LocationID or other fields
     if (req.user.role === 'ClubDirector') {
-      const allowedFields = ['TeacherID', 'TeacherMaxStudents'];
+      const allowedFields = ['TeacherID', 'TeacherMaxStudents', 'MinimumLevel'];
       const restrictedFields = Object.keys(req.body).filter(key => !allowedFields.includes(key) && key !== 'CreatedBy');
       
       if (restrictedFields.length > 0) {
-        return res.status(403).json({ error: `You can only edit teacher and max capacity. Cannot edit: ${restrictedFields.join(', ')}` });
+        return res.status(403).json({ error: `You can only edit teacher, max capacity, and minimum level. Cannot edit: ${restrictedFields.join(', ')}` });
       }
     }
     
