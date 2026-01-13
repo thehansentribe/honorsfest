@@ -359,16 +359,14 @@ router.get('/:id/dashboard', (req, res) => {
         WHERE ClubID = ? AND Role = 'ClubDirector' AND Active = 1
       `).get(club.ID).count;
       
-      // Count classes where the teacher is from this club
+      // Count classes belonging to this club
       const classCount = db.prepare(`
-        SELECT COUNT(DISTINCT c.ID) as count
+        SELECT COUNT(*) as count
         FROM Classes c
-        JOIN Users u ON c.TeacherID = u.ID
-        WHERE c.EventID = ? AND c.Active = 1 
-          AND u.ClubID = ? AND u.Role IN ('Teacher', 'ClubDirector')
+        WHERE c.EventID = ? AND c.Active = 1 AND c.ClubID = ?
       `).get(eventId, club.ID).count;
       
-      // Calculate total seats offered (sum of ActualMaxCapacity for classes taught by club members)
+      // Calculate total seats offered (sum of ActualMaxCapacity for classes belonging to this club)
       const seatsOfferedResult = db.prepare(`
         SELECT COALESCE(SUM(
           CASE 
@@ -377,10 +375,8 @@ router.get('/:id/dashboard', (req, res) => {
           END
         ), 0) as totalSeats
         FROM Classes c
-        JOIN Users u ON c.TeacherID = u.ID
         LEFT JOIN Locations l ON c.LocationID = l.ID
-        WHERE c.EventID = ? AND c.Active = 1 
-          AND u.ClubID = ? AND u.Role IN ('Teacher', 'ClubDirector')
+        WHERE c.EventID = ? AND c.Active = 1 AND c.ClubID = ?
       `).get(eventId, club.ID);
       const seatsOffered = seatsOfferedResult.totalSeats || 0;
       

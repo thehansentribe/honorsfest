@@ -83,7 +83,7 @@ router.get('/:id/summary', requireRole('ClubDirector', 'Admin', 'AdminViewOnly')
       }
     });
 
-    // Get classes where club members (Teachers or ClubDirectors) are teaching
+    // Get classes belonging to this club
     const Class = require('../models/class');
     const classesQuery = `
       SELECT DISTINCT
@@ -111,9 +111,7 @@ router.get('/:id/summary', requireRole('ClubDirector', 'Admin', 'AdminViewOnly')
       LEFT JOIN Timeslots t ON c.TimeslotID = t.ID
       WHERE c.EventID = ? 
         AND c.Active = 1 
-        AND c.TeacherID IS NOT NULL
-        AND u.ClubID = ? 
-        AND u.Role IN ('Teacher', 'ClubDirector')
+        AND c.ClubID = ?
       ORDER BY t.Date, t.StartTime, h.Name
     `;
 
