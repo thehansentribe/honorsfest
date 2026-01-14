@@ -2,9 +2,9 @@ const { db } = require('../config/db');
 
 class User {
   static generateUsername(firstName, lastName) {
-    // Force lowercase for consistency
-    const normalizedFirst = firstName.toLowerCase();
-    const normalizedLast = lastName.toLowerCase();
+    // Force lowercase and remove all non-alphanumeric characters (including spaces)
+    const normalizedFirst = firstName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normalizedLast = lastName.toLowerCase().replace(/[^a-z0-9]/g, '');
     
     const baseUsername = `${normalizedFirst}.${normalizedLast}`;
     let username = baseUsername;
@@ -112,7 +112,7 @@ class User {
           }
           
           // Generate a new username with timestamp and random suffix
-          const baseUsername = `${FirstName.toLowerCase()}.${LastName.toLowerCase()}`;
+          const baseUsername = `${FirstName.toLowerCase().replace(/[^a-z0-9]/g, '')}.${LastName.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
           const timestamp = Date.now();
           const random = Math.floor(Math.random() * 10000);
           Username = `${baseUsername}.${timestamp}.${random}`;
@@ -202,7 +202,7 @@ class User {
               }
               
               // Generate a new unique username
-              const baseUsername = `${FirstName.toLowerCase()}.${LastName.toLowerCase()}`;
+              const baseUsername = `${FirstName.toLowerCase().replace(/[^a-z0-9]/g, '')}.${LastName.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
               const timestamp = Date.now();
               const random = Math.floor(Math.random() * 10000);
               Username = `${baseUsername}.${timestamp}.${random}`;

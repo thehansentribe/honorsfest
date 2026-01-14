@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { db } = require('./db');
+const { migrateUsernames } = require('./migrate-usernames');
 
 function migrateDatabase() {
   try {
@@ -285,6 +286,14 @@ function migrateDatabase() {
       // Create index for ClubID
       db.exec('CREATE INDEX IF NOT EXISTS idx_classes_club ON Classes(ClubID)');
       console.log('✓ ClubID index created');
+    }
+    
+    // Run username sanitization migration (removes spaces and special characters)
+    try {
+      migrateUsernames();
+    } catch (usernameError) {
+      console.error('Username migration error:', usernameError);
+      // Don't throw, just log - this is a non-critical migration
     }
     
   } catch (error) {
