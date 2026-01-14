@@ -1479,93 +1479,41 @@ async function loadEventDashboard(eventId) {
     const addressParts = [event.Street, event.City, event.State, event.ZIP].filter(p => p);
     const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'Not specified';
     
-    // Format role labels
-    const roleLabels = {
-      Student: event.RoleLabelStudent || 'Student',
-      Teacher: event.RoleLabelTeacher || 'Teacher',
-      Staff: event.RoleLabelStaff || 'Staff',
-      ClubDirector: event.RoleLabelClubDirector || 'Club Director',
-      EventAdmin: event.RoleLabelEventAdmin || 'Event Admin'
-    };
-    
-    // Create main event overview table
-    const eventTableHtml = `
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Event Information</th>
-            <th>Statistics</th>
-            <th>Location</th>
-            <th>Role Labels</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>
-              <div><strong>Name:</strong> ${event.Name}</div>
-              <div><strong>Start Date:</strong> ${event.StartDate}</div>
-              <div><strong>End Date:</strong> ${event.EndDate}</div>
-              <div><strong>Status:</strong> <span class="badge ${event.Status === 'Live' ? 'badge-success' : 'badge-secondary'}">${event.Status}</span></div>
-              <div><strong>Active:</strong> <span class="badge ${event.Active ? 'badge-success' : 'badge-secondary'}">${event.Active ? 'Yes' : 'No'}</span></div>
-              <div><strong>Coordinator:</strong> ${event.CoordinatorName || 'N/A'}</div>
-              ${event.Description ? `<div style="margin-top: 8px;"><strong>Description:</strong> ${event.Description}</div>` : ''}
-            </td>
-            <td>
-              <div><strong>Classes:</strong> ${statistics.classes}</div>
-              <div><strong>Registrations:</strong> ${statistics.registrations}</div>
-              <div><strong>Enrolled:</strong> ${statistics.enrolled}</div>
-              <div><strong>Waitlisted:</strong> ${statistics.waitlisted}</div>
-              <div><strong>Offered Seats:</strong> ${statistics.offeredSeats || 0}</div>
-              <div><strong>Unique Users:</strong> ${statistics.users}</div>
-              <div><strong>Clubs:</strong> ${statistics.clubs}</div>
-              <div><strong>Locations:</strong> ${statistics.locations}</div>
-              <div><strong>Timeslots:</strong> ${statistics.timeslots}</div>
-            </td>
-            <td>
-              ${event.LocationDescription ? `<div><strong>Description:</strong> ${event.LocationDescription}</div>` : ''}
-              <div><strong>Address:</strong> ${fullAddress}</div>
-            </td>
-            <td style="font-size: 0.9rem;">
-              <div><strong>Student:</strong> ${roleLabels.Student}</div>
-              <div><strong>Teacher:</strong> ${roleLabels.Teacher}</div>
-              <div><strong>Staff:</strong> ${roleLabels.Staff}</div>
-              <div><strong>Club Director:</strong> ${roleLabels.ClubDirector}</div>
-              <div><strong>Event Admin:</strong> ${roleLabels.EventAdmin}</div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    // Aggregate user counts from clubs data
+    const totalDirectors = clubs.reduce((sum, c) => sum + (c.DirectorCount || 0), 0);
+    const totalTeachers = clubs.reduce((sum, c) => sum + (c.TeacherCount || 0), 0);
+    const totalStaff = clubs.reduce((sum, c) => sum + (c.StaffCount || 0), 0);
+    const totalStudents = clubs.reduce((sum, c) => sum + (c.StudentCount || 0), 0);
+
+    // Create compact event overview using stats-grid
+    const eventOverviewHtml = `
+      <div class="stats-grid">
+        <div class="stat-item"><span class="stat-label">Name:</span><span class="stat-value">${event.Name}</span></div>
+        <div class="stat-item"><span class="stat-label">Start:</span><span class="stat-value">${event.StartDate}</span></div>
+        <div class="stat-item"><span class="stat-label">End:</span><span class="stat-value">${event.EndDate}</span></div>
+        <div class="stat-item"><span class="stat-label">Status:</span><span class="stat-value" style="color:${event.Status === 'Live' ? '#28a745' : '#6c757d'}">${event.Status}</span></div>
+        <div class="stat-item"><span class="stat-label">Active:</span><span class="stat-value" style="color:${event.Active ? '#28a745' : '#6c757d'}">${event.Active ? 'Yes' : 'No'}</span></div>
+        <div class="stat-item"><span class="stat-label">Coordinator:</span><span class="stat-value">${event.CoordinatorName || 'N/A'}</span></div>
+        <div class="stat-item"><span class="stat-label">Classes:</span><span class="stat-value" style="color:#007bff">${statistics.classes}</span></div>
+        <div class="stat-item"><span class="stat-label">Enrolled:</span><span class="stat-value" style="color:#28a745">${statistics.enrolled}</span></div>
+        <div class="stat-item"><span class="stat-label">Waitlisted:</span><span class="stat-value" style="color:#ffc107">${statistics.waitlisted}</span></div>
+        <div class="stat-item"><span class="stat-label">Offered Seats:</span><span class="stat-value" style="color:#007bff">${statistics.offeredSeats || 0}</span></div>
+        <div class="stat-item"><span class="stat-label">Club Directors:</span><span class="stat-value" style="color:#fd7e14">${totalDirectors}</span></div>
+        <div class="stat-item"><span class="stat-label">Teachers:</span><span class="stat-value" style="color:#20c997">${totalTeachers}</span></div>
+        <div class="stat-item"><span class="stat-label">Staff:</span><span class="stat-value" style="color:#17a2b8">${totalStaff}</span></div>
+        <div class="stat-item"><span class="stat-label">Students:</span><span class="stat-value" style="color:#28a745">${totalStudents}</span></div>
+        <div class="stat-item"><span class="stat-label">Clubs:</span><span class="stat-value">${statistics.clubs}</span></div>
+        <div class="stat-item"><span class="stat-label">Locations:</span><span class="stat-value">${statistics.locations}</span></div>
+        <div class="stat-item"><span class="stat-label">Timeslots:</span><span class="stat-value">${statistics.timeslots}</span></div>
+        ${event.LocationDescription ? `<div class="stat-item"><span class="stat-label">Location:</span><span class="stat-value">${event.LocationDescription}</span></div>` : ''}
+        ${fullAddress !== 'Not specified' ? `<div class="stat-item"><span class="stat-label">Address:</span><span class="stat-value">${fullAddress}</span></div>` : ''}
+      </div>
     `;
-    
-    const eventMobileCards = createMobileCard({
-      'Event Name': event.Name,
-      'Start Date': event.StartDate,
-      'End Date': event.EndDate,
-      'Status': event.Status,
-      'Active': event.Active ? 'Yes' : 'No',
-      'Coordinator': event.CoordinatorName || 'N/A',
-      'Description': event.Description || 'N/A',
-      'Location': event.LocationDescription || fullAddress,
-      'Address': fullAddress !== 'Not specified' ? fullAddress : 'N/A',
-      'Classes': statistics.classes,
-      'Registrations': statistics.registrations,
-      'Enrolled': statistics.enrolled,
-      'Waitlisted': statistics.waitlisted,
-      'Offered Seats': statistics.offeredSeats || 0,
-      'Unique Users': statistics.users,
-      'Clubs': statistics.clubs,
-      'Locations': statistics.locations,
-      'Timeslots': statistics.timeslots,
-      'Student Label': roleLabels.Student,
-      'Teacher Label': roleLabels.Teacher,
-      'Staff Label': roleLabels.Staff,
-      'Club Director Label': roleLabels.ClubDirector,
-      'Event Admin Label': roleLabels.EventAdmin
-    }, 'Event Overview');
-    
+
     const dashboardHtml = `
-      <div style="margin-bottom: 20px;">
-        ${wrapResponsiveTable(eventTableHtml, eventMobileCards)}
+      <div style="margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
+        <h3 style="margin: 0 0 12px 0; color: #495057; font-size: 1.1rem;">Event Overview</h3>
+        ${eventOverviewHtml}
       </div>
       
       ${clubs.length > 0 ? `
