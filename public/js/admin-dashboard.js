@@ -1488,7 +1488,6 @@ async function loadEventDashboard(eventId) {
     // Create compact event overview using stats-grid
     const eventOverviewHtml = `
       <div class="stats-grid">
-        <div class="stat-item"><span class="stat-label">Name:</span><span class="stat-value">${event.Name}</span></div>
         <div class="stat-item"><span class="stat-label">Start:</span><span class="stat-value">${event.StartDate}</span></div>
         <div class="stat-item"><span class="stat-label">End:</span><span class="stat-value">${event.EndDate}</span></div>
         <div class="stat-item"><span class="stat-label">Status:</span><span class="stat-value" style="color:${event.Status === 'Live' ? '#28a745' : '#6c757d'}">${event.Status}</span></div>
@@ -1512,7 +1511,7 @@ async function loadEventDashboard(eventId) {
 
     const dashboardHtml = `
       <div style="margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
-        <h3 style="margin: 0 0 12px 0; color: #495057; font-size: 1.1rem;">Event Overview</h3>
+        <h3 style="margin: 0 0 12px 0; color: #495057; font-size: 1.1rem;">Event Overview: <span style="color: #007bff;">${event.Name}</span></h3>
         ${eventOverviewHtml}
       </div>
       
