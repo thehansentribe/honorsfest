@@ -10,6 +10,7 @@ let checkInParticipants = [];
 let checkInFilter = '';
 let checkInSortColumn = null;
 let checkInSortDirection = 'asc';
+let checkInEventData = null; // Stores the current event's data including BackgroundCheckAge and StartDate
 
 /**
  * Initialize check-in module
@@ -71,6 +72,15 @@ async function checkInLoadParticipants() {
 
   try {
     const user = getCurrentUser();
+    
+    // Load event data to get BackgroundCheckAge and StartDate
+    const eventResponse = await fetchWithAuth(`/api/events/${targetEventId}`);
+    if (eventResponse.ok) {
+      checkInEventData = await eventResponse.json();
+    } else {
+      checkInEventData = null;
+    }
+    
     let url = `/api/checkin/participants/${targetEventId}`;
     
     // ClubDirector can only see their club's students
@@ -256,7 +266,7 @@ function checkInRenderParticipants() {
     return;
   }
   
-  // Helper function to calculate age
+  // Helper function to calculate age (as of today for display)
   function calculateAge(dateOfBirth) {
     if (!dateOfBirth) return null;
     const today = new Date();
@@ -269,10 +279,31 @@ function checkInRenderParticipants() {
     return age;
   }
   
-  // Helper function to check if over 18
-  function isOver18(dateOfBirth) {
-    const age = calculateAge(dateOfBirth);
-    return age !== null && age >= 18;
+  // Helper function to calculate age as of a specific date
+  function calculateAgeAsOf(dateOfBirth, asOfDate) {
+    if (!dateOfBirth || !asOfDate) return null;
+    const targetDate = new Date(asOfDate);
+    const birthDate = new Date(dateOfBirth);
+    let age = targetDate.getFullYear() - birthDate.getFullYear();
+    const monthDiff = targetDate.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && targetDate.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  }
+  
+  // Helper function to check if background check is required
+  // Uses event's BackgroundCheckAge and calculates age as of event start date
+  function requiresBackgroundCheck(dateOfBirth) {
+    if (!checkInEventData) {
+      // Fallback to current date and age 18 if no event data
+      const age = calculateAge(dateOfBirth);
+      return age !== null && age >= 18;
+    }
+    const backgroundCheckAge = checkInEventData.BackgroundCheckAge || 18;
+    const eventStartDate = checkInEventData.StartDate;
+    const ageAsOfEvent = calculateAgeAsOf(dateOfBirth, eventStartDate);
+    return ageAsOfEvent !== null && ageAsOfEvent >= backgroundCheckAge;
   }
   
   const tableHtml = `
@@ -306,7 +337,7 @@ function checkInRenderParticipants() {
       <tbody>
         ${filtered.map(participant => {
           const age = calculateAge(participant.DateOfBirth);
-          const over18 = isOver18(participant.DateOfBirth);
+          const needsBgCheck = requiresBackgroundCheck(participant.DateOfBirth);
           
           return `
             <tr id="checkInRow_${participant.ID}">
@@ -325,7 +356,7 @@ function checkInRenderParticipants() {
                 </label>
               </td>
               <td>
-                ${over18 ? `
+                ${needsBgCheck ? `
                   <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
                     <input type="checkbox" 
                            ${participant.BackgroundCheck ? 'checked' : ''}
@@ -348,7 +379,7 @@ function checkInRenderParticipants() {
   // Mobile card view
   const mobileCards = filtered.map(participant => {
     const age = calculateAge(participant.DateOfBirth);
-    const over18 = isOver18(participant.DateOfBirth);
+    const needsBgCheck = requiresBackgroundCheck(participant.DateOfBirth);
     
     const actionsHtml = `
       <button onclick="checkInViewDetails(${participant.ID})" class="btn btn-sm btn-secondary">View</button>
@@ -372,7 +403,7 @@ function checkInRenderParticipants() {
           <span>Checked In</span>
         </label>
       </div>
-      ${over18 ? `
+      ${needsBgCheck ? `
         <div style="margin-bottom: 10px;">
           <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
             <input type="checkbox" 
@@ -489,6 +520,7 @@ async function checkInViewDetails(userId) {
     modal.className = 'modal';
     modal.style.display = 'flex';
     
+    // Calculate age as of today for display
     const age = user.DateOfBirth ? (() => {
       const today = new Date();
       const birthDate = new Date(user.DateOfBirth);
@@ -499,7 +531,24 @@ async function checkInViewDetails(userId) {
       }
       return age;
     })() : null;
-    const over18 = age !== null && age >= 18;
+    
+    // Determine if background check is required based on event settings
+    let needsBgCheck = false;
+    if (user.DateOfBirth && checkInEventData) {
+      const backgroundCheckAge = checkInEventData.BackgroundCheckAge || 18;
+      const eventStartDate = checkInEventData.StartDate;
+      const birthDate = new Date(user.DateOfBirth);
+      const targetDate = new Date(eventStartDate);
+      let ageAsOfEvent = targetDate.getFullYear() - birthDate.getFullYear();
+      const monthDiff = targetDate.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && targetDate.getDate() < birthDate.getDate())) {
+        ageAsOfEvent--;
+      }
+      needsBgCheck = ageAsOfEvent >= backgroundCheckAge;
+    } else if (user.DateOfBirth) {
+      // Fallback to current date and age 18
+      needsBgCheck = age !== null && age >= 18;
+    }
     
     modal.innerHTML = `
       <div class="modal-content" style="max-width: 600px;">
@@ -528,7 +577,7 @@ async function checkInViewDetails(userId) {
               </label>
             </div>
             
-            ${over18 ? `
+            ${needsBgCheck ? `
               <div class="form-group">
                 <label style="display: flex; align-items: center; gap: 10px;">
                   <input type="checkbox" id="detailBackgroundCheck" ${user.BackgroundCheck ? 'checked' : ''}>

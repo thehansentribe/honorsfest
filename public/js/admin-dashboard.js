@@ -2158,6 +2158,13 @@ async function editEvent(eventId) {
             <strong>Live:</strong> Clubs can view and register for classes.
           </small>
         </div>
+        <div class="form-group">
+          <label for="editBackgroundCheckAge">Background Check Age</label>
+          <input type="number" id="editBackgroundCheckAge" name="editBackgroundCheckAge" class="form-control" value="${event.BackgroundCheckAge || 18}" min="0" max="99">
+          <small style="color: var(--text-light); display: block; margin-top: 5px;">
+            Participants this age or older on the event start date will require a background check.
+          </small>
+        </div>
         <hr style="margin: 20px 0; border-color: var(--border);">
         <h3 style="margin: 0 0 15px 0; font-size: 16px; color: var(--primary);">Custom Role Names</h3>
         <small style="color: var(--text-light); margin-bottom: 15px; display: block;">Configure how role names appear for this event.</small>
@@ -2206,6 +2213,7 @@ async function handleEditEvent(event, eventId) {
     LocationDescription: form.editLocationDescription.value.trim() || null,
     Active: form.editEventActive?.checked ?? true,
     Status: form.editEventStatus.value,
+    BackgroundCheckAge: parseInt(form.editBackgroundCheckAge?.value, 10) || 18,
     RoleLabelStudent: form.editRoleLabelStudent.value.trim() || 'Student',
     RoleLabelTeacher: form.editRoleLabelTeacher.value.trim() || 'Teacher',
     RoleLabelStaff: form.editRoleLabelStaff.value.trim() || 'Staff',
@@ -3164,6 +3172,13 @@ function showCreateEventForm() {
             <strong>Live:</strong> Clubs can view and register for classes.
           </small>
         </div>
+        <div class="form-group">
+          <label for="backgroundCheckAge">Background Check Age</label>
+          <input type="number" id="backgroundCheckAge" name="backgroundCheckAge" class="form-control" value="18" min="0" max="99">
+          <small style="color: var(--text-light); display: block; margin-top: 5px;">
+            Participants this age or older on the event start date will require a background check.
+          </small>
+        </div>
         <hr style="margin: 20px 0; border-color: var(--border);">
         <h3 style="margin: 0 0 15px 0; font-size: 16px; color: var(--primary);">Custom Role Names</h3>
         <small style="color: var(--text-light); margin-bottom: 15px; display: block;">Optional: Configure how role names appear for this event.</small>
@@ -3237,7 +3252,8 @@ async function handleCreateEvent(e) {
     RoleLabelClubDirector: form.roleLabelClubDirector?.value?.trim() || 'Club Director',
     RoleLabelEventAdmin: form.roleLabelEventAdmin?.value?.trim() || 'Event Admin',
     Active: form.eventActive?.checked ?? true,
-    Status: form.eventStatus?.value || 'Closed'
+    Status: form.eventStatus?.value || 'Closed',
+    BackgroundCheckAge: parseInt(form.backgroundCheckAge?.value, 10) || 18
   };
 
 

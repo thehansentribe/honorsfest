@@ -63,7 +63,8 @@ function initializeDatabase() {
         RoleLabelTeacher TEXT DEFAULT 'Teacher',
         RoleLabelStaff TEXT DEFAULT 'Staff',
         RoleLabelClubDirector TEXT DEFAULT 'Club Director',
-        RoleLabelEventAdmin TEXT DEFAULT 'Event Admin'
+        RoleLabelEventAdmin TEXT DEFAULT 'Event Admin',
+        BackgroundCheckAge INTEGER DEFAULT 18
       );
 
       CREATE TABLE IF NOT EXISTS Locations (

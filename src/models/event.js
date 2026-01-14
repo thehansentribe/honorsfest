@@ -2,11 +2,11 @@ const { db } = require('../config/db');
 
 class Event {
   static create(eventData) {
-    const { Name, StartDate, EndDate, Status, Active, Description, CoordinatorName, LocationDescription, Street, City, State, ZIP, RoleLabelStudent, RoleLabelTeacher, RoleLabelStaff, RoleLabelClubDirector, RoleLabelEventAdmin } = eventData;
+    const { Name, StartDate, EndDate, Status, Active, Description, CoordinatorName, LocationDescription, Street, City, State, ZIP, RoleLabelStudent, RoleLabelTeacher, RoleLabelStaff, RoleLabelClubDirector, RoleLabelEventAdmin, BackgroundCheckAge } = eventData;
     
     const stmt = db.prepare(`
-      INSERT INTO Events (Name, StartDate, EndDate, Status, Active, Description, CoordinatorName, LocationDescription, Street, City, State, ZIP, RoleLabelStudent, RoleLabelTeacher, RoleLabelStaff, RoleLabelClubDirector, RoleLabelEventAdmin)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO Events (Name, StartDate, EndDate, Status, Active, Description, CoordinatorName, LocationDescription, Street, City, State, ZIP, RoleLabelStudent, RoleLabelTeacher, RoleLabelStaff, RoleLabelClubDirector, RoleLabelEventAdmin, BackgroundCheckAge)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -26,7 +26,8 @@ class Event {
       RoleLabelTeacher || 'Teacher',
       RoleLabelStaff || 'Staff',
       RoleLabelClubDirector || 'Club Director',
-      RoleLabelEventAdmin || 'Event Admin'
+      RoleLabelEventAdmin || 'Event Admin',
+      BackgroundCheckAge !== undefined ? parseInt(BackgroundCheckAge, 10) : 18
     );
 
     return this.findById(result.lastInsertRowid);
@@ -69,7 +70,7 @@ class Event {
   }
 
   static update(id, updates) {
-    const allowedUpdates = ['Name', 'StartDate', 'EndDate', 'Status', 'Active', 'Description', 'CoordinatorName', 'LocationDescription', 'Street', 'City', 'State', 'ZIP', 'RoleLabelStudent', 'RoleLabelTeacher', 'RoleLabelStaff', 'RoleLabelClubDirector', 'RoleLabelEventAdmin'];
+    const allowedUpdates = ['Name', 'StartDate', 'EndDate', 'Status', 'Active', 'Description', 'CoordinatorName', 'LocationDescription', 'Street', 'City', 'State', 'ZIP', 'RoleLabelStudent', 'RoleLabelTeacher', 'RoleLabelStaff', 'RoleLabelClubDirector', 'RoleLabelEventAdmin', 'BackgroundCheckAge'];
     const setClause = [];
     const values = [];
 

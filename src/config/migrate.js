@@ -43,6 +43,15 @@ function migrateDatabase() {
       console.log('Role label columns added successfully');
     }
     
+    // Check Events table for BackgroundCheckAge column
+    const hasBackgroundCheckAge = eventsTableInfo.some(col => col.name === 'BackgroundCheckAge');
+    
+    if (!hasBackgroundCheckAge) {
+      console.log('Adding BackgroundCheckAge column to Events table...');
+      db.exec('ALTER TABLE Events ADD COLUMN BackgroundCheckAge INTEGER DEFAULT 18');
+      console.log('✓ BackgroundCheckAge column added (default: 18)');
+    }
+    
     // Check Classes table for CreatedBy column
     const classesTableInfo = db.prepare("PRAGMA table_info(Classes)").all();
     const hasCreatedBy = classesTableInfo.some(col => col.name === 'CreatedBy');
