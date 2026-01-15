@@ -14,8 +14,12 @@ router.use(verifyToken);
 // GET /api/users - List users with filters
 router.get('/', (req, res) => {
   try {
+    const roles = req.query.roles
+      ? req.query.roles.split(',').map(role => role.trim()).filter(Boolean)
+      : null;
     const filters = {
       role: req.query.role,
+      roles,
       clubId: req.query.clubId,
       eventId: req.query.eventId,
       active: req.query.active

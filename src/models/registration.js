@@ -247,6 +247,67 @@ class Registration {
     this.recalculateWaitlistPositions(classId);
   }
 
+  static rebalanceClassRoster(classId) {
+    return db.transaction(() => {
+      const classData = Class.findById(classId);
+      if (!classData) {
+        return null;
+      }
+
+      const maxCapacity = classData.ActualMaxCapacity ?? classData.MaxCapacity ?? classData.TeacherMaxStudents;
+      const enrolled = db.prepare(`
+        SELECT ID, UserID
+        FROM Registrations
+        WHERE ClassID = ? AND Status = 'Enrolled'
+        ORDER BY ID ASC
+      `).all(classId);
+
+      let enrolledCount = enrolled.length;
+
+      // Demote to waitlist if capacity decreased
+      if (enrolledCount > maxCapacity) {
+        const demoteCount = enrolledCount - maxCapacity;
+        const toDemote = db.prepare(`
+          SELECT ID, UserID
+          FROM Registrations
+          WHERE ClassID = ? AND Status = 'Enrolled'
+          ORDER BY ID DESC
+          LIMIT ?
+        `).all(classId, demoteCount);
+
+        const maxWaitlist = db.prepare(`
+          SELECT MAX(WaitlistOrder) as maxOrder
+          FROM Registrations
+          WHERE ClassID = ? AND Status = 'Waitlisted'
+        `).get(classId);
+        let nextOrder = maxWaitlist?.maxOrder ? maxWaitlist.maxOrder + 1 : 1;
+
+        for (const entry of toDemote) {
+          db.prepare(`
+            UPDATE Registrations
+            SET Status = 'Waitlisted', WaitlistOrder = ?
+            WHERE ID = ?
+          `).run(nextOrder, entry.ID);
+
+          db.prepare('DELETE FROM Attendance WHERE ClassID = ? AND UserID = ?').run(classId, entry.UserID);
+
+          nextOrder += 1;
+        }
+        enrolledCount = Class.getEnrolledCount(classId);
+      }
+
+      while (Class.getEnrolledCount(classId) < maxCapacity) {
+        const promoted = this.processWaitlist(classId);
+        if (!promoted) {
+          break;
+        }
+      }
+
+      this.recalculateWaitlistPositions(classId);
+      return { enrolled: Class.getEnrolledCount(classId), capacity: maxCapacity };
+    })();
+  }
+
   static checkTimeslotConflict(userId, timeslotId, eventId) {
     // Get all enrolled classes for this user in this event
     const enrolledClasses = db.prepare(`

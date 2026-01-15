@@ -296,6 +296,32 @@ function migrateDatabase() {
       db.exec('CREATE INDEX IF NOT EXISTS idx_classes_club ON Classes(ClubID)');
       console.log('✓ ClubID index created');
     }
+
+    // Check Classes table for ClassNotes column
+    const classesTableInfoForNotes = db.prepare("PRAGMA table_info(Classes)").all();
+    const hasClassNotes = classesTableInfoForNotes.some(col => col.name === 'ClassNotes');
+
+    if (!hasClassNotes) {
+      console.log('Adding ClassNotes column to Classes table...');
+      db.exec('ALTER TABLE Classes ADD COLUMN ClassNotes TEXT');
+      console.log('✓ ClassNotes column added');
+    }
+
+    // Check ClassSecondaryTeachers table
+    const hasSecondaryTeachersTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='ClassSecondaryTeachers'").get();
+    if (!hasSecondaryTeachersTable) {
+      console.log('Creating ClassSecondaryTeachers table...');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS ClassSecondaryTeachers (
+          ClassID INTEGER NOT NULL,
+          UserID INTEGER NOT NULL,
+          PRIMARY KEY (ClassID, UserID),
+          FOREIGN KEY (ClassID) REFERENCES Classes(ID) ON DELETE CASCADE,
+          FOREIGN KEY (UserID) REFERENCES Users(ID) ON DELETE CASCADE
+        )
+      `);
+      console.log('✓ ClassSecondaryTeachers table created');
+    }
     
     // Run username sanitization migration (removes spaces and special characters)
     try {

@@ -7,6 +7,7 @@ let allLocations = [];
 let allTimeslots = [];
 let allClubs = [];
 let allClasses = [];
+let timeslotStats = new Map();
 let currentUser = null;
 let assignedEventId = null;
 let assignedEvent = null;
@@ -2072,24 +2073,37 @@ async function editClass(classId) {
   const eventId = select?.value || cls.EventID;
   
   // Load honors, teachers, locations, and clubs for dropdowns
-  const [honorsRes, locationsRes, teachersRes, directorsRes, clubsRes] = await Promise.all([
+  const [classDetailsRes, honorsRes, locationsRes, teachersRes, directorsRes, clubsRes, timeslotsRes, secondaryRes] = await Promise.all([
+    fetchWithAuth(`/api/classes/details/${classId}`),
     fetchWithAuth('/api/classes/honors'),
     fetchWithAuth(`/api/events/${eventId}/locations`),
     fetchWithAuth(`/api/users?role=Teacher&eventId=${eventId}`),
     fetchWithAuth(`/api/users?role=ClubDirector&eventId=${eventId}`),
-    fetchWithAuth(`/api/clubs/event/${eventId}`)
+    fetchWithAuth(`/api/clubs/event/${eventId}`),
+    fetchWithAuth(`/api/events/${eventId}/timeslots`),
+    fetchWithAuth(`/api/users?roles=Teacher,Staff,ClubDirector&eventId=${eventId}&active=1`)
   ]);
   
+  const classDetails = await classDetailsRes.json();
   const honors = await honorsRes.json();
   const locations = await locationsRes.json();
   const teachers = await teachersRes.json();
   const directors = await directorsRes.json();
   const clubs = await clubsRes.json();
+  const timeslots = await timeslotsRes.json();
+  const secondaryTeachers = await secondaryRes.json();
   // Merge teachers and club directors for teacher selection
   const allTeachers = [...teachers, ...directors].sort((a, b) => {
     if (a.LastName !== b.LastName) return a.LastName.localeCompare(b.LastName);
     return a.FirstName.localeCompare(b.FirstName);
   });
+
+  const allSecondaryTeachers = [...secondaryTeachers].sort((a, b) => {
+    if (a.LastName !== b.LastName) return a.LastName.localeCompare(b.LastName);
+    return a.FirstName.localeCompare(b.FirstName);
+  });
+
+  const selectedSecondaryIds = new Set((classDetails.SecondaryTeachers || []).map(t => t.ID));
   
   const modal = document.createElement('div');
   modal.id = 'editClassModal';
@@ -2123,10 +2137,27 @@ async function editClass(classId) {
           </select>
         </div>
         <div class="form-group">
+          <label for="editClassSecondaryTeachers">Secondary Teachers / Helpers</label>
+          <select id="editClassSecondaryTeachers" name="editClassSecondaryTeachers" class="form-control" multiple size="5">
+            ${allSecondaryTeachers.map(t => `<option value="${t.ID}" ${selectedSecondaryIds.has(t.ID) ? 'selected' : ''}>${t.FirstName} ${t.LastName} (${t.Role})</option>`).join('')}
+          </select>
+          <small style="color: var(--text-light);">Optional - select multiple teachers, staff, or club directors</small>
+        </div>
+        <div class="form-group">
           <label for="editClassLocation">Location</label>
           <select id="editClassLocation" name="editClassLocation" class="form-control">
             <option value="">No Location</option>
             ${locations.map(l => `<option value="${l.ID}" ${cls.LocationID === l.ID ? 'selected' : ''}>${l.Name} (Capacity: ${l.MaxCapacity})</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="editClassTimeslot">Timeslot</label>
+          <select id="editClassTimeslot" name="editClassTimeslot" class="form-control">
+            <option value="">Select Timeslot</option>
+            ${timeslots.map(slot => {
+              const label = `${slot.Date} ${convertTo12Hour(slot.StartTime)} - ${convertTo12Hour(slot.EndTime)}`;
+              return `<option value="${slot.ID}" ${cls.TimeslotID === slot.ID ? 'selected' : ''}>${label}</option>`;
+            }).join('')}
           </select>
         </div>
         <div class="form-group">
@@ -2148,6 +2179,10 @@ async function editClass(classId) {
           </select>
           <small style="color: var(--text-light);">Leave as "All Levels" if no restriction needed</small>
         </div>
+        <div class="form-group">
+          <label for="editClassNotes">Class Notes</label>
+          <textarea id="editClassNotes" name="editClassNotes" class="form-control" rows="3" placeholder="Add notes about the class or teaching needs...">${escapeHtml(classDetails.ClassNotes || '')}</textarea>
+        </div>
         <div class="form-actions">
           <button type="submit" class="btn btn-primary">Update Class</button>
           <button type="button" onclick="closeModal('editClassModal')" class="btn btn-outline">Cancel</button>
@@ -2161,13 +2196,19 @@ async function editClass(classId) {
 async function handleEditClass(e, classId) {
   e.preventDefault();
   const form = e.target;
+  const selectedSecondaryTeachers = Array.from(form.editClassSecondaryTeachers?.selectedOptions || [])
+    .map(option => parseInt(option.value, 10))
+    .filter(id => !Number.isNaN(id));
   
   const classData = {
     ClubID: form.editClassClub?.value || null,
     TeacherID: form.editClassTeacher?.value || null,
+    SecondaryTeacherIDs: selectedSecondaryTeachers,
     LocationID: form.editClassLocation?.value || null,
+    TimeslotID: form.editClassTimeslot?.value || null,
     TeacherMaxStudents: parseInt(form.editClassMaxCapacity?.value) || 0,
-    MinimumLevel: form.editClassMinimumLevel?.value || null
+    MinimumLevel: form.editClassMinimumLevel?.value || null,
+    ClassNotes: form.editClassNotes?.value?.trim() || null
   };
   
   try {
@@ -2290,6 +2331,11 @@ async function viewClassStudents(classId) {
     const timeslotText = classData.TimeslotDate && classData.TimeslotStartTime && classData.TimeslotEndTime
       ? `${classData.TimeslotDate} from ${convertTo12Hour(classData.TimeslotStartTime)} - ${convertTo12Hour(classData.TimeslotEndTime)}`
       : 'Not set';
+
+    const secondaryTeachersText = (classData.SecondaryTeachers || []).length
+      ? classData.SecondaryTeachers.map(t => `${t.FirstName} ${t.LastName}`).join(', ')
+      : 'None';
+    const classNotesText = classData.ClassNotes ? escapeHtml(classData.ClassNotes) : 'None';
     
     modal.innerHTML = `
       <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
@@ -2311,6 +2357,14 @@ async function viewClassStudents(classId) {
               <div>
                 <strong style="color: var(--text-light); font-size: 0.875rem;">Timeslot:</strong>
                 <div style="font-size: 1rem; margin-top: 4px;">${timeslotText}</div>
+              </div>
+              <div>
+                <strong style="color: var(--text-light); font-size: 0.875rem;">Secondary Teachers:</strong>
+                <div style="font-size: 1rem; margin-top: 4px;">${secondaryTeachersText}</div>
+              </div>
+              <div>
+                <strong style="color: var(--text-light); font-size: 0.875rem;">Class Notes:</strong>
+                <div style="font-size: 1rem; margin-top: 4px;">${classNotesText}</div>
               </div>
             </div>
           </div>
@@ -3935,8 +3989,24 @@ async function loadTimeslots(eventId) {
   }
   
   try {
-    const response = await fetchWithAuth(`/api/events/${targetEventId}/timeslots`);
+    const [response, classesResponse] = await Promise.all([
+      fetchWithAuth(`/api/events/${targetEventId}/timeslots`),
+      fetchWithAuth(`/api/classes/${targetEventId}`)
+    ]);
     allTimeslots = await response.json();
+    const classes = await classesResponse.json();
+
+    timeslotStats = new Map();
+    classes.forEach(cls => {
+      if (!cls.TimeslotID) return;
+      const current = timeslotStats.get(cls.TimeslotID) || { count: 0, capacity: 0 };
+      const capacity = cls.ActualMaxCapacity || cls.MaxCapacity || cls.TeacherMaxStudents || 0;
+      timeslotStats.set(cls.TimeslotID, {
+        count: current.count + 1,
+        capacity: current.capacity + capacity
+      });
+    });
+
     renderTimeslotsList();
   } catch (error) {
     console.error('Error loading timeslots:', error);
@@ -3961,10 +4031,12 @@ function renderTimeslotsList() {
     <table class="data-table">
       <thead>
         <tr>
-          <th style="width: 25%; text-align: left;">Date</th>
-          <th style="width: 20%; text-align: left;">Start Time</th>
-          <th style="width: 20%; text-align: left;">End Time</th>
-          <th style="width: 20%; text-align: left;">Duration</th>
+          <th style="width: 20%; text-align: left;">Date</th>
+          <th style="width: 15%; text-align: left;">Start Time</th>
+          <th style="width: 15%; text-align: left;">End Time</th>
+          <th style="width: 15%; text-align: left;">Duration</th>
+          <th style="width: 15%; text-align: left;"># Classes</th>
+          <th style="width: 15%; text-align: left;">Total Capacity</th>
           <th style="width: 15%; text-align: left;">Actions</th>
         </tr>
       </thead>
@@ -3975,6 +4047,8 @@ function renderTimeslotsList() {
           <td style="text-align: left;">${convertTo12Hour(slot.StartTime)}</td>
           <td style="text-align: left;">${convertTo12Hour(slot.EndTime)}</td>
           <td style="text-align: left;">${calculateDuration(slot.StartTime, slot.EndTime)}</td>
+          <td style="text-align: left;">${timeslotStats.get(slot.ID)?.count || 0}</td>
+          <td style="text-align: left;">${timeslotStats.get(slot.ID)?.capacity || 0}</td>
           <td style="text-align: left;">
             <button onclick="editTimeslot(${slot.ID})" class="btn btn-sm btn-secondary">Edit</button>
             <button onclick="deleteTimeslot(${slot.ID})" class="btn btn-sm btn-danger">Delete</button>
@@ -4188,13 +4262,14 @@ async function showCreateClassForm() {
   }
   
   // Load honors, teachers, locations, timeslots, and clubs for the event
-  const [honorsRes, teachersRes, directorsRes, locationsRes, timeslotsRes, clubsRes] = await Promise.all([
+  const [honorsRes, teachersRes, directorsRes, locationsRes, timeslotsRes, clubsRes, secondaryRes] = await Promise.all([
     fetchWithAuth('/api/classes/honors'),
     fetchWithAuth(`/api/users?role=Teacher&eventId=${eventId}`),
     fetchWithAuth(`/api/users?role=ClubDirector&eventId=${eventId}`),
     fetchWithAuth(`/api/events/${eventId}/locations`),
     fetchWithAuth(`/api/events/${eventId}/timeslots`),
-    fetchWithAuth(`/api/clubs/event/${eventId}`)
+    fetchWithAuth(`/api/clubs/event/${eventId}`),
+    fetchWithAuth(`/api/users?roles=Teacher,Staff,ClubDirector&eventId=${eventId}&active=1`)
   ]);
   
   const honors = await honorsRes.json();
@@ -4203,9 +4278,15 @@ async function showCreateClassForm() {
   const locations = await locationsRes.json();
   const timeslots = await timeslotsRes.json();
   const clubs = await clubsRes.json();
+  const secondaryTeachers = await secondaryRes.json();
   
   // Merge teachers and club directors for teacher selection
   const allTeachers = [...teachers, ...directors].sort((a, b) => {
+    if (a.LastName !== b.LastName) return a.LastName.localeCompare(b.LastName);
+    return a.FirstName.localeCompare(b.FirstName);
+  });
+
+  const allSecondaryTeachers = [...secondaryTeachers].sort((a, b) => {
     if (a.LastName !== b.LastName) return a.LastName.localeCompare(b.LastName);
     return a.FirstName.localeCompare(b.FirstName);
   });
@@ -4253,6 +4334,13 @@ async function showCreateClassForm() {
           <small style="color: var(--text-light);">Optional - Teacher can be assigned later</small>
         </div>
         <div class="form-group">
+          <label for="classSecondaryTeachers">Secondary Teachers / Helpers</label>
+          <select id="classSecondaryTeachers" name="classSecondaryTeachers" class="form-control" multiple size="5">
+            ${allSecondaryTeachers.map(t => `<option value="${t.ID}">${t.FirstName} ${t.LastName} (${t.Role})</option>`).join('')}
+          </select>
+          <small style="color: var(--text-light);">Optional - select multiple teachers, staff, or club directors</small>
+        </div>
+        <div class="form-group">
           <label for="classLocation">Location *</label>
           <select id="classLocation" name="classLocation" class="form-control" required>
             <option value="">Select Location</option>
@@ -4277,6 +4365,10 @@ async function showCreateClassForm() {
             <option value="MasterGuide">Master Guide only</option>
           </select>
           <small style="color: var(--text-light);">Leave as "All Levels" if no restriction needed</small>
+        </div>
+        <div class="form-group">
+          <label for="classNotes">Class Notes</label>
+          <textarea id="classNotes" name="classNotes" class="form-control" rows="3" placeholder="Add notes about the class or teaching needs..."></textarea>
         </div>
         <div class="form-group">
           <label>Select Timeslots (Sessions) for this Class *</label>
@@ -4312,6 +4404,9 @@ async function handleCreateClass(e) {
   }
   
   const selectedTimeslots = Array.from(form.querySelectorAll('input[name="classTimeslots"]:checked')).map(cb => cb.value);
+  const selectedSecondaryTeachers = Array.from(form.classSecondaryTeachers?.selectedOptions || [])
+    .map(option => parseInt(option.value, 10))
+    .filter(id => !Number.isNaN(id));
   
   if (selectedTimeslots.length === 0) {
     showNotification('Please select at least one timeslot (session) for this class', 'error');
@@ -4324,7 +4419,9 @@ async function handleCreateClass(e) {
     TeacherID: form.classTeacher?.value || null, // Teacher is optional
     LocationID: form.classLocation?.value,
     TeacherMaxStudents: parseInt(form.classMaxCapacity?.value) || 0,
-    MinimumLevel: form.classMinimumLevel?.value || null
+    MinimumLevel: form.classMinimumLevel?.value || null,
+    ClassNotes: form.classNotes?.value?.trim() || null,
+    SecondaryTeacherIDs: selectedSecondaryTeachers
   };
 
   if (!classData.HonorID || !classData.ClubID || !classData.LocationID || !classData.TeacherMaxStudents) {
@@ -4553,6 +4650,13 @@ async function renderClasses() {
       return '';
     };
 
+    const getNotesIcon = (cls) => {
+      if (!cls.ClassNotes) {
+        return '';
+      }
+      return `<span class="notes-icon" title="${escapeHtml(cls.ClassNotes)}" style="margin-left: 6px; cursor: help;">📝</span>`;
+    };
+
     const tableHtml = `
       <table class="data-table">
         <thead>
@@ -4595,7 +4699,7 @@ async function renderClasses() {
           ${activeClasses.length === 0 && inactiveClasses.length === 0 ? '<tr><td colspan="8" class="text-center">No classes match the current filters</td></tr>' : ''}
           ${activeClasses.map(cls => `
           <tr style="border-bottom: 1px solid #e0e0e0;">
-            <td style="padding: 12px 8px; text-align: left;"><strong>${cls.HonorName || 'N/A'}</strong>${getLevelBadge(cls)}</td>
+            <td style="padding: 12px 8px; text-align: left;"><strong>${cls.HonorName || 'N/A'}</strong>${getLevelBadge(cls)}${getNotesIcon(cls)}</td>
             <td style="padding: 12px 8px; text-align: left;">${cls.ClubName || '<span style="color: #999;">N/A</span>'}</td>
             <td style="padding: 12px 8px; text-align: left;">${cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
             <td style="padding: 12px 8px; text-align: left;">${cls.LocationName || 'N/A'}</td>
@@ -4618,7 +4722,7 @@ async function renderClasses() {
           </tr>
           ${inactiveClasses.map(cls => `
           <tr style="border-bottom: 1px solid #e0e0e0; opacity: 0.7; background: #f9f9f9;">
-            <td style="padding: 12px 8px; text-align: left;"><strong>${cls.HonorName || 'N/A'}</strong>${getLevelBadge(cls)}</td>
+            <td style="padding: 12px 8px; text-align: left;"><strong>${cls.HonorName || 'N/A'}</strong>${getLevelBadge(cls)}${getNotesIcon(cls)}</td>
             <td style="padding: 12px 8px; text-align: left;">${cls.ClubName || '<span style="color: #999;">N/A</span>'}</td>
             <td style="padding: 12px 8px; text-align: left;">${cls.TeacherFirstName ? `${cls.TeacherFirstName} ${cls.TeacherLastName}` : '<span style="color: #999;">Unassigned</span>'}</td>
             <td style="padding: 12px 8px; text-align: left;">${cls.LocationName || 'N/A'}</td>
@@ -4663,7 +4767,8 @@ async function renderClasses() {
         'Location': cls.LocationName || 'N/A',
         'Date/Time': dateTime,
         'Capacity': `${cls.EnrolledCount || 0}/${cls.WaitlistCount || 0}/${cls.ActualMaxCapacity || cls.MaxCapacity}`,
-        'Status': cls.Active ? 'Active' : 'Inactive'
+        'Status': cls.Active ? 'Active' : 'Inactive',
+        ...(cls.ClassNotes ? { 'Notes': cls.ClassNotes } : {})
       }, cls.HonorName || 'N/A', actionsHtml);
     }).join('');
     

@@ -272,7 +272,11 @@ class User {
     let query = 'SELECT u.*, c.Name as ClubName, e.Name as EventName, e.ID as EventID, u.Invited, u.InviteAccepted FROM Users u LEFT JOIN Clubs c ON u.ClubID = c.ID LEFT JOIN Events e ON u.EventID = e.ID WHERE 1=1';
     const params = [];
 
-    if (filters.role) {
+    if (filters.roles && Array.isArray(filters.roles) && filters.roles.length > 0) {
+      const placeholders = filters.roles.map(() => '?').join(',');
+      query += ` AND u.Role IN (${placeholders})`;
+      params.push(...filters.roles);
+    } else if (filters.role) {
       query += ' AND u.Role = ?';
       params.push(filters.role);
     }

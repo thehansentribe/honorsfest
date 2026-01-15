@@ -3,6 +3,7 @@ const { verifyToken, requireRole } = require('../middleware/auth');
 const Class = require('../models/class');
 const Honor = require('../models/honor');
 const Location = require('../models/location');
+const Registration = require('../models/registration');
 
 const router = express.Router();
 router.use(verifyToken);
@@ -174,7 +175,7 @@ router.get('/details/:id', (req, res) => {
 // Supports both single-session and multi-session class creation
 router.post('/', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) => {
   try {
-    const { TimeslotIDs, isMultiSession, ...classData } = req.body;
+    const { TimeslotIDs, isMultiSession, SecondaryTeacherIDs, ...classData } = req.body;
     
     // Set CreatedBy from authenticated user
     classData.CreatedBy = req.user.id;
@@ -200,6 +201,11 @@ router.post('/', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) 
       if (isMultiSession && TimeslotIDs.length > 1) {
         // Create linked multi-session class
         const createdClasses = Class.createMultiSession(classData, TimeslotIDs);
+        if (SecondaryTeacherIDs) {
+          createdClasses.forEach(cls => {
+            cls.SecondaryTeachers = Class.setSecondaryTeachers(cls.ID, SecondaryTeacherIDs);
+          });
+        }
         res.status(201).json({
           message: `Created multi-session class with ${createdClasses.length} sessions`,
           classes: createdClasses,
@@ -214,6 +220,9 @@ router.post('/', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) 
             ...classData,
             TimeslotID: timeslotId
           });
+          if (SecondaryTeacherIDs) {
+            created.SecondaryTeachers = Class.setSecondaryTeachers(created.ID, SecondaryTeacherIDs);
+          }
           createdClasses.push(created);
         }
         res.status(201).json({
@@ -225,6 +234,9 @@ router.post('/', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res) 
     } else if (req.body.TimeslotID) {
       // Single timeslot provided (original behavior)
       const created = Class.create(classData);
+      if (SecondaryTeacherIDs) {
+        created.SecondaryTeachers = Class.setSecondaryTeachers(created.ID, SecondaryTeacherIDs);
+      }
       res.status(201).json(created);
     } else {
       res.status(400).json({ error: 'TimeslotID or TimeslotIDs is required' });
@@ -264,25 +276,46 @@ router.put('/:id', requireRole('Admin', 'EventAdmin', 'ClubDirector'), (req, res
       return res.status(404).json({ error: 'Class not found' });
     }
     
-    // ClubDirectors can only edit classes they created
-    if (req.user.role === 'ClubDirector' && existingClass.CreatedBy !== req.user.id) {
-      return res.status(403).json({ error: 'You can only edit classes that you created' });
+    // ClubDirectors can only edit classes for their club
+    if (req.user.role === 'ClubDirector') {
+      const User = require('../models/user');
+      const userData = User.findById(req.user.id);
+      if (!userData || !userData.ClubID || userData.ClubID !== existingClass.ClubID) {
+        return res.status(403).json({ error: 'You can only edit classes for your club' });
+      }
     }
     
     // ClubDirectors can only edit TeacherID, TeacherMaxStudents (max capacity), and MinimumLevel
     // They cannot edit LocationID or other fields
     if (req.user.role === 'ClubDirector') {
-      const allowedFields = ['TeacherID', 'TeacherMaxStudents', 'MinimumLevel'];
+      const allowedFields = ['TeacherID', 'TeacherMaxStudents', 'MinimumLevel', 'TimeslotID', 'ClassNotes', 'SecondaryTeacherIDs'];
       const restrictedFields = Object.keys(req.body).filter(key => !allowedFields.includes(key) && key !== 'CreatedBy');
       
       if (restrictedFields.length > 0) {
-        return res.status(403).json({ error: `You can only edit teacher, max capacity, and minimum level. Cannot edit: ${restrictedFields.join(', ')}` });
+        return res.status(403).json({ error: `You can only edit teacher, max capacity, minimum level, timeslot, notes, and secondary teachers. Cannot edit: ${restrictedFields.join(', ')}` });
       }
     }
+
+    if (req.body.TimeslotID) {
+      const Timeslot = require('../models/timeslot');
+      const timeslot = Timeslot.findById(parseInt(req.body.TimeslotID));
+      if (!timeslot || timeslot.EventID !== existingClass.EventID) {
+        return res.status(400).json({ error: 'Timeslot must belong to the same event as the class' });
+      }
+    }
+
+    const { SecondaryTeacherIDs, ...classUpdates } = req.body;
     
-    const classData = Class.update(classId, req.body);
+    const classData = Class.update(classId, classUpdates);
     if (!classData) {
       return res.status(404).json({ error: 'Class not found' });
+    }
+    if (SecondaryTeacherIDs !== undefined) {
+      classData.SecondaryTeachers = Class.setSecondaryTeachers(classId, SecondaryTeacherIDs);
+    }
+
+    if (classUpdates.TeacherMaxStudents !== undefined || classUpdates.LocationID !== undefined || classUpdates.MaxCapacity !== undefined) {
+      Registration.rebalanceClassRoster(classId);
     }
     res.json(classData);
   } catch (error) {

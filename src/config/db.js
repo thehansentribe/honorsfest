@@ -115,6 +115,7 @@ function initializeDatabase() {
         ClassGroupID TEXT, -- Links sessions of same multi-session class (NULL for single-session)
         SessionNumber INTEGER DEFAULT 1, -- Order within group: 1, 2, 3...
         MinimumLevel TEXT CHECK(MinimumLevel IN ('Friend', 'Companion', 'Explorer', 'Ranger', 'Voyager', 'Guide', 'MasterGuide', NULL)),
+        ClassNotes TEXT,
         FOREIGN KEY (EventID) REFERENCES Events(ID),
         FOREIGN KEY (HonorID) REFERENCES Honors(ID),
         FOREIGN KEY (TeacherID) REFERENCES Users(ID),
@@ -122,6 +123,14 @@ function initializeDatabase() {
         FOREIGN KEY (TimeslotID) REFERENCES Timeslots(ID),
         FOREIGN KEY (CreatedBy) REFERENCES Users(ID),
         FOREIGN KEY (ClubID) REFERENCES Clubs(ID)
+      );
+
+      CREATE TABLE IF NOT EXISTS ClassSecondaryTeachers (
+        ClassID INTEGER NOT NULL,
+        UserID INTEGER NOT NULL,
+        PRIMARY KEY (ClassID, UserID),
+        FOREIGN KEY (ClassID) REFERENCES Classes(ID) ON DELETE CASCADE,
+        FOREIGN KEY (UserID) REFERENCES Users(ID) ON DELETE CASCADE
       );
 
       CREATE TABLE IF NOT EXISTS Registrations (

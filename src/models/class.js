@@ -36,7 +36,7 @@ class Class {
   }
 
   static create(classData) {
-    const { EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents, CreatedBy, ClubID, ClassGroupID, SessionNumber, MinimumLevel } = classData;
+    const { EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents, CreatedBy, ClubID, ClassGroupID, SessionNumber, MinimumLevel, ClassNotes } = classData;
     
     // Validate no duplicate honor in same timeslot
     // If TeacherID is provided, check for duplicate with same teacher
@@ -74,8 +74,8 @@ class Class {
     }
 
     const stmt = db.prepare(`
-      INSERT INTO Classes (EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents, CreatedBy, ClubID, ClassGroupID, SessionNumber, MinimumLevel)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO Classes (EventID, HonorID, TeacherID, LocationID, TimeslotID, MaxCapacity, TeacherMaxStudents, CreatedBy, ClubID, ClassGroupID, SessionNumber, MinimumLevel, ClassNotes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -90,7 +90,8 @@ class Class {
       ClubID || null,
       ClassGroupID || null,
       SessionNumber || 1,
-      MinimumLevel || null
+      MinimumLevel || null,
+      ClassNotes || null
     );
 
     return this.findById(result.lastInsertRowid);
@@ -272,6 +273,8 @@ class Class {
         classData.TotalSessions = 1;
         classData.IsMultiSession = false;
       }
+
+      classData.SecondaryTeachers = this.getSecondaryTeachers(id);
     }
 
     return classData;
@@ -383,7 +386,7 @@ class Class {
   }
 
   static update(id, updates) {
-    const allowedUpdates = ['TeacherID', 'LocationID', 'MaxCapacity', 'TeacherMaxStudents', 'Active', 'MinimumLevel', 'ClubID'];
+    const allowedUpdates = ['TeacherID', 'LocationID', 'MaxCapacity', 'TeacherMaxStudents', 'Active', 'MinimumLevel', 'ClubID', 'TimeslotID', 'ClassNotes'];
     const setClause = [];
     const values = [];
 
@@ -504,6 +507,31 @@ class Class {
       LEFT JOIN Honors h ON c.HonorID = h.ID
       WHERE c.EventID = ? AND c.TeacherID IS NULL AND c.Active = 1
     `).all(eventId);
+  }
+
+  static getSecondaryTeachers(classId) {
+    return db.prepare(`
+      SELECT u.ID, u.FirstName, u.LastName, u.Role
+      FROM ClassSecondaryTeachers cst
+      INNER JOIN Users u ON cst.UserID = u.ID
+      WHERE cst.ClassID = ?
+      ORDER BY u.LastName, u.FirstName
+    `).all(classId);
+  }
+
+  static setSecondaryTeachers(classId, userIds = []) {
+    const uniqueIds = Array.from(new Set((userIds || []).map(id => parseInt(id, 10)).filter(id => !Number.isNaN(id))));
+    return db.transaction(() => {
+      db.prepare('DELETE FROM ClassSecondaryTeachers WHERE ClassID = ?').run(classId);
+      if (uniqueIds.length === 0) {
+        return [];
+      }
+      const insert = db.prepare('INSERT INTO ClassSecondaryTeachers (ClassID, UserID) VALUES (?, ?)');
+      for (const userId of uniqueIds) {
+        insert.run(classId, userId);
+      }
+      return this.getSecondaryTeachers(classId);
+    })();
   }
 }
 
