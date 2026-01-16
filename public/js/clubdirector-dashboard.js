@@ -1512,11 +1512,16 @@ async function showCreateClassFormClubDirector() {
           <small style="color: var(--text-light);">Optional - Teacher can be assigned later (Only teachers from your club)</small>
         </div>
         <div class="form-group">
-          <label for="classSecondaryTeachers">Secondary Teachers / Helpers</label>
-          <select id="classSecondaryTeachers" name="classSecondaryTeachers" class="form-control" multiple size="5">
-            ${allTeachers.map(t => `<option value="${t.ID}">${t.FirstName} ${t.LastName} (${t.Role})</option>`).join('')}
+          <label for="classSecondaryTeacherSelect">Additional Teachers</label>
+          <select id="classSecondaryTeacherSelect" name="classSecondaryTeacherSelect" class="form-control">
+            <option value="">Select a teacher to add</option>
+            ${allTeachers.map(t => `<option value="${t.ID}" data-name="${escapeHtml(`${t.FirstName} ${t.LastName}`.trim())}" data-role="${escapeHtml(t.Role || '')}" data-club="${escapeHtml(t.ClubName || '')}">${t.FirstName} ${t.LastName} (${t.Role})</option>`).join('')}
           </select>
-          <small style="color: var(--text-light);">Optional - select multiple teachers, staff, or club directors</small>
+          <small style="color: var(--text-light);">Choose a teacher to add to the additional teachers list</small>
+        </div>
+        <div class="form-group">
+          <label>Additional Teachers</label>
+          <div id="classSecondaryTeacherList" style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; min-height: 44px;"></div>
         </div>
         <div class="form-group">
           <label for="classMaxCapacity">Max Capacity *</label>
@@ -1574,6 +1579,12 @@ async function showCreateClassFormClubDirector() {
     </div>
   `;
   document.body.appendChild(modal);
+  initSecondaryTeacherPicker(
+    document.getElementById('createClassForm'),
+    document.getElementById('classSecondaryTeacherSelect'),
+    document.getElementById('classSecondaryTeacherList'),
+    []
+  );
 }
 
 // Import functionality - CSV parsing and validation
@@ -2320,11 +2331,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             </select>
           </div>
           <div class="form-group">
-            <label for="editClassSecondaryTeachers">Secondary Teachers / Helpers</label>
-            <select id="editClassSecondaryTeachers" name="editClassSecondaryTeachers" class="form-control" multiple size="5">
-              ${allSecondaryTeachers.map(t => `<option value="${t.ID}" ${selectedSecondaryIds.has(t.ID) ? 'selected' : ''}>${t.FirstName} ${t.LastName} (${t.Role})</option>`).join('')}
+            <label for="editClassSecondaryTeacherSelect">Additional Teachers</label>
+            <select id="editClassSecondaryTeacherSelect" name="editClassSecondaryTeacherSelect" class="form-control">
+              <option value="">Select a teacher to add</option>
+              ${allSecondaryTeachers.map(t => `<option value="${t.ID}" data-name="${escapeHtml(`${t.FirstName} ${t.LastName}`.trim())}" data-role="${escapeHtml(t.Role || '')}" data-club="${escapeHtml(t.ClubName || '')}">${t.FirstName} ${t.LastName} (${t.Role})</option>`).join('')}
             </select>
-            <small style="color: var(--text-light);">Optional - select multiple teachers, staff, or club directors</small>
+            <small style="color: var(--text-light);">Choose a teacher to add to the additional teachers list</small>
+          </div>
+          <div class="form-group">
+            <label>Additional Teachers</label>
+            <div id="editClassSecondaryTeacherList" style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; min-height: 44px;"></div>
           </div>
           <div class="form-group">
             <label for="editClassLocation">Location</label>
@@ -2375,14 +2391,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
     `;
     document.body.appendChild(modal);
+    initSecondaryTeacherPicker(
+      document.getElementById('editClassForm'),
+      document.getElementById('editClassSecondaryTeacherSelect'),
+      document.getElementById('editClassSecondaryTeacherList'),
+      classDetails.SecondaryTeachers || []
+    );
     
     // Handle form submission
     document.getElementById('editClassForm').onsubmit = async function(e) {
       e.preventDefault();
       const form = e.target;
-      const selectedSecondaryTeachers = Array.from(form.editClassSecondaryTeachers?.selectedOptions || [])
-        .map(option => parseInt(option.value, 10))
-        .filter(id => !Number.isNaN(id));
+      const selectedSecondaryTeachers = getSecondaryTeacherIds(form);
       
       // Club Directors can edit teacher, secondary teachers, max capacity, minimum level, timeslot, and notes
       const classData = {
@@ -2422,9 +2442,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const form = e.target;
     
     const selectedTimeslots = Array.from(form.querySelectorAll('input[name="classTimeslots"]:checked')).map(cb => parseInt(cb.value));
-    const selectedSecondaryTeachers = Array.from(form.classSecondaryTeachers?.selectedOptions || [])
-      .map(option => parseInt(option.value, 10))
-      .filter(id => !Number.isNaN(id));
+    const selectedSecondaryTeachers = getSecondaryTeacherIds(form);
     const isMultiSession = form.isMultiSession?.checked || false;
     
     if (selectedTimeslots.length === 0) {

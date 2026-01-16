@@ -2137,11 +2137,16 @@ async function editClass(classId) {
           </select>
         </div>
         <div class="form-group">
-          <label for="editClassSecondaryTeachers">Secondary Teachers / Helpers</label>
-          <select id="editClassSecondaryTeachers" name="editClassSecondaryTeachers" class="form-control" multiple size="5">
-            ${allSecondaryTeachers.map(t => `<option value="${t.ID}" ${selectedSecondaryIds.has(t.ID) ? 'selected' : ''}>${t.FirstName} ${t.LastName} (${t.Role})</option>`).join('')}
+          <label for="editClassSecondaryTeacherSelect">Additional Teachers</label>
+          <select id="editClassSecondaryTeacherSelect" name="editClassSecondaryTeacherSelect" class="form-control">
+            <option value="">Select a teacher to add</option>
+            ${allSecondaryTeachers.map(t => `<option value="${t.ID}" data-name="${escapeHtml(`${t.FirstName} ${t.LastName}`.trim())}" data-role="${escapeHtml(t.Role || '')}" data-club="${escapeHtml(t.ClubName || '')}">${t.FirstName} ${t.LastName} (${t.Role})</option>`).join('')}
           </select>
-          <small style="color: var(--text-light);">Optional - select multiple teachers, staff, or club directors</small>
+          <small style="color: var(--text-light);">Choose a teacher to add to the additional teachers list</small>
+        </div>
+        <div class="form-group">
+          <label>Additional Teachers</label>
+          <div id="editClassSecondaryTeacherList" style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; min-height: 44px;"></div>
         </div>
         <div class="form-group">
           <label for="editClassLocation">Location</label>
@@ -2191,14 +2196,18 @@ async function editClass(classId) {
     </div>
   `;
   document.body.appendChild(modal);
+  initSecondaryTeacherPicker(
+    document.getElementById('editClassForm'),
+    document.getElementById('editClassSecondaryTeacherSelect'),
+    document.getElementById('editClassSecondaryTeacherList'),
+    classDetails.SecondaryTeachers || []
+  );
 }
 
 async function handleEditClass(e, classId) {
   e.preventDefault();
   const form = e.target;
-  const selectedSecondaryTeachers = Array.from(form.editClassSecondaryTeachers?.selectedOptions || [])
-    .map(option => parseInt(option.value, 10))
-    .filter(id => !Number.isNaN(id));
+  const selectedSecondaryTeachers = getSecondaryTeacherIds(form);
   
   const classData = {
     ClubID: form.editClassClub?.value || null,
@@ -3999,11 +4008,12 @@ async function loadTimeslots(eventId) {
     timeslotStats = new Map();
     classes.forEach(cls => {
       if (!cls.TimeslotID) return;
-      const current = timeslotStats.get(cls.TimeslotID) || { count: 0, capacity: 0 };
+      const current = timeslotStats.get(cls.TimeslotID) || { count: 0, capacity: 0, enrolled: 0 };
       const capacity = cls.ActualMaxCapacity || cls.MaxCapacity || cls.TeacherMaxStudents || 0;
       timeslotStats.set(cls.TimeslotID, {
         count: current.count + 1,
-        capacity: current.capacity + capacity
+        capacity: current.capacity + capacity,
+        enrolled: current.enrolled + (cls.EnrolledCount || 0)
       });
     });
 
@@ -4035,9 +4045,10 @@ function renderTimeslotsList() {
           <th style="width: 15%; text-align: left;">Start Time</th>
           <th style="width: 15%; text-align: left;">End Time</th>
           <th style="width: 15%; text-align: left;">Duration</th>
-          <th style="width: 15%; text-align: left;"># Classes</th>
-          <th style="width: 15%; text-align: left;">Total Capacity</th>
-          <th style="width: 15%; text-align: left;">Actions</th>
+          <th style="width: 13%; text-align: left;"># Classes</th>
+          <th style="width: 13%; text-align: left;">Total Capacity</th>
+          <th style="width: 13%; text-align: left;">Total Enrolled</th>
+          <th style="width: 14%; text-align: left;">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -4049,6 +4060,7 @@ function renderTimeslotsList() {
           <td style="text-align: left;">${calculateDuration(slot.StartTime, slot.EndTime)}</td>
           <td style="text-align: left;">${timeslotStats.get(slot.ID)?.count || 0}</td>
           <td style="text-align: left;">${timeslotStats.get(slot.ID)?.capacity || 0}</td>
+          <td style="text-align: left;">${timeslotStats.get(slot.ID)?.enrolled || 0}</td>
           <td style="text-align: left;">
             <button onclick="editTimeslot(${slot.ID})" class="btn btn-sm btn-secondary">Edit</button>
             <button onclick="deleteTimeslot(${slot.ID})" class="btn btn-sm btn-danger">Delete</button>
@@ -4334,11 +4346,16 @@ async function showCreateClassForm() {
           <small style="color: var(--text-light);">Optional - Teacher can be assigned later</small>
         </div>
         <div class="form-group">
-          <label for="classSecondaryTeachers">Secondary Teachers / Helpers</label>
-          <select id="classSecondaryTeachers" name="classSecondaryTeachers" class="form-control" multiple size="5">
-            ${allSecondaryTeachers.map(t => `<option value="${t.ID}">${t.FirstName} ${t.LastName} (${t.Role})</option>`).join('')}
+          <label for="classSecondaryTeacherSelect">Additional Teachers</label>
+          <select id="classSecondaryTeacherSelect" name="classSecondaryTeacherSelect" class="form-control">
+            <option value="">Select a teacher to add</option>
+            ${allSecondaryTeachers.map(t => `<option value="${t.ID}" data-name="${escapeHtml(`${t.FirstName} ${t.LastName}`.trim())}" data-role="${escapeHtml(t.Role || '')}" data-club="${escapeHtml(t.ClubName || '')}">${t.FirstName} ${t.LastName} (${t.Role})</option>`).join('')}
           </select>
-          <small style="color: var(--text-light);">Optional - select multiple teachers, staff, or club directors</small>
+          <small style="color: var(--text-light);">Choose a teacher to add to the additional teachers list</small>
+        </div>
+        <div class="form-group">
+          <label>Additional Teachers</label>
+          <div id="classSecondaryTeacherList" style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; min-height: 44px;"></div>
         </div>
         <div class="form-group">
           <label for="classLocation">Location *</label>
@@ -4391,6 +4408,12 @@ async function showCreateClassForm() {
     </div>
   `;
   document.body.appendChild(modal);
+  initSecondaryTeacherPicker(
+    document.getElementById('createClassForm'),
+    document.getElementById('classSecondaryTeacherSelect'),
+    document.getElementById('classSecondaryTeacherList'),
+    []
+  );
 }
 
 async function handleCreateClass(e) {
@@ -4404,9 +4427,7 @@ async function handleCreateClass(e) {
   }
   
   const selectedTimeslots = Array.from(form.querySelectorAll('input[name="classTimeslots"]:checked')).map(cb => cb.value);
-  const selectedSecondaryTeachers = Array.from(form.classSecondaryTeachers?.selectedOptions || [])
-    .map(option => parseInt(option.value, 10))
-    .filter(id => !Number.isNaN(id));
+  const selectedSecondaryTeachers = getSecondaryTeacherIds(form);
   
   if (selectedTimeslots.length === 0) {
     showNotification('Please select at least one timeslot (session) for this class', 'error');

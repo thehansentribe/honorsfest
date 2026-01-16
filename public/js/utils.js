@@ -42,6 +42,80 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function initSecondaryTeacherPicker(formEl, selectEl, listEl, initialTeachers = []) {
+  if (!formEl || !selectEl || !listEl) return;
+
+  formEl._secondaryTeachers = new Map();
+
+  const renderList = () => {
+    const teachers = Array.from(formEl._secondaryTeachers.values());
+    if (teachers.length === 0) {
+      listEl.innerHTML = '<div style="color: var(--text-light);">No additional teachers selected</div>';
+      return;
+    }
+
+    listEl.innerHTML = teachers.map(teacher => {
+      const clubLabel = teacher.clubName ? ` — ${escapeHtml(teacher.clubName)}` : '';
+      return `
+        <span class="secondary-teacher-chip" data-id="${teacher.id}" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: #f1f5f9; margin: 4px;">
+          <span>${escapeHtml(teacher.name)}${teacher.role ? ` (${escapeHtml(teacher.role)})` : ''}${clubLabel}</span>
+          <button type="button" class="secondary-teacher-remove" data-id="${teacher.id}" aria-label="Remove teacher" style="border: none; background: transparent; cursor: pointer; font-size: 14px;">×</button>
+        </span>
+      `;
+    }).join('');
+  };
+
+  const addTeacher = (teacher) => {
+    if (!teacher || !teacher.id || formEl._secondaryTeachers.has(teacher.id)) {
+      return;
+    }
+    formEl._secondaryTeachers.set(teacher.id, teacher);
+    renderList();
+  };
+
+  const removeTeacher = (teacherId) => {
+    if (!teacherId) return;
+    formEl._secondaryTeachers.delete(teacherId);
+    renderList();
+  };
+
+  initialTeachers.forEach(t => {
+    addTeacher({
+      id: String(t.ID),
+      name: `${t.FirstName || ''} ${t.LastName || ''}`.trim(),
+      role: t.Role || '',
+      clubName: t.ClubName || ''
+    });
+  });
+
+  selectEl.addEventListener('change', () => {
+    const option = selectEl.selectedOptions && selectEl.selectedOptions[0];
+    if (!option || !option.value) return;
+    addTeacher({
+      id: option.value,
+      name: option.dataset.name || option.textContent.trim(),
+      role: option.dataset.role || '',
+      clubName: option.dataset.club || ''
+    });
+    selectEl.value = '';
+  });
+
+  listEl.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!target) return;
+    if (target.classList.contains('secondary-teacher-remove')) {
+      removeTeacher(target.dataset.id);
+    }
+  });
+
+  renderList();
+}
+
+function getSecondaryTeacherIds(formEl) {
+  if (!formEl || !formEl._secondaryTeachers) return [];
+  return Array.from(formEl._secondaryTeachers.keys()).map(id => parseInt(id, 10)).filter(id => !Number.isNaN(id));
+}
+
 const BRANDING_DEFAULTS = {
   siteName: 'Honors Festival',
   logoData: null
