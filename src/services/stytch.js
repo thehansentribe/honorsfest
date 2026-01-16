@@ -282,10 +282,12 @@ class StytchService {
         email: newEmail.toLowerCase().trim(),
         login_magic_link_url: redirectUrl,
         login_expiration_minutes: 60,
+        signup_magic_link_url: redirectUrl,
+        signup_expiration_minutes: 60,
       };
 
-      // Use magicLinks.email.loginOrCreate with user_id to add email to existing user
-      const response = await client.magicLinks.email.loginOrCreate(params);
+      // Use magicLinks.email.send with user_id to add email to existing user
+      const response = await client.magicLinks.email.send(params);
       
       return {
         emailId: response.email_id,
