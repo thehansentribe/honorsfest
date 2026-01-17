@@ -15,12 +15,21 @@
         <span id="pageTitle" class="page-title">Teacher Dashboard</span>
       </div>
     </div>
-    <div class="user-info" style="flex-wrap: wrap; gap: 0.75rem;">
-      <span id="clubNameDisplay" class="event-info" style="display: none;"></span>
-      <span id="eventName" class="event-info"></span>
-      <span id="userName">Welcome, <strong id="userDisplayName" style="cursor: pointer; text-decoration: underline;" onclick="showEditMyProfile()" title="Click to edit your profile"></strong></span>
-      <span id="checkInNumberDisplay" class="event-info" style="font-weight: bold;"></span>
-      <button onclick="logout()" class="btn btn-outline">Logout</button>
+    <div class="user-info" style="flex-direction: column; align-items: flex-end; gap: 0.75rem; width: 100%; max-width: 640px;">
+      <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; justify-content: flex-end; width: 100%;">
+        <span id="clubNameDisplay" class="event-info" style="display: none;"></span>
+        <span id="eventSelectorContainer" style="display: none;">
+          <select id="eventSelector" class="form-control" style="width: auto; min-width: 200px;" onchange="switchEvent()">
+            <option value="">Select Event...</option>
+          </select>
+        </span>
+        <span id="eventName" class="event-info"></span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; justify-content: flex-end; width: 100%;">
+        <span id="userName">Welcome, <strong id="userDisplayName" style="cursor: pointer; text-decoration: underline;" onclick="showEditMyProfile()" title="Click to edit your profile"></strong></span>
+        <span id="checkInNumberDisplay" class="event-info" style="font-weight: bold;"></span>
+        <button onclick="logout()" class="btn btn-outline">Logout</button>
+      </div>
     </div>
   </div>
 
@@ -29,21 +38,71 @@
   </div>
 
   <div class="container">
-    <div class="card">
-      <div class="card-header">
-        <h2 class="card-title">My Classes</h2>
+    <div id="teacherTabs" class="tabs">
+      <button class="tab active" data-tab="classes" onclick="switchTeacherTab('classes', this)">My Classes</button>
+      <button class="tab" data-tab="registration" onclick="switchTeacherTab('registration', this)">Class Registration</button>
+    </div>
+
+    <div id="teacherClassesTabContent">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">My Classes</h2>
+        </div>
+        <div id="myClasses">
+          <p class="text-center">Loading...</p>
+        </div>
       </div>
-      <div id="myClasses">
-        <p class="text-center">Loading...</p>
+
+      <div class="card" id="rosterCard" style="display: none;">
+        <div class="card-header">
+          <h2 class="card-title">Class Roster</h2>
+        </div>
+        <div id="roster">
+          <p class="text-center">Select a class to view roster</p>
+        </div>
       </div>
     </div>
 
-    <div class="card" id="rosterCard" style="display: none;">
-      <div class="card-header">
-        <h2 class="card-title">Class Roster</h2>
-      </div>
-      <div id="roster">
-        <p class="text-center">Select a class to view roster</p>
+    <div id="teacherRegistrationTabContent" style="display: none;">
+      <div class="dashboard-split">
+        <div>
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Available Classes</h2>
+            </div>
+            <div class="class-filters">
+              <select id="teacherTimeslotFilter" class="form-control">
+                <option value="">All Timeslots</option>
+              </select>
+              <select id="teacherFilter" class="form-control">
+                <option value="">All Teachers</option>
+              </select>
+            </div>
+            <div id="teacherClassesList" class="mt-2">
+              <p class="text-center">Loading classes...</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">My Schedule</h2>
+            </div>
+            <div id="teacherScheduleGrid">
+              <p class="text-center">Loading schedule...</p>
+            </div>
+          </div>
+
+          <div class="card mt-2">
+            <div class="card-header">
+              <h2 class="card-title">My Classes</h2>
+            </div>
+            <div id="teacherMyClasses">
+              <p class="text-center">Loading...</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -51,7 +110,13 @@
   <script src="/js/utils.js"></script>
   <script>
     let currentUserId = null;
-    let myClasses = [];
+    let currentEventId = null;
+    let availableEvents = [];
+    let myTeachingClasses = [];
+    let selectedClass = null;
+    let classRoster = [];
+    let allClasses = [];
+    let myRegistrations = [];
 
     document.addEventListener('DOMContentLoaded', async () => {
       if (!checkAuth()) return;
@@ -75,28 +140,110 @@
         setClubName(null);
       }
 
-      await checkEventStatus();
+      await loadEvents();
       await loadMyClasses();
+      await loadRegistrationData();
     });
 
-    async function checkEventStatus() {
+    function switchTeacherTab(tabName, clickedElement) {
+      document.querySelectorAll('#teacherTabs .tab').forEach(t => t.classList.remove('active'));
+      if (clickedElement) clickedElement.classList.add('active');
+
+      const classesTab = document.getElementById('teacherClassesTabContent');
+      const registrationTab = document.getElementById('teacherRegistrationTabContent');
+
+      if (tabName === 'classes') {
+        if (classesTab) classesTab.style.display = 'block';
+        if (registrationTab) registrationTab.style.display = 'none';
+      } else {
+        if (classesTab) classesTab.style.display = 'none';
+        if (registrationTab) registrationTab.style.display = 'block';
+      }
+    }
+
+    async function loadEvents() {
       try {
-        // Get events where user's club participates
-        const eventsResponse = await fetchWithAuth('/api/events/my');
-        const events = await eventsResponse.json();
-        
-        const banner = document.getElementById('eventStatusBanner');
-        if (events.length === 0) {
-          banner.style.display = 'block';
-          banner.innerHTML = '<strong>⚠ No Events:</strong> Your club is not participating in any active events.';
+        const response = await fetchWithAuth('/api/events/my');
+        availableEvents = await response.json();
+
+        const eventNameEl = document.getElementById('eventName');
+        const eventSelectorContainer = document.getElementById('eventSelectorContainer');
+        const eventSelector = document.getElementById('eventSelector');
+
+        if (availableEvents.length === 0) {
+          if (eventNameEl) eventNameEl.textContent = 'No events available';
+          showNotification('Your club is not participating in any active events.', 'info');
           return;
         }
-        
-        const currentEvent = events.find(e => e.Status === 'Live') || events[0];
-        if (currentEvent && currentEvent.Status !== 'Live') {
-          banner.style.display = 'block';
-          banner.innerHTML = '<strong>⚠ Registration Not Open:</strong> Registration is not currently open for this event.';
-        } else {
+
+        if (availableEvents.length > 1) {
+          if (eventSelectorContainer) eventSelectorContainer.style.display = 'block';
+          eventSelector.innerHTML = '<option value="">Select Event...</option>';
+          availableEvents.forEach(event => {
+            const option = document.createElement('option');
+            option.value = event.ID;
+            option.textContent = `${event.Name} (${event.Status})`;
+            eventSelector.appendChild(option);
+          });
+        } else if (eventSelectorContainer) {
+          eventSelectorContainer.style.display = 'none';
+        }
+
+        const savedEventId = localStorage.getItem('teacherSelectedEventId');
+        let selectedEvent = availableEvents.find(e => e.ID.toString() === savedEventId) ||
+          availableEvents.find(e => e.Status === 'Live') ||
+          availableEvents[0];
+
+        if (selectedEvent) {
+          currentEventId = selectedEvent.ID;
+          if (eventNameEl) eventNameEl.textContent = selectedEvent.Name;
+          if (eventSelector) eventSelector.value = selectedEvent.ID;
+          localStorage.setItem('teacherSelectedEventId', selectedEvent.ID);
+          await checkEventStatus(selectedEvent);
+        }
+      } catch (error) {
+        console.error('Error loading events:', error);
+        showNotification('Error loading events: ' + error.message, 'error');
+      }
+    }
+
+    async function switchEvent() {
+      const eventSelector = document.getElementById('eventSelector');
+      const selectedEventId = parseInt(eventSelector.value);
+      if (!selectedEventId) return;
+
+      const selectedEvent = availableEvents.find(e => e.ID === selectedEventId);
+      if (!selectedEvent) return;
+
+      currentEventId = selectedEventId;
+      const eventNameEl = document.getElementById('eventName');
+      if (eventNameEl) eventNameEl.textContent = selectedEvent.Name;
+      localStorage.setItem('teacherSelectedEventId', selectedEventId);
+
+      await checkEventStatus(selectedEvent);
+      await loadMyClasses();
+      await loadRegistrationData();
+    }
+
+    async function checkEventStatus(event = null) {
+      try {
+        if (!event && currentEventId) {
+          const response = await fetchWithAuth(`/api/events/${currentEventId}`);
+          event = await response.json();
+        }
+
+        if (!event) return;
+
+        const banner = document.getElementById('eventStatusBanner');
+        if (event.Status !== 'Live') {
+          if (banner) {
+            banner.style.display = 'block';
+            banner.className = 'status-banner status-banner-closed';
+            banner.innerHTML = event.Status === 'Closed'
+              ? '<strong>⚠ Registration Not Open:</strong> Registration is closed for this event. You can view classes but cannot register.'
+              : '<strong>⚠ Registration Not Open:</strong> Registration is not yet open for this event. You can view classes but cannot register.';
+          }
+        } else if (banner) {
           banner.style.display = 'none';
         }
       } catch (error) {
@@ -106,43 +253,25 @@
 
     async function loadMyClasses() {
       try {
-        // Get events where user's club participates
-        const eventsResponse = await fetchWithAuth('/api/events/my');
-        const events = await eventsResponse.json();
-        
-        if (events.length === 0) {
-          document.getElementById('myClasses').innerHTML = '<p>Your club is not participating in any active events.</p>';
+        if (!currentEventId) {
+          document.getElementById('myClasses').innerHTML = '<p class="text-center">Please select an event first.</p>';
           return;
         }
 
-        // Get first Live event or first event
-        const activeEvent = events.find(e => e.Status === 'Live') || events[0];
+        const classesResponse = await fetchWithAuth(`/api/classes/${currentEventId}?teacherId=${currentUserId}`);
+        myTeachingClasses = await classesResponse.json();
 
-        if (!activeEvent) {
-          document.getElementById('myClasses').innerHTML = '<p>No active events</p>';
-          return;
-        }
-
-        // Display event name
-        const eventNameEl = document.getElementById('eventName');
-        if (eventNameEl && activeEvent) {
-          eventNameEl.textContent = activeEvent.Name;
-        }
-
-        const classesResponse = await fetchWithAuth(`/api/classes/${activeEvent.ID}?teacherId=${currentUserId}`);
-        myClasses = await classesResponse.json();
-
-        renderClasses();
+        renderTeachingClasses();
       } catch (error) {
         console.error('Error loading classes:', error);
         document.getElementById('myClasses').innerHTML = '<p>Error loading classes</p>';
       }
     }
 
-    function renderClasses() {
+    function renderTeachingClasses() {
       const container = document.getElementById('myClasses');
 
-      if (myClasses.length === 0) {
+      if (myTeachingClasses.length === 0) {
         container.innerHTML = '<p class="text-center">No classes assigned</p>';
         return;
       }
@@ -152,7 +281,7 @@
           <label for="classSelect">Select Class:</label>
           <select id="classSelect" class="form-control" onchange="loadRoster(this.value)">
             <option value="">-- Select a class --</option>
-            ${myClasses.map(c => `<option value="${c.ID}">${c.HonorName} - ${c.TimeslotDate} ${c.TimeslotStartTime}</option>`).join('')}
+            ${myTeachingClasses.map(c => `<option value="${c.ID}">${c.HonorName} - ${c.TimeslotDate} ${c.TimeslotStartTime}</option>`).join('')}
           </select>
         </div>
       `;
@@ -160,10 +289,11 @@
 
     async function loadRoster(classId) {
       if (!classId) return;
+      selectedClass = myTeachingClasses.find(c => c.ID === parseInt(classId));
 
       try {
         const response = await fetchWithAuth(`/api/registrations/class/${classId}/roster`);
-        const roster = await response.json();
+        classRoster = await response.json();
 
         const rosterCard = document.getElementById('rosterCard');
         const rosterContainer = document.getElementById('roster');
@@ -182,7 +312,7 @@
               </tr>
             </thead>
             <tbody>
-              ${roster.map(student => `
+              ${classRoster.map(student => `
                 <tr>
                   <td>${student.FirstName} ${student.LastName}</td>
                   <td>${student.ClubName || 'No Club'}</td>
@@ -201,7 +331,7 @@
           </table>
         `;
         
-        const mobileCards = roster.map(student => {
+        const mobileCards = classRoster.map(student => {
           const attendedChecked = student.Attended ? 'checked' : '';
           const completedChecked = student.Completed ? 'checked' : '';
           
@@ -251,6 +381,467 @@
         showNotification('Error updating attendance', 'error');
       }
     }
+
+    async function loadRegistrationData() {
+      if (!currentEventId) return;
+
+      try {
+        const classesResponse = await fetchWithAuth(`/api/classes/${currentEventId}`);
+        allClasses = await classesResponse.json();
+
+        const regResponse = await fetchWithAuth(`/api/registrations/user/${currentUserId}?eventId=${currentEventId}`);
+        myRegistrations = await regResponse.json();
+
+        await loadRegistrationFilters();
+        renderRegistrationClasses();
+        renderSchedule();
+        renderMyRegistrations();
+      } catch (error) {
+        console.error('Error loading registration data:', error);
+        showNotification('Error loading class registration data', 'error');
+      }
+    }
+
+    async function loadRegistrationFilters() {
+      try {
+        const timeslotsResponse = await fetchWithAuth(`/api/timeslots/event/${currentEventId}`);
+        const timeslots = await timeslotsResponse.json();
+        
+        const timeslotSelect = document.getElementById('teacherTimeslotFilter');
+        const previousTimeslot = timeslotSelect.value;
+        while (timeslotSelect.options.length > 1) {
+          timeslotSelect.remove(1);
+        }
+        
+        timeslots.forEach(ts => {
+          const option = document.createElement('option');
+          option.value = ts.ID;
+          option.textContent = `${ts.Date} - ${convertTo12Hour(ts.StartTime)} to ${convertTo12Hour(ts.EndTime)}`;
+          timeslotSelect.appendChild(option);
+        });
+        if (previousTimeslot && Array.from(timeslotSelect.options).some(opt => opt.value === previousTimeslot)) {
+          timeslotSelect.value = previousTimeslot;
+        } else {
+          timeslotSelect.value = '';
+        }
+        
+        const teachersMap = new Map();
+        allClasses.forEach(c => {
+          if (c.TeacherID && c.TeacherFirstName && c.TeacherLastName) {
+            const key = `${c.TeacherID}`;
+            if (!teachersMap.has(key)) {
+              teachersMap.set(key, {
+                id: c.TeacherID,
+                name: `${c.TeacherFirstName} ${c.TeacherLastName}`
+              });
+            }
+          }
+        });
+        
+        const teacherSelect = document.getElementById('teacherFilter');
+        const previousTeacher = teacherSelect.value;
+        while (teacherSelect.options.length > 1) {
+          teacherSelect.remove(1);
+        }
+        Array.from(teachersMap.values()).sort((a, b) => a.name.localeCompare(b.name)).forEach(teacher => {
+          const option = document.createElement('option');
+          option.value = teacher.id;
+          option.textContent = teacher.name;
+          teacherSelect.appendChild(option);
+        });
+        if (previousTeacher && Array.from(teacherSelect.options).some(opt => opt.value === previousTeacher)) {
+          teacherSelect.value = previousTeacher;
+        } else {
+          teacherSelect.value = '';
+        }
+      } catch (error) {
+        console.error('Error loading filters:', error);
+      }
+    }
+
+    function renderRegistrationClasses() {
+      const container = document.getElementById('teacherClassesList');
+      const timeslotFilter = document.getElementById('teacherTimeslotFilter').value;
+      const teacherFilter = document.getElementById('teacherFilter').value;
+
+      const currentEvent = availableEvents.find(e => e.ID === currentEventId);
+      const isEventLive = currentEvent && currentEvent.Status === 'Live';
+
+      const user = getCurrentUser();
+      const userLevel = user?.investitureLevel || null;
+      const LEVEL_HIERARCHY = ['Friend', 'Companion', 'Explorer', 'Ranger', 'Voyager', 'Guide', 'MasterGuide'];
+      const meetsLevelRequirement = (level, classMinLevel) => {
+        if (!classMinLevel) return true;
+        if (!level || level === 'None') return false;
+        const userIndex = LEVEL_HIERARCHY.indexOf(level);
+        const minIndex = LEVEL_HIERARCHY.indexOf(classMinLevel);
+        if (userIndex === -1 || minIndex === -1) return false;
+        return userIndex >= minIndex;
+      };
+
+      const filtered = allClasses.filter(c => {
+        if (!c.Active) return false;
+        if (!meetsLevelRequirement(userLevel, c.MinimumLevel)) return false;
+        if (timeslotFilter && c.TimeslotID && c.TimeslotID.toString() !== timeslotFilter) return false;
+        if (teacherFilter && c.TeacherID && c.TeacherID.toString() !== teacherFilter) return false;
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<p class="text-center">No classes available</p>';
+        return;
+      }
+
+      const tableData = filtered.map(c => {
+        const location = `${c.LocationName || 'TBA'}`;
+        const teacher = c.TeacherFirstName ? `${c.TeacherFirstName} ${c.TeacherLastName}` : 'TBA';
+
+        const isRegistered = myRegistrations.some(r => r.ClassID === c.ID);
+        const hasEnrolledInTimeslot = myRegistrations.some(r => r.TimeslotID === c.TimeslotID && r.Status === 'Enrolled');
+        const hasWaitlistForThisClass = myRegistrations.some(r => r.ClassID === c.ID && r.Status === 'Waitlisted');
+        const hasWaitlistInTimeslot = myRegistrations.some(r => r.TimeslotID === c.TimeslotID && r.Status === 'Waitlisted');
+
+        const isFull = c.RemainingSpots <= 0;
+        const canRegister = !isRegistered && !hasEnrolledInTimeslot && !isFull;
+        const canWaitlist = !isRegistered && !hasWaitlistInTimeslot && isFull;
+
+        const sessionTime = c.TimeslotDate && c.TimeslotStartTime && c.TimeslotEndTime
+          ? `${c.TimeslotDate}<br><small>${convertTo12Hour(c.TimeslotStartTime)} - ${convertTo12Hour(c.TimeslotEndTime)}</small>`
+          : 'TBA';
+
+        if (isRegistered) return null;
+
+        let actionButtons = '';
+        if (!isEventLive) {
+          actionButtons = '<span style="color: #999;">Registration not open</span>';
+        } else if (canRegister) {
+          actionButtons = `<button onclick="register(${c.ID})" class="btn btn-primary btn-sm">Register</button>`;
+        } else if (hasEnrolledInTimeslot && !canWaitlist && !isFull) {
+          actionButtons = `<button onclick="register(${c.ID})" class="btn btn-sm" style="background-color: #87CEEB; color: #000; border-color: #87CEEB;">Register</button>`;
+        } else if (canWaitlist) {
+          actionButtons = `<button onclick="waitlist(${c.ID})" class="btn btn-warning btn-sm">Waitlist</button>`;
+        } else if (hasWaitlistInTimeslot && !canRegister) {
+          actionButtons = '<span style="color: #999;">Already waitlisted for another class at this time</span>';
+        }
+
+        const displayTeacher = teacher === 'TBA' ? '<span style="color: #999;">TBA</span>' : teacher;
+        const displayLocation = location === 'TBA' ? '<span style="color: #999;">TBA</span>' : location;
+
+        const multiSessionBadge = c.IsMultiSession && c.TotalSessions > 1
+          ? `<span class="badge bg-info" style="font-size: 0.7em; margin-left: 5px;" title="Session ${c.SessionNumber} of ${c.TotalSessions}">Session ${c.SessionNumber}/${c.TotalSessions}</span>`
+          : '';
+
+        return {
+          classId: c.ID,
+          honorId: c.HonorID || '',
+          teacherId: c.TeacherID || '',
+          locationId: c.LocationID || '',
+          timeslotId: c.TimeslotID || '',
+          classGroupId: c.ClassGroupID || '',
+          honorName: c.HonorName || 'Unknown',
+          club: c.ClubName || 'N/A',
+          teacher: displayTeacher,
+          location: displayLocation,
+          sessionTime: sessionTime,
+          remainingSpots: c.RemainingSpots,
+          actionButtons: actionButtons,
+          isMultiSession: c.IsMultiSession,
+          totalSessions: c.TotalSessions,
+          sessionNumber: c.SessionNumber,
+          multiSessionBadge: multiSessionBadge
+        };
+      }).filter(data => data !== null);
+
+      const tableHtml = `
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Honor Name</th>
+              <th>Club</th>
+              <th>Teacher</th>
+              <th>Location</th>
+              <th>Session Time</th>
+              <th>Remaining Spots</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableData.map(c => `
+              <tr data-class-id="${c.classId}" data-honor-id="${c.honorId}" data-teacher-id="${c.teacherId}" data-location-id="${c.locationId}" data-timeslot-id="${c.timeslotId}" data-class-group-id="${c.classGroupId}" style="${c.isMultiSession ? 'background: linear-gradient(to right, #e3f2fd 0%, transparent 100%);' : ''}">
+                <td>${c.honorName}${c.multiSessionBadge}</td>
+                <td>${c.club || '<span style="color: #999;">N/A</span>'}</td>
+                <td>${c.teacher}</td>
+                <td>${c.location}</td>
+                <td>${c.sessionTime}</td>
+                <td>${c.remainingSpots}</td>
+                <td>${c.actionButtons}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+
+      const mobileCards = tableData.map(c => {
+        const sessionTimePlain = c.sessionTime.replace(/<br\s*\/?>/gi, ' ').replace(/<small>/gi, '').replace(/<\/small>/gi, '').replace(/<[^>]*>/g, '').trim();
+        const cardData = {
+          'Honor Name': c.honorName,
+          'Club': c.club,
+          'Teacher': c.teacher.replace(/<[^>]*>/g, ''),
+          'Location': c.location.replace(/<[^>]*>/g, ''),
+          'Session Time': sessionTimePlain,
+          'Remaining Spots': c.remainingSpots
+        };
+        if (c.isMultiSession && c.totalSessions > 1) {
+          cardData['Session'] = `${c.sessionNumber} of ${c.totalSessions}`;
+        }
+        return createMobileCard(cardData, c.honorName, `<div class="card-row-actions">${c.actionButtons}</div>`);
+      }).join('');
+
+      container.innerHTML = wrapResponsiveTable(tableHtml, mobileCards);
+    }
+
+    function renderSchedule() {
+      const container = document.getElementById('teacherScheduleGrid');
+      const enrolled = myRegistrations.filter(r => r.Status === 'Enrolled');
+      
+      if (enrolled.length === 0) {
+        container.innerHTML = '<p class="text-center">No enrolled classes</p>';
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="timeslot-grid">
+          <div class="timeslot-row">
+            <strong>Timeslot</strong>
+            <strong>Class</strong>
+          </div>
+          ${enrolled.map(r => {
+            const multiSessionBadge = r.IsMultiSession && r.TotalSessions > 1
+              ? `<span class="badge bg-info" style="font-size: 0.65em; margin-left: 5px;">Session ${r.SessionNumber}/${r.TotalSessions}</span>`
+              : '';
+            return `
+            <div class="timeslot-row" style="${r.IsMultiSession ? 'background: linear-gradient(to right, #e3f2fd 0%, transparent 100%);' : ''}">
+              <span>${formatDateTime(r.TimeslotDate, r.TimeslotStartTime, r.TimeslotEndTime)}</span>
+              <span>
+                <strong>${r.HonorName}</strong>${multiSessionBadge}<br>
+                <small>${r.TeacherFirstName} ${r.TeacherLastName}</small>
+              </span>
+            </div>
+          `;}).join('')}
+        </div>
+      `;
+    }
+
+    function renderMyRegistrations() {
+      const container = document.getElementById('teacherMyClasses');
+      
+      if (myRegistrations.length === 0) {
+        container.innerHTML = '<p class="text-center">No registered classes</p>';
+        return;
+      }
+
+      const enrolled = myRegistrations.filter(r => r.Status === 'Enrolled');
+      const waitlisted = myRegistrations.filter(r => r.Status === 'Waitlisted');
+
+      container.innerHTML = `
+        <h3>Registered Classes (${enrolled.length})</h3>
+        ${enrolled.map(r => {
+          const multiSessionBadge = r.IsMultiSession && r.TotalSessions > 1
+            ? `<span class="badge bg-info" style="font-size: 0.65em; margin-left: 5px;">Session ${r.SessionNumber}/${r.TotalSessions}</span>`
+            : '';
+          const dropButtonText = r.IsMultiSession && r.TotalSessions > 1 ? 'Drop All Sessions' : 'Drop';
+          return `
+          <div style="padding: 0.5rem; border: 1px solid var(--border); border-radius: 0.25rem; margin-bottom: 0.5rem;${r.IsMultiSession ? ' background: linear-gradient(to right, #e3f2fd 0%, transparent 100%);' : ''}">
+            <strong>${r.HonorName}</strong>${multiSessionBadge}<br>
+            <small>${formatDateTime(r.TimeslotDate, r.TimeslotStartTime, r.TimeslotEndTime)}</small><br>
+            <button onclick="dropClass(${r.ID})" class="btn btn-danger btn-sm mt-1">${dropButtonText}</button>
+          </div>
+        `;}).join('')}
+        
+        ${waitlisted.length > 0 ? `
+          <h3 class="mt-2">Waitlisted Classes (${waitlisted.length})</h3>
+          ${waitlisted.map(r => {
+            const multiSessionBadge = r.IsMultiSession && r.TotalSessions > 1
+              ? `<span class="badge bg-info" style="font-size: 0.65em; margin-left: 5px;">Session ${r.SessionNumber}/${r.TotalSessions}</span>`
+              : '';
+            return `
+            <div style="padding: 0.5rem; border: 1px solid var(--border); border-radius: 0.25rem; margin-bottom: 0.5rem;${r.IsMultiSession ? ' background: linear-gradient(to right, #e3f2fd 0%, transparent 100%);' : ''}">
+              <strong>${r.HonorName}</strong>${multiSessionBadge}<br>
+              <small>Position ${r.WaitlistOrder} - ${formatDateTime(r.TimeslotDate, r.TimeslotStartTime, r.TimeslotEndTime)}</small><br>
+              <button onclick="dropClass(${r.ID})" class="btn btn-danger btn-sm mt-1">Drop Waitlist</button>
+            </div>
+          `;}).join('')}
+        ` : ''}
+      `;
+    }
+
+    async function register(classId) {
+      try {
+        const response = await fetchWithAuth('/api/registrations', {
+          method: 'POST',
+          body: JSON.stringify({ ClassID: classId })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showNotification('Successfully registered!', 'success');
+          await loadRegistrationData();
+        } else if (response.status === 409 && data.conflict) {
+          showConflictModalTeacher(classId, data);
+        } else {
+          showNotification(data.error, 'error');
+        }
+      } catch (error) {
+        showNotification('Error registering', 'error');
+      }
+    }
+
+    function showConflictModalTeacher(newClassId, conflictData) {
+      const modal = document.createElement('div');
+      modal.id = 'conflictModal';
+      modal.className = 'modal';
+      modal.style.display = 'flex';
+
+      const isMultiSession = conflictData.isMultiSession && conflictData.conflicts && conflictData.conflicts.length > 0;
+      const conflicts = isMultiSession ? conflictData.conflicts : [{ 
+        conflictClassName: conflictData.conflictClassName,
+        conflictRegistrationId: conflictData.conflictRegistrationId
+      }];
+
+      const conflictListHtml = conflicts.map(c => {
+        const timeInfo = c.timeslotDate ? ` (${c.timeslotDate})` : '';
+        return `<li style="margin-bottom: 8px;"><strong>${c.conflictClassName}</strong>${timeInfo}</li>`;
+      }).join('');
+
+      const registrationIds = conflicts.map(c => c.conflictRegistrationId).join(',');
+
+      const headerText = isMultiSession ? 'Multi-Session Class Conflict' : 'Timeslot Conflict';
+      const descriptionText = isMultiSession
+        ? `This is a multi-session class (${conflictData.totalSessions} sessions). You are already enrolled in ${conflicts.length} class${conflicts.length > 1 ? 'es' : ''} during the timeslots this class requires:`
+        : 'You are already enrolled in another class during this timeslot.';
+      const actionText = isMultiSession && conflicts.length > 1
+        ? `Would you like to drop these ${conflicts.length} classes and register for the new multi-session class?`
+        : 'Would you like to move to the new class?';
+
+      modal.innerHTML = `
+        <div class="modal-content" style="max-width: 550px;">
+          <div class="modal-header">
+            <h2>${headerText}</h2>
+            <button onclick="closeModal('conflictModal')" class="btn btn-outline">×</button>
+          </div>
+          <div style="padding: 20px;">
+            <p style="margin-bottom: 15px;">${descriptionText}</p>
+            <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+              <strong>Class${conflicts.length > 1 ? 'es' : ''} to be dropped:</strong>
+              <ul style="margin: 10px 0 0 20px; padding: 0;">
+                ${conflictListHtml}
+              </ul>
+            </div>
+            <p style="margin-bottom: 20px;">${actionText}</p>
+            <div style="display: flex; gap: 10px;">
+              <button onclick="resolveConflictTeacher('${newClassId}', '${registrationIds}')" class="btn btn-primary" style="flex: 1;">
+                Yes, ${conflicts.length > 1 ? 'Drop All & Register' : 'Move Me'}
+              </button>
+              <button onclick="closeModal('conflictModal')" class="btn btn-outline" style="flex: 1;">
+                No, Keep Current Class${conflicts.length > 1 ? 'es' : ''}
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    async function resolveConflictTeacher(newClassId, conflictRegistrationIds) {
+      try {
+        const registrationIds = conflictRegistrationIds.split(',').filter(id => id.trim());
+        for (const regId of registrationIds) {
+          const dropResponse = await fetchWithAuth(`/api/registrations/${regId}`, {
+            method: 'DELETE'
+          });
+          if (!dropResponse.ok) {
+            throw new Error(`Failed to drop class (registration ${regId})`);
+          }
+        }
+        
+        const registerResponse = await fetchWithAuth('/api/registrations', {
+          method: 'POST',
+          body: JSON.stringify({ ClassID: newClassId })
+        });
+        
+        if (!registerResponse.ok) {
+          const errorData = await registerResponse.json();
+          throw new Error(errorData.error || 'Failed to register for new class');
+        }
+        
+        closeModal('conflictModal');
+        await loadRegistrationData();
+        
+        const message = registrationIds.length > 1 
+          ? `Successfully dropped ${registrationIds.length} classes and registered for the new multi-session class!`
+          : 'Successfully moved to new class!';
+        showNotification(message, 'success');
+      } catch (error) {
+        showNotification('Error moving classes: ' + error.message, 'error');
+      }
+    }
+
+    async function waitlist(classId) {
+      if (!confirm('Join waitlist for this class?')) return;
+
+      try {
+        const response = await fetchWithAuth('/api/registrations', {
+          method: 'POST',
+          body: JSON.stringify({ ClassID: classId })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showNotification('Added to waitlist!', 'info');
+          await loadRegistrationData();
+        } else {
+          showNotification(data.error, 'error');
+        }
+      } catch (error) {
+        showNotification('Error joining waitlist', 'error');
+      }
+    }
+
+    async function dropClass(registrationId) {
+      if (!confirm('Drop this class?')) return;
+
+      try {
+        const response = await fetchWithAuth(`/api/registrations/${registrationId}`, {
+          method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showNotification('Class dropped', 'info');
+          await loadRegistrationData();
+        } else {
+          showNotification(data.error, 'error');
+        }
+      } catch (error) {
+        showNotification('Error dropping class', 'error');
+      }
+    }
+
+    // Filter change handlers for registration
+    document.getElementById('teacherTimeslotFilter')?.addEventListener('change', renderRegistrationClasses);
+    document.getElementById('teacherFilter')?.addEventListener('change', renderRegistrationClasses);
+
+    window.switchTeacherTab = switchTeacherTab;
+    window.switchEvent = switchEvent;
+    window.loadRoster = loadRoster;
+    window.updateAttendance = updateAttendance;
+    window.register = register;
+    window.waitlist = waitlist;
+    window.dropClass = dropClass;
+    window.resolveConflictTeacher = resolveConflictTeacher;
   </script>
   <footer style="text-align: center; padding: 20px; color: #666; font-size: 0.875rem; border-top: 1px solid #e0e0e0; margin-top: 40px;">
     Build Date: <span id="buildDate">2025-11-03 17:39:43</span>

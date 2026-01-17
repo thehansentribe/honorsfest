@@ -3075,13 +3075,13 @@ Thank you!`;
               `;
             })()}
             <hr style="margin: 20px 0;">
-            <h3 style="margin-bottom: 15px;">Add Student</h3>
+            <h3 style="margin-bottom: 15px;">Add Participant</h3>
             <div class="form-group">
-              <label for="addStudentSelect">Select Student</label>
+              <label for="addStudentSelect">Select Participant</label>
               <select id="addStudentSelect" class="form-control" style="margin-bottom: 10px;">
                 <option value="">Loading...</option>
               </select>
-              <button onclick="handleAddStudentToClass(${classId})" class="btn btn-primary">Add Student</button>
+              <button onclick="handleAddStudentToClass(${classId})" class="btn btn-primary">Add Participant</button>
             </div>
           </div>
         </div>
@@ -3104,9 +3104,10 @@ Thank you!`;
         select.innerHTML = '<option value="">No available students</option>';
         select.disabled = true;
       } else {
-        select.innerHTML += availableStudents.map(s => 
-          `<option value="${s.id}">${s.lastName}, ${s.firstName} (${s.clubName})</option>`
-        ).join('');
+        select.innerHTML += availableStudents.map(s => {
+          const roleLabel = s.role ? ` - ${s.role}` : '';
+          return `<option value="${s.id}">${s.lastName}, ${s.firstName} (${s.clubName})${roleLabel}</option>`;
+        }).join('');
       }
     } catch (error) {
       showNotification('Error loading students: ' + error.message, 'error');

@@ -359,7 +359,10 @@ router.get('/available/:classId', requireRole('Admin', 'AdminViewOnly', 'EventAd
     }
     
     // Get club filter from query parameter (for Club Directors)
-    const clubIdFilter = req.query.clubId ? parseInt(req.query.clubId) : null;
+    // Enforce club scoping for Club Directors
+    const clubIdFilter = req.user.role === 'ClubDirector'
+      ? req.user.clubId
+      : (req.query.clubId ? parseInt(req.query.clubId) : null);
     
     // Build query with optional club filter
     let query = `
@@ -398,7 +401,13 @@ router.get('/available/:classId', requireRole('Admin', 'AdminViewOnly', 'EventAd
         // Only include if student's club is participating in the event
         return Club.isInEvent(s.ClubID, classData.EventID);
       })
-      .map(s => ({ id: s.ID, firstName: s.FirstName, lastName: s.LastName, clubName: s.ClubName || 'No Club' }));
+      .map(s => ({
+        id: s.ID,
+        firstName: s.FirstName,
+        lastName: s.LastName,
+        clubName: s.ClubName || 'No Club',
+        role: s.Role
+      }));
     
     res.json(availableStudents);
   } catch (error) {
